@@ -28,4 +28,4 @@ class Runner extends ScriptRunner {
 }
 
 
-new Runner().run({ logs: true })
+new Runner().run({ logs: false })
