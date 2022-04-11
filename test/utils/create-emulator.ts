@@ -3,14 +3,19 @@ import { emulator, init } from 'flow-js-testing';
 import { config } from '@onflow/config';
 import { deployAll } from './deploy-contracts';
 
-type CreateFlowEmulatorParams = {
+export type CreateFlowEmulatorParams = {
   logs?: boolean;
 };
 
+export async function prepareEmulator(params: CreateFlowEmulatorParams) {
+  await startEmulator(params);
+  await deployAll(withPrefix(await config().get('SERVICE_ADDRESS')));
+  return emulator
+}
+
 export function createFlowEmulator(params: CreateFlowEmulatorParams): void {
   beforeAll(async () => {
-    await startEmulator(params);
-    await deployAll(withPrefix(await config().get('SERVICE_ADDRESS')));
+    await prepareEmulator(params)
   }, 20000);
 
   afterAll(async () => {
