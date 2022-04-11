@@ -1,0 +1,50 @@
+{
+  "emulators": {
+    "default": {
+      "port": 3569,
+      "serviceAccount": "emulator-account"
+    }
+  },
+  "contracts": {
+    "NonFungibleToken": {
+      "source": "./cadence/contracts/melos-nft/NonFungibleToken.cdc",
+      "aliases": {
+        "emulator": "0xf8d6e0586b0a20c7",
+        "testnet": "0x631e88ae7f1d7c20"
+      }
+    },
+    "MetadataViews": {
+      "source": "./cadence/contracts/melos-nft/MetadataViews.cdc",
+      "aliases": {
+        "testnet": "0x631e88ae7f1d7c20"
+      }
+    },
+    "FungibleToken": {
+      "source": "./cadence/contracts/melos-nft/FungibleToken.cdc",
+      "aliases": {
+        "emulator": "0xee82856bf20e2aa6",
+        "testnet": "0x9a0766d93b6608b7"
+      }
+    },
+    "FlowToken": {
+      "source": "./cadence/contracts/melos-nft/FlowToken.cdc",
+      "aliases": {
+        "emulator": "0x0ae53cb6e3f42a79",
+        "testnet": "0x7e60df042a9c0868"
+      }
+    },
+    "MelosNFT": "./cadence/contracts/melos-nft/MelosNFT.cdc"
+  },
+  "networks": {
+    "emulator": "127.0.0.1:3569",
+    "mainnet": "access.mainnet.nodes.onflow.org:9000",
+    "testnet": "access.devnet.nodes.onflow.org:9000"
+  },
+  "accounts": {
+    "emulator-account": {
+      "address": "f8d6e0586b0a20c7",
+      "key": "98e4e163c9494dbfc2dc271f48941ed7113890d5fddc2cfa8a603836a09806b8"
+    }
+  },
+  "deployments": {}
+}
