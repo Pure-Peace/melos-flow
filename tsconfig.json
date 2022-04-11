@@ -9,7 +9,7 @@
     "skipLibCheck": true,
     "importHelpers": true,
     "declaration": true,
-    "strict": true,
+    "strict": false,
     "noImplicitReturns": true,
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
@@ -20,8 +20,11 @@
     "baseUrl": ".",
     "noUnusedLocals": false,
     "noUnusedParameters": false,
+    "allowJs": true
   },
   "include": [
     "./test",
+    "./src",
+    "./scripts"
   ]
 }
