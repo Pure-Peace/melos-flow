@@ -1,8 +1,8 @@
 import { emulator, init } from 'flow-js-testing';
 import { config } from '@onflow/config';
 import { deployAll } from './deploy-contracts';
-import { EMULATOR_PORT } from './config';
-import { withPrefix } from './common';
+import { EMULATOR_PORT } from '../../sdk/config';
+import { withPrefix } from '../../sdk/common';
 
 
 export type CreateFlowEmulatorParams = {

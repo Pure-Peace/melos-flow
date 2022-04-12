@@ -25,6 +25,7 @@
   "include": [
     "./test",
     "./src",
-    "./scripts"
+    "./scripts",
+    "./sdk"
   ]
 }

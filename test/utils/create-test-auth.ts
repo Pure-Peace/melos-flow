@@ -1,6 +1,6 @@
 import type { Fcl } from '@rarible/fcl-types';
-import { TESTNET_ADDRESS, EMULATOR_ADDRESS } from './config';
-import { FlowService } from './flow-service';
+import { TESTNET_ADDRESS, EMULATOR_ADDRESS } from '../../sdk/config';
+import { FlowService } from '../../sdk/flow-service';
 
 export function createTestAuth(
   fcl: Fcl,

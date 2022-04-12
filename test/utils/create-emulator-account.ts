@@ -1,5 +1,5 @@
 import { getAccountAddress, mintFlow } from 'flow-js-testing';
-import { getEmulatorPrivateKey, MINT_AMOUNT } from './config';
+import { getEmulatorPrivateKey, MINT_AMOUNT } from '../../sdk/config';
 
 type EmulatorAccount = {
   address: string;

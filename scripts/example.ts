@@ -1,5 +1,4 @@
-import { getFlowBalance } from "flow-js-testing";
-import { runTransaction, waitForSeal } from "../test/utils/transaction";
+import { runTransaction, waitForSeal } from "../sdk/transaction";
 import { ScriptRunner } from "../test/utils/script-runner";
 
 

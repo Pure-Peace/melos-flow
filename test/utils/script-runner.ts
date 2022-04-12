@@ -3,7 +3,7 @@ import type { Fcl } from "@rarible/fcl-types";
 import { CreateFlowEmulatorParams, prepareEmulator } from "./create-emulator";
 import { createEmulatorAccount } from './create-emulator-account';
 import { createTestAuth } from './create-test-auth';
-import { FlowAuthorizeMinter } from "./flow-service";
+import { FlowAuthorizeMinter } from "../../sdk/flow-service";
 import { Emulator, emulator } from 'flow-js-testing';
 
 

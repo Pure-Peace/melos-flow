@@ -1,4 +1,4 @@
-import flowConfig from '../../flow.json';
+import flowConfig from '../flow.json';
 
 import { toFlowAddress } from './common';
 
