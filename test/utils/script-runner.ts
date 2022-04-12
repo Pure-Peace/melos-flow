@@ -1,12 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import * as fclLib from '@onflow/fcl';
 import type { Fcl } from "@rarible/fcl-types";
-import { config } from '@onflow/config';
-import { CreateFlowEmulatorParams, prepareEmulator, withPrefix } from "./create-emulator";
+import { CreateFlowEmulatorParams, prepareEmulator } from "./create-emulator";
 import { createEmulatorAccount } from './create-emulator-account';
 import { createTestAuth } from './create-test-auth';
-import { deployAll } from './deploy-contracts';
 import { FlowAuthorizeMinter } from "./flow-service";
+import { Emulator, emulator } from 'flow-js-testing';
 
 
 export class BaseScriptRunner {
@@ -17,13 +16,14 @@ export class BaseScriptRunner {
       privateKey: string;
       auth: FlowAuthorizeMinter;
     }
-  } = {}
+  } = {};
+  emulator: Emulator;
 }
 
 
 export class ScriptRunner extends BaseScriptRunner {
-  public async init(initialAccounts?: string[]) {
-    await deployAll(withPrefix(await config().get('SERVICE_ADDRESS')));
+  public async init(params?: CreateFlowEmulatorParams, initialAccounts?: string[]) {
+    this.emulator = await prepareEmulator(params)
     this.fcl = fclLib;
     if (initialAccounts) {
       console.log(`Setting up ${initialAccounts.length} accounts...`)
@@ -46,9 +46,10 @@ export class ScriptRunner extends BaseScriptRunner {
     return account
   }
 
-  public async run(initialAccounts?: string[]) {
+
+  public async run(params?: CreateFlowEmulatorParams, initialAccounts?: string[]) {
     await this.before()
-    await this.init(initialAccounts)
+    await this.init(params, initialAccounts)
     try {
       await this.main()
     } catch (err) {
@@ -58,12 +59,16 @@ export class ScriptRunner extends BaseScriptRunner {
     console.log('[ScriptRunner: DONE]')
   }
 
+  public setLogLevel(logLevel: ('debug' | 'info' | 'warning')[]) {
+    this.emulator.filters = logLevel
+  }
+
   public async before() {
-    throw new Error('Must override this')
+
   }
 
   public async after() {
-    throw new Error('Must override this')
+    await emulator.stop()
   }
 
   public async main(): Promise<any> {

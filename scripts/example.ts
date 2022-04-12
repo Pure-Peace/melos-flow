@@ -1,4 +1,4 @@
-import { emulator, init } from "flow-js-testing";
+import { getFlowBalance } from "flow-js-testing";
 import { ScriptRunner } from "../test/utils/script-runner";
 
 
@@ -13,20 +13,13 @@ transaction {
 
 
 class Runner extends ScriptRunner {
-  async before() {
-    await init('./cadence')
-    await emulator.start(8080, true)
-  }
-
-  async after() {
-    await emulator.stop()
-  }
-
   async main() {
     const { fcl } = this
     const Alice = await this.getAccount('Alice')
     console.log(Alice)
-    emulator.filters = ['debug', 'info', 'warning']
+    this.setLogLevel(['debug', 'info', 'warning'])
+
+    console.log(await getFlowBalance(Alice.address))
 
     const tx = await fcl.send([
       fcl.transaction(CODE),

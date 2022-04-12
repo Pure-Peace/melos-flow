@@ -33,11 +33,11 @@ export function sansPrefix(address: string): string {
   return address.replace(/^0x/, '').replace(/^Fx/, '');
 }
 
-export async function startEmulator(params: CreateFlowEmulatorParams): Promise<void> {
+export async function startEmulator(params: CreateFlowEmulatorParams = { logs: true }): Promise<void> {
   const basePath = './cadence';
   await init(basePath);
   await emulator.start(8080, params.logs);
-  if (params.logLevel.length > 0) {
+  if (params.logLevel?.length > 0) {
     emulator.filters = params.logLevel
   }
 }
