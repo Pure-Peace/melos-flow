@@ -1,4 +1,6 @@
-import { ScriptRunner } from '../test/utils/script-runner';
+/* eslint-disable @typescript-eslint/no-var-requires */
+/* eslint-disable no-undef */
+const { ScriptRunner } = require("../build/test/utils/script-runner")
 
 
 const CODE = `
@@ -28,4 +30,4 @@ class Runner extends ScriptRunner {
 }
 
 
-new Runner().run({ logs: false })
+new Runner().run()

@@ -3,8 +3,10 @@ import { emulator, init } from 'flow-js-testing';
 import { config } from '@onflow/config';
 import { deployAll } from './deploy-contracts';
 
+
 export type CreateFlowEmulatorParams = {
   logs?: boolean;
+  logLevel?: ('debug' | 'info' | 'warning')[]
 };
 
 export async function prepareEmulator(params: CreateFlowEmulatorParams) {
@@ -32,10 +34,10 @@ export function sansPrefix(address: string): string {
 }
 
 export async function startEmulator(params: CreateFlowEmulatorParams): Promise<void> {
-  const basePath = path.resolve(__dirname, '../../cadence');
+  const basePath = './cadence';
   await init(basePath);
-  await emulator.start();
-  if (params.logs) {
-    emulator.setLogging(true);
+  await emulator.start(8080, params.logs);
+  if (params.logLevel.length > 0) {
+    emulator.filters = params.logLevel
   }
 }
