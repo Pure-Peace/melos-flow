@@ -1,7 +1,7 @@
-import path from 'path';
 import { emulator, init } from 'flow-js-testing';
 import { config } from '@onflow/config';
 import { deployAll } from './deploy-contracts';
+import { EMULATOR_PORT } from './config';
 
 
 export type CreateFlowEmulatorParams = {
@@ -36,7 +36,7 @@ export function sansPrefix(address: string): string {
 export async function startEmulator(params: CreateFlowEmulatorParams = { logs: true }): Promise<void> {
   const basePath = './cadence';
   await init(basePath);
-  await emulator.start(8080, params.logs);
+  await emulator.start(EMULATOR_PORT, params.logs);
   if (params.logLevel?.length > 0) {
     emulator.filters = params.logLevel
   }

@@ -1,4 +1,5 @@
 import { getFlowBalance } from "flow-js-testing";
+import { runTransaction, waitForSeal } from "../test/utils/transaction";
 import { ScriptRunner } from "../test/utils/script-runner";
 
 
@@ -19,14 +20,22 @@ class Runner extends ScriptRunner {
     console.log(Alice)
     this.setLogLevel(['debug', 'info', 'warning'])
 
-    const tx = await fcl.send([
+    // Type1
+    /* const tx = await fcl.send([
       fcl.transaction(CODE),
       fcl.payer(Alice.auth),
       fcl.proposer(Alice.auth),
       fcl.authorizations([Alice.auth]),
       fcl.limit(999),
     ]);
-    const result = await fcl.tx(tx).onceSealed();
+    const result = await fcl.tx(tx).onceSealed(); */
+
+    // Type2
+    const tx = await runTransaction(fcl, {
+      cadence: CODE
+    }, Alice.auth)
+    const result = await waitForSeal(fcl, tx)
+
     console.log(result)
   }
 }

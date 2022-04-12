@@ -1,7 +1,8 @@
 import flowConfig from '../../flow.json';
 
 export const TESTNET_ADDRESS = 'https://access-testnet.onflow.org'
-export const EMULATOR_ADDRESS = 'http://127.0.0.1:8080'
+export const EMULATOR_PORT = 8080
+export const EMULATOR_ADDRESS = `http://127.0.0.1:${EMULATOR_PORT}`
 
 export const MINT_AMOUNT = 10000
 
