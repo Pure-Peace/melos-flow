@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import * as fclLib from '@onflow/fcl';
 import type { Fcl } from "@rarible/fcl-types";
 import { CreateFlowEmulatorParams, prepareEmulator } from "./create-emulator";

@@ -6,8 +6,6 @@ type EmulatorAccount = {
   privateKey: string;
 };
 
-
-
 export async function createEmulatorAccount(accountName: string): Promise<EmulatorAccount> {
   const address = await getAccountAddress(accountName);
   await mintFlow(address, `${MINT_AMOUNT}.1`);

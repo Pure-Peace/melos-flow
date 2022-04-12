@@ -2,6 +2,7 @@ import { emulator, init } from 'flow-js-testing';
 import { config } from '@onflow/config';
 import { deployAll } from './deploy-contracts';
 import { EMULATOR_PORT } from './config';
+import { withPrefix } from './common';
 
 
 export type CreateFlowEmulatorParams = {
@@ -25,13 +26,6 @@ export function createFlowEmulator(params: CreateFlowEmulatorParams): void {
   }, 20000);
 }
 
-export function withPrefix(address: string): string {
-  return '0x' + sansPrefix(address);
-}
-
-export function sansPrefix(address: string): string {
-  return address.replace(/^0x/, '').replace(/^Fx/, '');
-}
 
 export async function startEmulator(params: CreateFlowEmulatorParams = { logs: true }): Promise<void> {
   const basePath = './cadence';

@@ -1,5 +1,6 @@
 import type { Fcl } from "@rarible/fcl-types"
 import type { CommonFlowTransaction } from "@rarible/fcl-types"
+import { replaceImportAddresses } from "./code-replacer"
 
 export type AuthWithPrivateKey = undefined | ((account?: any) => Promise<any>)
 
@@ -15,8 +16,10 @@ export type MethodArgs = {
 export const runScript = async (
   fcl: Fcl,
   params: MethodArgs,
+  addressMap?: Record<string, string>,
 ) => {
-  const result = await fcl.send([fcl.script`${params.cadence}`, params.args])
+  const cadence = replaceImportAddresses(params.cadence, addressMap)
+  const result = await fcl.send([fcl.script`${cadence}`, params.args])
   return await fcl.decode(result)
 }
 
@@ -24,8 +27,10 @@ export const runTransaction = async (
   fcl: Fcl,
   params: MethodArgs,
   signature: AuthWithPrivateKey,
+  addressMap?: Record<string, string>,
   gasLimit = 999,
 ): Promise<string> => {
+  const code = replaceImportAddresses(params.cadence, addressMap)
   const ix = [fcl.limit(gasLimit)]
   ix.push(
     fcl.payer(signature || fcl.authz),
@@ -36,7 +41,7 @@ export const runTransaction = async (
   if (params.args) {
     ix.push(params.args)
   }
-  ix.push(fcl.transaction(params.cadence))
+  ix.push(fcl.transaction(code))
   const tx = await fcl.send(ix)
   return tx.transactionId
 }
