@@ -11,25 +11,44 @@ import { FlowAuthorizeMinter } from "./flow-service";
 
 export class BaseScriptRunner {
   fcl: Fcl;
-  address: string;
-  privateKey: string;
-  auth: FlowAuthorizeMinter;
+  accounts: {
+    [key: string]: {
+      address: string;
+      privateKey: string;
+      auth: FlowAuthorizeMinter;
+    }
+  } = {}
 }
 
 
 export class ScriptRunner extends BaseScriptRunner {
-  public async init() {
+  public async init(initialAccounts?: string[]) {
     await deployAll(withPrefix(await config().get('SERVICE_ADDRESS')));
     this.fcl = fclLib;
-    const { address, privateKey } = await createEmulatorAccount('TestAccount');
-    this.address = address
-    this.privateKey = privateKey
-    this.auth = await createTestAuth(this.fcl, 'emulator', address, privateKey);
+    if (initialAccounts) {
+      console.log(`Setting up ${initialAccounts.length} accounts...`)
+      for (const acc of initialAccounts) {
+        await this.getAccount(acc)
+      }
+    }
   }
 
-  public async run() {
+  public async getAccount(accountName: string) {
+    if (this.accounts[accountName]) {
+      return this.accounts[accountName]
+    }
+
+    console.log(`Add new account ${accountName}...`)
+    const { address, privateKey } = await createEmulatorAccount(accountName);
+    const auth = await createTestAuth(this.fcl, 'emulator', address, privateKey);
+    const account = { address, privateKey, auth }
+    this.accounts[accountName] = account
+    return account
+  }
+
+  public async run(initialAccounts?: string[]) {
     await this.before()
-    await this.init()
+    await this.init(initialAccounts)
     try {
       await this.main()
     } catch (err) {
