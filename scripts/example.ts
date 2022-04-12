@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
-/* eslint-disable no-undef */
-const { ScriptRunner } = require("../build/test/utils/script-runner")
+import { emulator, init } from "flow-js-testing";
+import { ScriptRunner } from "../test/utils/script-runner";
 
 
 const CODE = `
@@ -14,9 +13,18 @@ transaction {
 
 
 class Runner extends ScriptRunner {
+  async before() {
+    await init('./cadence')
+    emulator.filters = ['debug', 'info', 'warning']
+    await emulator.start(8080, true)
+  }
+
+  async after() {
+    await emulator.stop()
+  }
+
   async main() {
     const { fcl, auth } = this
-
     const tx = await fcl.send([
       fcl.transaction(CODE),
       fcl.payer(auth),
