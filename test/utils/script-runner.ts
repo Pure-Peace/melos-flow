@@ -46,6 +46,20 @@ export class ScriptRunner extends BaseScriptRunner {
     return account
   }
 
+  public async getAccounts(accountNames: string[]): Promise<{
+    [key: string]: {
+      address: string;
+      privateKey: string;
+      auth: FlowAuthorizeMinter;
+    }
+  }> {
+    const accounts = {}
+    for (const acc of accountNames) {
+      accounts[acc] = await this.getAccount(acc)
+    }
+    return accounts
+  }
+
 
   public async run(params?: CreateFlowEmulatorParams, initialAccounts?: string[]) {
     await this.before()

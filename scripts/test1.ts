@@ -1,4 +1,4 @@
-import { getFlowBalance } from "flow-js-testing";
+import { getFlowBalance, sendTransaction } from "flow-js-testing";
 import { ScriptRunner } from "../test/utils/script-runner";
 
 
@@ -14,19 +14,11 @@ transaction {
 
 class Runner extends ScriptRunner {
   async main() {
-    const { fcl } = this
-    const Alice = await this.getAccount('Alice')
+    const { Alice, Bob } = await this.getAccounts(['Alice', 'Bob'])
     console.log(Alice)
     this.setLogLevel(['debug', 'info', 'warning'])
 
-    const tx = await fcl.send([
-      fcl.transaction(CODE),
-      fcl.payer(Alice.auth),
-      fcl.proposer(Alice.auth),
-      fcl.authorizations([Alice.auth]),
-      fcl.limit(999),
-    ]);
-    const result = await fcl.tx(tx).onceSealed();
+    const [result] = await sendTransaction({ name: 'log-signers', signers: [Alice.address, Bob.address], args: ['hihihi'] })
     console.log(result)
   }
 }
