@@ -1,16 +1,5 @@
-import { getFlowBalance, sendTransaction } from "flow-js-testing";
+import { sendTransaction } from "flow-js-testing";
 import { ScriptRunner } from "../test/utils/script-runner";
-
-
-const CODE = `
-import FungibleToken from 0xee82856bf20e2aa6
-
-transaction {
-  prepare(account: AuthAccount) {
-    log(account)
-  }
-}`;
-
 
 class Runner extends ScriptRunner {
   async main() {
