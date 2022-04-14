@@ -1,60 +1,31 @@
-// This is an example implementation of a Flow Non-Fungible Token
-// It is not part of the official standard but it assumed to be
-// very similar to how many NFTs would implement the core functionality.
-
 import NonFungibleToken from "./NonFungibleToken.cdc"
-import MetadataViews from "./MetadataViews.cdc"
 
 pub contract MelosNFT: NonFungibleToken {
 
     pub var totalSupply: UInt64
+    pub var baseMetadataURI: String
 
     pub event ContractInitialized()
     pub event Withdraw(id: UInt64, from: Address?)
     pub event Deposit(id: UInt64, to: Address?)
 
+    pub event MetadataBaseURIChanged(baseMetadataURI: String)
+
     pub let CollectionStoragePath: StoragePath
     pub let CollectionPublicPath: PublicPath
-    pub let MinterStoragePath: StoragePath
+    pub let AdminStoragePath: StoragePath
 
-    pub resource NFT: NonFungibleToken.INFT, MetadataViews.Resolver {
+    pub resource NFT: NonFungibleToken.INFT {
         pub let id: UInt64
 
-        pub let name: String
-        pub let description: String
-        pub let thumbnail: String
-
-        init(
-            id: UInt64,
-            name: String,
-            description: String,
-            thumbnail: String,
-        ) {
+        init(id: UInt64) {
             self.id = id
-            self.name = name
-            self.description = description
-            self.thumbnail = thumbnail
-        }
-    
-        pub fun getViews(): [Type] {
-            return [
-                Type<MetadataViews.Display>()
-            ]
         }
 
-        pub fun resolveView(_ view: Type): AnyStruct? {
-            switch view {
-                case Type<MetadataViews.Display>():
-                    return MetadataViews.Display(
-                        name: self.name,
-                        description: self.description,
-                        thumbnail: MetadataViews.HTTPFile(
-                            url: self.thumbnail
-                        )
-                    )
-            }
-
-            return nil
+        // getNFTMetadata
+        // - returns the MetadataURI of an NFT
+        pub fun getNFTMetadata(): String {
+          return MelosNFT.baseMetadataURI.concat(self.id.toString())
         }
     }
 
@@ -70,7 +41,7 @@ pub contract MelosNFT: NonFungibleToken {
         }
     }
 
-    pub resource Collection: MelosNFTCollectionPublic, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection {
+    pub resource Collection: MelosNFTCollectionPublic, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic {
         // dictionary of NFT conforming tokens
         // NFT is a resource type with an `UInt64` ID field
         pub var ownedNFTs: @{UInt64: NonFungibleToken.NFT}
@@ -124,12 +95,6 @@ pub contract MelosNFT: NonFungibleToken {
             return nil
         }
 
-        pub fun borrowViewResolver(id: UInt64): &AnyResource{MetadataViews.Resolver} {
-            let nft = &self.ownedNFTs[id] as auth &NonFungibleToken.NFT
-            let MelosNFT = nft as! &MelosNFT.NFT
-            return MelosNFT as &AnyResource{MetadataViews.Resolver}
-        }
-
         destroy() {
             destroy self.ownedNFTs
         }
@@ -140,43 +105,40 @@ pub contract MelosNFT: NonFungibleToken {
         return <- create Collection()
     }
 
-    // Resource that an admin or something similar would own to be
-    // able to mint new NFTs
-    //
-    pub resource NFTMinter {
+    // Administrative resource that only the contract deployer has access to
+    // - to mint new NFTs
+    // - set baseMetadataURI
+    pub resource Admin {
 
         // mintNFT mints a new NFT with a new ID
         // and deposit it in the recipients collection using their collection reference
-        pub fun mintNFT(
-            recipient: &{NonFungibleToken.CollectionPublic},
-            name: String,
-            description: String,
-            thumbnail: String,
-        ) {
+        pub fun mintNFT(recipient: &{NonFungibleToken.CollectionPublic}) {
 
             // create a new NFT
-            var newNFT <- create NFT(
-                id: MelosNFT.totalSupply,
-                name: name,
-                description: description,
-                thumbnail: thumbnail,
-            )
+            var newNFT <- create NFT(id: MelosNFT.totalSupply)
 
             // deposit it in the recipient's account using their reference
             recipient.deposit(token: <-newNFT)
 
             MelosNFT.totalSupply = MelosNFT.totalSupply + UInt64(1)
         }
+
+        pub fun setBaseMetadataURI(baseMetadataURI: String) {
+            MelosNFT.baseMetadataURI = baseMetadataURI
+            emit MetadataBaseURIChanged(baseMetadataURI: baseMetadataURI)
+        }
     }
 
-    init() {
+    init(baseMetadataURI: String) {
         // Initialize the total supply
         self.totalSupply = 0
 
+        self.baseMetadataURI = baseMetadataURI
+
         // Set the named paths
-        self.CollectionStoragePath = /storage/MelosNFTCollection
-        self.CollectionPublicPath = /public/MelosNFTCollection
-        self.MinterStoragePath = /storage/MelosNFTMinter
+        self.CollectionStoragePath = /storage/melosNFTCollection
+        self.CollectionPublicPath = /public/melosNFTCollection
+        self.AdminStoragePath = /storage/melosNFTAdmin
 
         // Create a Collection resource and save it to storage
         let collection <- create Collection()
@@ -188,9 +150,9 @@ pub contract MelosNFT: NonFungibleToken {
             target: self.CollectionStoragePath
         )
 
-        // Create a Minter resource and save it to storage
-        let minter <- create NFTMinter()
-        self.account.save(<-minter, to: self.MinterStoragePath)
+        // Create a Admin resource and save it to storage
+        let admin <- create Admin()
+        self.account.save(<-admin, to: self.AdminStoragePath)
 
         emit ContractInitialized()
     }
