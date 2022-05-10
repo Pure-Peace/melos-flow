@@ -14,7 +14,7 @@ transaction(recipient: Address, name: String, description: String, thumbnail: St
     prepare(signer: AuthAccount) {
 
         // borrow a reference to the Admin resource in storage
-        self.admin = signer.borrow<&MelosNFT.Admin>(from: MelosNFT.MinterStoragePath)
+        self.admin = signer.borrow<&MelosNFT.Admin>(from: MelosNFT.AdminStoragePath)
             ?? panic("Could not borrow a reference to the NFT minter")
     }
 

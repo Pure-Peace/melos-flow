@@ -31,7 +31,7 @@ export async function startEmulator(params: CreateFlowEmulatorParams = { logs: t
   const basePath = './cadence';
   await init(basePath);
   await emulator.start(EMULATOR_PORT, params.logs);
-  if (params.logLevel?.length > 0) {
+  if (params.logLevel && params.logLevel?.length > 0) {
     emulator.filters = params.logLevel
   }
 }
