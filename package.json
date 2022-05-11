@@ -11,7 +11,7 @@
   "scripts": {
     "build": "tsc --project tsconfig-build.json",
     "clean": "rimraf ./build",
-    "test": "jest --passWithNoTests --maxWorkers=1 --testTimeout=30000",
+    "test": "jest --runInBand",
     "verify": "tsc --noEmit",
     "do": "node ./_scripts"
   },

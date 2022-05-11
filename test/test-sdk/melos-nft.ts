@@ -1,4 +1,5 @@
 import { mintFlow, getAccountAddress, executeScript, sendTransaction, deployContractByName } from 'flow-js-testing';
+import { safeDeployByName } from '../utils/deploy-contracts';
 
 export const melosAdminAddress = async () => {
   return await getAccountAddress('MelosAdmin');
@@ -9,12 +10,12 @@ export const melosAdminAddress = async () => {
  * @throws Will throw an error if transaction is reverted.
  * @returns {Promise<[{*} txResult, {error} error]>}
  * */
-export const deployMelos = async (): Promise<any> => {
+export const deployMelos = async (baseMetadataURI: string): Promise<any> => {
   const melosAdmin = await melosAdminAddress();
   await mintFlow(melosAdmin, '10.0');
 
-  await deployContractByName({ to: melosAdmin, name: 'NonFungibleToken' });
-  return deployContractByName({ to: melosAdmin, name: 'MelosNFT' });
+  await safeDeployByName({ to: melosAdmin, name: 'NonFungibleToken' })
+  return deployContractByName({ to: melosAdmin, name: 'MelosNFT', args: [1231312] });
 };
 
 /**
