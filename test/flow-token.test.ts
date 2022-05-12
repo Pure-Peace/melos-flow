@@ -1,33 +1,19 @@
-import path from "path";
-import {
-  emulator,
-  init,
-  getAccountAddress,
-  deployContractByName,
-  sendTransaction,
-  getContractAddress,
-  shallPass,
-  getFlowBalance,
-  executeScript,
-} from "flow-js-testing";
-import * as fclLib from "@onflow/fcl"
-import { createFlowEmulator } from "./utils/create-emulator";
-import { Fcl } from "@rarible/fcl-types";
-
+import {getAccountAddress, sendTransaction, shallPass, getFlowBalance} from 'flow-js-testing';
+import {createFlowEmulator} from './utils/helpers';
 
 // Increase timeout if your tests failing due to timeout
 jest.setTimeout(10000);
 
-describe("FlowToken", () => {
-  createFlowEmulator({ logs: false })
-  const fcl: Fcl = fclLib
-  it("FlowTokenTransfer", async () => {
-    const to = await getAccountAddress("recipient");
+describe('FlowToken', () => {
+  createFlowEmulator({logs: false});
+
+  it('FlowTokenTransfer', async () => {
+    const to = await getAccountAddress('recipient');
     const before = await getFlowBalance(to);
-    const amount = 88;
+    const amount = 100;
     await shallPass(
       await sendTransaction({
-        name: "FlowTokenTransfer",
+        name: 'flow_token_transfer',
         args: [to, amount],
       })
     );
