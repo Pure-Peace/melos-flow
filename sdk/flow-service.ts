@@ -1,12 +1,17 @@
-import { ec as EC } from 'elliptic';
-import { SHA3 } from 'sha3';
-import type { Fcl } from '@rarible/fcl-types';
+import {ec as EC} from 'elliptic';
+import {SHA3} from 'sha3';
+import type {Fcl} from '@rarible/fcl-types';
 
 const ec = new EC('p256');
 
-export type FlowSigningFunctionResponse = { addr: string; keyId: number; signature: string };
-export type FlowSigningFunction = (signable: { message: string }) => FlowSigningFunctionResponse;
-export type FlowAuthorizeMinterResponce = { tempId: string; addr: string; keyId: number; signingFunction: FlowSigningFunction };
+export type FlowSigningFunctionResponse = {addr: string; keyId: number; signature: string};
+export type FlowSigningFunction = (signable: {message: string}) => FlowSigningFunctionResponse;
+export type FlowAuthorizeMinterResponce = {
+  tempId: string;
+  addr: string;
+  keyId: number;
+  signingFunction: FlowSigningFunction;
+};
 export type FlowAuthorizeMinter = (account: any) => Promise<FlowAuthorizeMinterResponce>;
 
 class FlowService {
@@ -15,25 +20,31 @@ class FlowService {
     private readonly minterFlowAddress: string,
     private readonly minterPrivateKeyHex: string,
     private readonly minterAccountIndex: string | number
-  ) { }
+  ) {}
 
   authorizeMinter = (): FlowAuthorizeMinter => {
     return async (account = {}) => {
-      const user = await this.getAccount(this.minterFlowAddress);
-      const key = user.keys[+this.minterAccountIndex];
+      const latestUser = async () => {
+        const user = await this.getAccount(this.minterFlowAddress);
+        return {
+          user,
+          keyIndex: user.keys[+this.minterAccountIndex].index,
+        };
+      };
+      const {user, keyIndex} = await latestUser();
 
       const sign = this.signWithKey;
       const pk = this.minterPrivateKeyHex;
 
       return {
         ...account,
-        tempId: `${user.address}-${key.index}`,
+        tempId: `${user.address}-${keyIndex}`,
         addr: this.fcl.sansPrefix(user.address),
-        keyId: +key.index,
-        signingFunction: (signable) => {
+        keyId: +keyIndex,
+        signingFunction: async (signable) => {
           return {
             addr: this.fcl.withPrefix(user.address),
-            keyId: +key.index,
+            keyId: (await latestUser()).keyIndex,
             signature: sign(pk, signable.message),
           };
         },
@@ -49,7 +60,7 @@ class FlowService {
     }[];
     address: string;
   }> => {
-    const { account } = await this.fcl.send([this.fcl.getAccount(addr)]);
+    const {account} = await this.fcl.send([this.fcl.getAccount(addr)]);
     return account;
   };
 
@@ -69,4 +80,4 @@ class FlowService {
   };
 }
 
-export { FlowService };
+export {FlowService};

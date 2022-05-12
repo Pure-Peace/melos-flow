@@ -1,5 +1,54 @@
 declare module '@onflow/fcl';
 declare module '@onflow/config';
+declare module 'flow-cadut' {
+  type TxResult = {
+    txId: {
+      tag: string;
+      transaction?: any;
+      transactionStatus?: any;
+      transactionId: string;
+      encodedData?: any;
+      events?: any;
+      account?: any;
+      block?: any;
+      blockHeader?: any;
+      latestBlock?: any;
+      collection?: any;
+    };
+    status: number;
+    statusString: string;
+    statusCode: number;
+    errorMessage: string;
+    events: any[];
+  };
+
+  async function sendTransaction(
+    props: {
+      code?: string;
+      cadence?: string;
+      args?: any[];
+      addressMap?: Record<string, string>;
+      limit?: number;
+      processed?: boolean;
+      proposer?: FlowAuthorizeMinter;
+      payer?: FlowAuthorizeMinter;
+      signers?: FlowAuthorizeMinter;
+      wait?: string;
+    } = {wait: 'seal'}
+  ): Promise<[TxResult | null, any]>;
+
+  async function executeScript(
+    props: {
+      code?: string;
+      cadence?: string;
+      args?: any[];
+      addressMap?: Record<string, string>;
+      limit?: number;
+      processed?: boolean;
+      raw?: boolean;
+    } = {raw: false}
+  ): Promise<[any, any]>;
+}
 declare module 'flow-js-testing' {
   /**
    * Inits framework variables, storing private key of service account and base path
@@ -33,7 +82,7 @@ declare module 'flow-js-testing' {
    * @param {boolean} [byAddress=false] - flag to indicate if address map is address to address type.
    * @returns {string}
    */
-  async function getTemplate(file, addressMap: { string: string } = {}, byAddress: boolean = false): string;
+  async function getTemplate(file, addressMap: {string: string} = {}, byAddress: boolean = false): string;
 
   /**
    * Returns contract template using name of the file in "contracts" folder containing the code.
@@ -41,7 +90,7 @@ declare module 'flow-js-testing' {
    * @param {{string:string}} [addressMap={}] - name/address map to use as lookup table for addresses in import statements.
    * @returns {Promise<string>}
    */
-  async function getContractCode({ name, addressMap }): Promise<string>;
+  async function getContractCode({name, addressMap}): Promise<string>;
 
   /**
    * Returns transaction template using name of the file in "transactions" folder containing the code.
@@ -49,7 +98,7 @@ declare module 'flow-js-testing' {
    * @param {{string:string}} [addressMap={}] - name/address map to use as lookup table for addresses in import statements.
    * @returns {Promise<string>}
    */
-  async function getTransactionCode({ name, addressMap }): Promise<string>;
+  async function getTransactionCode({name, addressMap}): Promise<string>;
 
   /**
    * Returns script template using name of the file in "scripts" folder containing the code.
@@ -57,7 +106,7 @@ declare module 'flow-js-testing' {
    * @param {{string:string}} [addressMap={}] - name/address map to use as lookup table for addresses in import statements.
    * @returns {Promise<string>}
    */
-  async function getScriptCode({ name, addressMap }): Promise<string>;
+  async function getScriptCode({name, addressMap}): Promise<string>;
 
   /**
    * Submits transaction to emulator network and waits before it will be sealed.
@@ -156,14 +205,14 @@ declare module 'flow-js-testing' {
    * @param byName - lag to indicate whether we shall use names of the contracts.
    * @returns {*}
    */
-  function replaceImportAddresses(code: string, addressMap: { string: string; }, byName = true): any;
+  function replaceImportAddresses(code: string, addressMap: {string: string}, byName = true): any;
 
   /**
    * Resolves import addresses defined in code template
    * @param {string} code - Cadence template code.
    * @returns {{string:string}} - name/address map
    */
-  function resolveImports(code: string): { string: string; };
+  function resolveImports(code: string): {string: string};
 
   /**
    * Return Promise from passed interaction
@@ -220,11 +269,11 @@ declare module 'flow-js-testing' {
      */
     log(message: any, type: 'log' | 'error' = 'log');
 
-    extractKeyValue(str): { key: string; value: string };
+    extractKeyValue(str): {key: string; value: string};
 
     fixJSON(msg): string;
 
-    parseDataBuffer(data): { msg: string; level: string };
+    parseDataBuffer(data): {msg: string; level: string};
 
     /**
      * Start emulator.
