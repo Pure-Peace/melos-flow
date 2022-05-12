@@ -6,7 +6,7 @@ import MelosNFT from "../../contracts/MelosNFT.cdc"
 // It must be run with the account that has the Admin resource
 // stored at path /storage/melosNFTAdmin.
 
-transaction(recipient: Address, name: String, description: String, thumbnail: String) {
+transaction(recipient: Address) {
 
     // local variable for storing the admin reference
     let admin: &MelosNFT.Admin
@@ -15,7 +15,7 @@ transaction(recipient: Address, name: String, description: String, thumbnail: St
 
         // borrow a reference to the Admin resource in storage
         self.admin = signer.borrow<&MelosNFT.Admin>(from: MelosNFT.AdminStoragePath)
-            ?? panic("Could not borrow a reference to the NFT minter")
+            ?? panic("Could not borrow a reference to the NFT admin")
     }
 
     execute {
