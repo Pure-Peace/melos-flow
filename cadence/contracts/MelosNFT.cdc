@@ -9,6 +9,9 @@ pub contract MelosNFT: NonFungibleToken {
     pub event Withdraw(id: UInt64, from: Address?)
     pub event Deposit(id: UInt64, to: Address?)
 
+    pub event Mint(id: UInt64, recipient: Address)
+    pub event Destroy(id: UInt64)
+
     pub event MetadataBaseURIChanged(baseMetadataURI: String)
 
     pub let CollectionStoragePath: StoragePath
@@ -22,10 +25,12 @@ pub contract MelosNFT: NonFungibleToken {
             self.id = id
         }
 
-        // getNFTMetadata
-        // - returns the MetadataURI of an NFT
-        pub fun getNFTMetadata(): String {
+        pub fun getMetadata(): String {
           return MelosNFT.baseMetadataURI.concat(self.id.toString())
+        }
+
+        destroy() {
+            emit Destroy(id: self.id)
         }
     }
 
@@ -95,6 +100,11 @@ pub contract MelosNFT: NonFungibleToken {
             return nil
         }
 
+        pub fun getMetadata(id: UInt64): String {
+            let ref = &self.ownedNFTs[id] as auth &NonFungibleToken.NFT
+            return (ref as! &MelosNFT.NFT).getMetadata()
+        }
+
         destroy() {
             destroy self.ownedNFTs
         }
@@ -110,17 +120,18 @@ pub contract MelosNFT: NonFungibleToken {
     // - set baseMetadataURI
     pub resource Admin {
 
-        // mintNFT mints a new NFT with a new ID
+        // Mints a new NFT
         // and deposit it in the recipients collection using their collection reference
-        pub fun mintNFT(recipient: &{NonFungibleToken.CollectionPublic}) {
-
+        pub fun mintTo(recipient: Capability<&{NonFungibleToken.CollectionPublic}>): &NonFungibleToken.NFT {
             // create a new NFT
-            var newNFT <- create NFT(id: MelosNFT.totalSupply)
-
-            // deposit it in the recipient's account using their reference
-            recipient.deposit(token: <-newNFT)
-
-            MelosNFT.totalSupply = MelosNFT.totalSupply + UInt64(1)
+            let token <- create NFT(id: MelosNFT.totalSupply)
+            MelosNFT.totalSupply = MelosNFT.totalSupply + 1
+            let tokenRef = &token as &NonFungibleToken.NFT
+            emit Mint(id: token.id, recipient: recipient.address)
+            
+            let receiver = recipient.borrow() ?? panic("Could not get receiver reference to the NFT Collection") 
+            receiver.deposit(token: <-token)
+            return tokenRef
         }
 
         pub fun setBaseMetadataURI(baseMetadataURI: String) {
@@ -128,6 +139,7 @@ pub contract MelosNFT: NonFungibleToken {
             emit MetadataBaseURIChanged(baseMetadataURI: baseMetadataURI)
         }
     }
+
 
     init(baseMetadataURI: String) {
         // Initialize the total supply
