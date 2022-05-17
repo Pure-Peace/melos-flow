@@ -9,8 +9,7 @@ pub contract MelosNFT: NonFungibleToken {
     pub event Withdraw(id: UInt64, from: Address?)
     pub event Deposit(id: UInt64, to: Address?)
 
-    pub event Mint(id: UInt64, recipient: Address)
-    pub event Destroy(id: UInt64)
+    pub event Minted(id: UInt64, recipient: Address)
 
     pub event MetadataBaseURIChanged(baseMetadataURI: String)
 
@@ -29,9 +28,6 @@ pub contract MelosNFT: NonFungibleToken {
           return MelosNFT.baseMetadataURI.concat(self.id.toString())
         }
 
-        destroy() {
-            emit Destroy(id: self.id)
-        }
     }
 
     pub resource interface MelosNFTCollectionPublic {
@@ -127,7 +123,7 @@ pub contract MelosNFT: NonFungibleToken {
             let token <- create NFT(id: MelosNFT.totalSupply)
             MelosNFT.totalSupply = MelosNFT.totalSupply + 1
             let tokenRef = &token as &NonFungibleToken.NFT
-            emit Mint(id: token.id, recipient: recipient.address)
+            emit Minted(id: token.id, recipient: recipient.address)
             
             let receiver = recipient.borrow() ?? panic("Could not get receiver reference to the NFT Collection") 
             receiver.deposit(token: <-token)
