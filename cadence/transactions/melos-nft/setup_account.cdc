@@ -1,4 +1,4 @@
-import NonFungibleToken from "../../contracts/NonFungibleToken.cdc"
+import NonFungibleToken from "../../contracts/core/NonFungibleToken.cdc"
 import MelosNFT from "../../contracts/MelosNFT.cdc"
 
 

@@ -7,28 +7,32 @@
   },
   "contracts": {
     "FungibleToken": {
-      "source": "./cadence/contracts/FungibleToken.cdc",
+      "source": "./cadence/contracts/core/FungibleToken.cdc",
       "aliases": {
         "emulator": "ee82856bf20e2aa6",
         "testnet": "9a0766d93b6608b7"
       }
     },
     "FlowToken": {
-      "source": "./cadence/contracts/FlowToken.cdc",
+      "source": "./cadence/contracts/core/FlowToken.cdc",
       "aliases": {
         "emulator": "0ae53cb6e3f42a79",
         "testnet": "7e60df042a9c0868"
       }
     },
     "NonFungibleToken": {
-      "source": "./cadence/contracts/NonFungibleToken.cdc",
+      "source": "./cadence/contracts/core/NonFungibleToken.cdc",
       "aliases": {
         "emulator": "f8d6e0586b0a20c7",
         "testnet": "631e88ae7f1d7c20"
       }
     },
-    "MelosNFT": "./cadence/contracts/MelosNFT.cdc",
-    "NFTStorefront": "./cadence/contracts/NFTStorefront.cdc"
+    "FUSD": "./cadence/contracts/core/FUSD.cdc",
+    "FlowStorageFees": "./cadence/contracts/core/FlowStorageFees.cdc",
+    "NFTStorefront": "./cadence/contracts/core/NFTStorefront.cdc",
+    "MelosFee": "./cadence/contracts/MelosFee.cdc",
+    "MelosOrder": "./cadence/contracts/MelosOrder.cdc",
+    "MelosNFT": "./cadence/contracts/MelosNFT.cdc"
   },
   "networks": {
     "emulator": "127.0.0.1:3569",
