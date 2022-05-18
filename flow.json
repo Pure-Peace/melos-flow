@@ -28,11 +28,12 @@
       }
     },
     "FUSD": "./cadence/contracts/core/FUSD.cdc",
+    "MelosNFT": "./cadence/contracts/MelosNFT.cdc",
     "FlowStorageFees": "./cadence/contracts/core/FlowStorageFees.cdc",
     "NFTStorefront": "./cadence/contracts/core/NFTStorefront.cdc",
     "MelosFee": "./cadence/contracts/MelosFee.cdc",
     "MelosOrder": "./cadence/contracts/MelosOrder.cdc",
-    "MelosNFT": "./cadence/contracts/MelosNFT.cdc"
+    "MelosOpenBid": "./cadence/contracts/MelosOpenBid.cdc"
   },
   "networks": {
     "emulator": "127.0.0.1:3569",

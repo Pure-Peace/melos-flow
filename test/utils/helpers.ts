@@ -1,4 +1,4 @@
-import {emulator, getAccountAddress, init} from 'flow-js-testing';
+import {emulator as _emulator, getAccountAddress, init} from 'flow-js-testing';
 import {readFileSync} from 'fs';
 import path from 'path';
 import type {Fcl} from '@rarible/fcl-types';
@@ -12,7 +12,11 @@ import {EMULATOR_PORT} from '../../sdk/config';
 import {toFlowAddress} from '../../sdk/common';
 import {TxResult} from 'flow-cadut';
 
+export const UFIX64_PRECISION = 8;
+
 const _fcl: Fcl = fclLib;
+
+export const emulator = _emulator;
 
 export type CreateFlowEmulatorParams = {
   logs?: boolean;
@@ -39,6 +43,8 @@ export type Account = {
 export type AccountsConfig = Record<string, Account>;
 
 export const BASE_PATH = path.join(__dirname, '../../cadence');
+
+export const toUFix64 = (value: number) => value.toFixed(UFIX64_PRECISION);
 
 export const getCode = (filePath: string) => {
   return readFileSync(path.join(BASE_PATH, filePath.endsWith('.cdc') ? filePath : `${filePath}.cdc`), {
@@ -158,11 +164,13 @@ export async function checkProjectDeployments() {
   }
 }
 
-export async function deployProject() {
+export async function deployProject(log = false) {
   return new Promise((resolve, reject) => {
     exec('flow project deploy', (error, stdout, stderr) => {
       if (stdout) {
-        console.log(stdout);
+        if (log) {
+          console.log(stdout);
+        }
         return resolve(0);
       }
 
