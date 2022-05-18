@@ -2,25 +2,21 @@ import NonFungibleToken from "../../contracts/core/NonFungibleToken.cdc"
 import MelosNFT from "../../contracts/MelosNFT.cdc"
 
 
-// This transaction transfers a Melos NFT from one account to another.
+// transfer MelosNFT token with tokenId to given address
+//
+transaction(tokenId: UInt64, to: Address) {
+    let token: @NonFungibleToken.NFT
+    let receiver: Capability<&{NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver}>
 
-transaction(recipient: Address, withdrawID: UInt64) {
-    prepare(signer: AuthAccount) {
-        
-        // get the recipients public account object
-        let recipient = getAccount(recipient)
+    prepare(acct: AuthAccount) {
+        let collection = acct.borrow<&MelosNFT.Collection>(from: MelosNFT.CollectionStoragePath)
+            ?? panic("Missing NFT collection on signer account")
+        self.token <- collection.withdraw(withdrawID: tokenId)
+        self.receiver = getAccount(to).getCapability<&{NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver}>(MelosNFT.CollectionPublicPath)
+    }
 
-        // borrow a reference to the signer's NFT collection
-        let collectionRef = signer.borrow<&MelosNFT.Collection>(from: MelosNFT.CollectionStoragePath)
-            ?? panic("Could not borrow a reference to the owner's collection")
-
-        // borrow a public reference to the receivers collection
-        let depositRef = recipient.getCapability(MelosNFT.CollectionPublicPath)!.borrow<&{NonFungibleToken.CollectionPublic}>()!
-
-        // withdraw the NFT from the owner's collection
-        let nft <- collectionRef.withdraw(withdrawID: withdrawID)
-
-        // Deposit the NFT in the recipient's collection
-        depositRef.deposit(token: <-nft)
+    execute {
+        let receiver = self.receiver.borrow()!
+        receiver.deposit(token: <- self.token)
     }
 }

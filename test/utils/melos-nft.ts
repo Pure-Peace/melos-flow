@@ -46,7 +46,7 @@ export const transferMelos = async (sender: string, recipient: string, itemId: n
 
   return sendTransaction({
     code: txCode('melos-nft/transfer_melos_nft'),
-    args: [recipient, itemId],
+    args: [itemId, recipient],
     payer: auth,
     addressMap,
     limit,

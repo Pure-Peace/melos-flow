@@ -2,19 +2,14 @@ import NonFungibleToken from "../../contracts/core/NonFungibleToken.cdc"
 import MelosNFT from "../../contracts/MelosNFT.cdc"
 
 
+// Setup storage for MelosNFT on signer account
+//
 transaction {
-    prepare(signer: AuthAccount) {
-        // if the account doesn't already have a collection
-        if signer.borrow<&MelosNFT.Collection>(from: MelosNFT.CollectionStoragePath) == nil {
-
-            // create a new empty collection
-            let collection <- MelosNFT.createEmptyCollection()
-            
-            // save it to the account
-            signer.save(<-collection, to: MelosNFT.CollectionStoragePath)
-
-            // create a public capability for the collection
-            signer.link<&MelosNFT.Collection{NonFungibleToken.CollectionPublic, MelosNFT.MelosNFTCollectionPublic}>(MelosNFT.CollectionPublicPath, target: MelosNFT.CollectionStoragePath)
+    prepare(acct: AuthAccount) {
+        if acct.borrow<&MelosNFT.Collection>(from: MelosNFT.CollectionStoragePath) == nil {
+            let collection <- MelosNFT.createEmptyCollection() as! @MelosNFT.Collection
+            acct.save(<-collection, to: MelosNFT.CollectionStoragePath)
+            acct.link<&{NonFungibleToken.CollectionPublic, NonFungibleToken.Receiver}>(MelosNFT.CollectionPublicPath, target: MelosNFT.CollectionStoragePath)
         }
     }
 }
