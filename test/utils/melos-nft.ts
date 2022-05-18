@@ -1,6 +1,8 @@
 import {sendTransaction, executeScript} from 'flow-cadut';
 import {getAuthAccount, scriptCode, txCode} from './helpers';
 
+const limit = 999;
+
 const addressMap = {
   NonFungibleToken: '0xf8d6e0586b0a20c7',
   MelosNFT: '0xf8d6e0586b0a20c7',
@@ -13,7 +15,7 @@ const addressMap = {
 export const setupMelosOnAccount = async (account: string) => {
   const {auth} = await getAuthAccount(account);
 
-  return sendTransaction({code: txCode('melos-nft/setup_account'), payer: auth, addressMap});
+  return sendTransaction({code: txCode('melos-nft/setup_account'), payer: auth, addressMap, limit});
 };
 
 /**
@@ -21,7 +23,7 @@ export const setupMelosOnAccount = async (account: string) => {
  * @throws Will throw an error if execution will be halted
  * */
 export const getMelosSupply = async () => {
-  return executeScript({code: scriptCode('melos-nft/get_melos_supply'), addressMap});
+  return executeScript({code: scriptCode('melos-nft/get_melos_supply'), addressMap, limit});
 };
 
 /**
@@ -30,7 +32,7 @@ export const getMelosSupply = async () => {
 export const mintMelos = async (recipient: string) => {
   const {auth} = await getAuthAccount('emulator-account');
 
-  return sendTransaction({code: txCode('melos-nft/mint_melos_nft'), args: [recipient], payer: auth, addressMap});
+  return sendTransaction({code: txCode('melos-nft/mint_melos_nft'), args: [recipient], payer: auth, addressMap, limit});
 };
 
 /**
@@ -47,6 +49,7 @@ export const transferMelos = async (sender: string, recipient: string, itemId: n
     args: [recipient, itemId],
     payer: auth,
     addressMap,
+    limit,
   });
 };
 
@@ -56,7 +59,7 @@ export const transferMelos = async (sender: string, recipient: string, itemId: n
  * @param {UInt64} itemID - NFT id
  * */
 export const getMelos = async (account: string, itemID: number) => {
-  return executeScript({code: scriptCode('melos-nft/get_melos'), args: [account, itemID], addressMap});
+  return executeScript({code: scriptCode('melos-nft/get_melos'), args: [account, itemID], addressMap, limit});
 };
 
 /**
@@ -64,5 +67,5 @@ export const getMelos = async (account: string, itemID: number) => {
  * @param {string} account - account address
  * */
 export const getMelosCount = async (account: string) => {
-  return executeScript({code: scriptCode('melos-nft/get_collection_length'), args: [account], addressMap});
+  return executeScript({code: scriptCode('melos-nft/get_collection_length'), args: [account], addressMap, limit});
 };

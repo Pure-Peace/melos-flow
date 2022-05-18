@@ -1,11 +1,19 @@
-import {createFlowEmulator, ensureTxResult, getAccount, setupProject} from './utils/helpers';
+import {emulator, ensureTxResult, getAccount, prepareEmulator, setupProject} from './utils/helpers';
 import {getMelosCount, getMelosSupply, mintMelos, setupMelosOnAccount, transferMelos} from './utils/melos-nft';
 
 // Increase timeout if your tests failing due to timeout
-jest.setTimeout(10000);
+jest.setTimeout(100000);
 
 describe('Melos NFT test', () => {
-  createFlowEmulator({logs: false});
+  beforeEach(async () => {
+    await prepareEmulator({logs: false});
+    return await new Promise((r) => setTimeout(r, 1000));
+  });
+
+  afterEach(async () => {
+    await emulator.stop();
+    return await new Promise((r) => setTimeout(r, 1000));
+  });
 
   it('supply should be 0 after contract is deployed', async () => {
     await setupProject();
