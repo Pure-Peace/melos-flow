@@ -415,9 +415,18 @@ pub contract MelosEnglishAuction {
 
         access(self) fun addUnclaimedBid(bid: @Bid) {
             let mark = bid.mark
-            let bids <- !MelosEnglishAuction.unclaimedBids.containsKey(mark) ? [] as @[MelosEnglishAuction.Bid]: MelosEnglishAuction.unclaimedBids.remove(key: mark)!
-            bids.append(<-bid)
-            let dummy <- MelosEnglishAuction.unclaimedBids[mark] <- bids
+
+            fun bids(bid: @Bid): @[Bid] {
+              if MelosEnglishAuction.unclaimedBids.containsKey(mark) {
+                let bids <- MelosEnglishAuction.unclaimedBids.remove(key: mark)!
+                bids.append(<-bid)
+                return <- bids
+              } 
+              
+              return <- [<-bid]
+            }
+
+            let dummy <- MelosEnglishAuction.unclaimedBids[mark] <- bids(bid: <- bid)
             destroy dummy
         }
     }

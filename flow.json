@@ -33,7 +33,8 @@
     "NFTStorefront": "./cadence/contracts/core/NFTStorefront.cdc",
     "MelosFee": "./cadence/contracts/MelosFee.cdc",
     "MelosOrder": "./cadence/contracts/MelosOrder.cdc",
-    "MelosOpenBid": "./cadence/contracts/MelosOpenBid.cdc"
+    "MelosOpenBid": "./cadence/contracts/MelosOpenBid.cdc",
+    "MelosEnglishAuction": "./cadence/contracts/MelosEnglishAuction.cdc"
   },
   "networks": {
     "emulator": "127.0.0.1:3569",
@@ -58,6 +59,7 @@
     "emulator": {
       "emulator-account": [
         "NonFungibleToken",
+        "FUSD",
         "NFTStorefront",
         {
           "name": "MelosNFT",
@@ -67,7 +69,11 @@
               "value": "Hello World"
             }
           ]
-        }
+        },
+        "MelosFee",
+        "MelosOrder",
+        "MelosOpenBid",
+        "MelosEnglishAuction"
       ]
     }
   }
