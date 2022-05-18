@@ -12,5 +12,5 @@ pub fun main(address: Address): [UInt64] {
         .borrow()
         ?? panic("Could not borrow public storefront from address")
     
-  	return storefrontRef.getListingIDs()
+      return storefrontRef.getListingIDs()
 }
