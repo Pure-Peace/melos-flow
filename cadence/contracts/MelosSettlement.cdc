@@ -32,6 +32,19 @@ pub contract MelosSettlement {
 
   pub event AllowedPaymentTokensChanged(old: [Type], new: [Type])
 
+  pub event ListingCreated(
+    listingType: UInt8,
+    seller: Address, 
+    listingId: UInt64,
+    nftId: UInt64,
+    nftType: Type,
+    paymentToken: Type,
+    listingStartTime: UFix64,
+    listingEndTime: UFix64
+  )
+  pub event ListingRemoved(_ listingId: UInt64)
+  pub event ListingCompleted(_ listingId: UInt64)
+
   init (
     feeRecipient: Address,
     makerRelayerFee: UFix64,
@@ -74,6 +87,10 @@ pub contract MelosSettlement {
 
       assert(cfg != nil, message: "Invalid listing config")
     }
+  }
+
+  pub fun createListingManager(): @ListingManager {
+      return <-create ListingManager()
   }
 
   pub resource Admin {
@@ -237,20 +254,131 @@ pub contract MelosSettlement {
   }
 
   pub resource ListingManager {
-    access(self) var listedNFTs: [UInt64]
+    // NFT id => Listing id
+    access(self) var listedNFTs: {UInt64: UInt64}
+    // Listing => Listing resource
     access(self) var listings: @{UInt64: Listing}
 
     destroy () {
+      pre {
+        self.listings.keys.length == 0: "There are uncompleted listings"
+      }
       destroy self.listings
 
       emit ListingManagerDestroyed(self.uuid)
     }
 
     init() {
-      self.listedNFTs = []
+      self.listedNFTs = {}
       self.listings <- {}
 
       emit ListingManagerCreated(self.uuid)
+    }
+
+    pub fun getListingIds(): [UInt64] {
+        return self.listings.keys
+    }
+
+    pub fun getListedNFTs(): [UInt64] {
+        return self.listedNFTs.keys
+    }
+
+    pub fun isListingExists(listingId: UInt64): Bool {
+        return self.listings[listingId] != nil
+    }
+
+    pub fun isNFTListed(nftId: UInt64): Bool {
+        return self.listedNFTs[nftId] != nil
+    }
+
+    pub fun getListingIdByNFTId(nftId: UInt64): UInt64 {
+        pre {
+          self.listedNFTs[nftId] != nil: "NFT not listed"
+        }
+        return self.listedNFTs[nftId]!
+    }
+
+    pub fun getListing(listingId: UInt64): &Listing {
+        pre {
+          self.listings[listingId] != nil: "Listing not exists"
+        }
+        return &self.listings[listingId] as! &Listing
+    }
+
+    pub fun getListingByNFTId(nftId: UInt64): &Listing {
+        return self.getListing(listingId: self.getListingIdByNFTId(nftId: nftId))
+    }
+
+    pub fun createListing(
+      listingType: ListingType,
+      nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>,
+      listingManagerId: UInt64,
+      nftType: Type,
+      nftId: UInt64,
+      paymentToken: Type,
+      listingStartTime: UFix64,
+      listingEndTime: UFix64,
+      listingConfig: {MelosSettlement.ListingConfig}
+    ): UInt64 {
+        pre {
+          MelosSettlement.allowedPaymentTokens.contains(paymentToken) == true: "Payment tokens not allowed"
+        }
+
+        let listing <- create Listing(
+          listingType: listingType,
+          nftProvider: nftProvider,
+          listingManagerId: listingManagerId,
+          nftType: nftType,
+          nftId: nftId,
+          paymentToken: paymentToken,
+          listingStartTime: listingStartTime,
+          listingEndTime: listingEndTime,
+          listingConfig: listingConfig
+        )
+        let listingId = listing.uuid
+
+        self.listedNFTs[nftId] = listingId
+        let _ <- self.listings[listingId] <- listing
+        destroy _
+
+        emit ListingCreated(
+          listingType: listingType.rawValue,
+          seller: self.owner?.address!, 
+          listingId: listingId,
+          nftId: nftId,
+          nftType: nftType,
+          paymentToken: paymentToken,
+          listingStartTime: listingStartTime,
+          listingEndTime: listingEndTime
+        )
+
+        return listingId
+    }
+
+    pub fun removeListing(listingId: UInt64) {
+        pre {
+          self.listings[listingId] != nil: "Listing not exists"
+        }
+        let listing <- self.listings.remove(key: listingId)!
+        let nftId = listing.getDetails().nftId
+        self.listedNFTs.remove(key: nftId)
+        destroy listing
+  
+        emit ListingRemoved(listingId)
+    }
+
+    pub fun completeListing(listingId: UInt64) {
+        pre {
+            self.listings[listingId] != nil: "Listing not exists"
+        }
+
+        let listing <- self.listings.remove(key: listingId)!
+        let details = listing.getDetails()
+        assert(details.isPurchased == true, message: "Listing is not purchased")
+        self.listedNFTs.remove(key: details.nftId)
+        destroy listing
+        
+        emit ListingCompleted(listingId)
     }
   }
 }
