@@ -78,15 +78,18 @@ pub contract MelosSettlement {
     switch listingType {
       case ListingType.Common:
         cfg = listingConfig as? Common
+        break
       case ListingType.OpenBid:
         cfg = listingConfig as? OpenBid
+        break
       case ListingType.DutchAuction:
         cfg = listingConfig as? DutchAuction
+        break
       case ListingType.EnglishAuction:
         cfg = listingConfig as? EnglishAuction
-
-      assert(cfg != nil, message: "Invalid listing config")
+        break
     }
+    assert(cfg != nil, message: "Invalid listing config")
   }
 
   pub fun createListingManager(): @ListingManager {
@@ -206,7 +209,7 @@ pub contract MelosSettlement {
   }
 
   pub resource Listing {
-    access(self) var initialized: Bool
+    access(self) let initialized: Bool
     access(self) let details: ListingDetails
     access(contract) let nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
 
@@ -223,6 +226,14 @@ pub contract MelosSettlement {
     ) {
       MelosSettlement.checkListingConfig(listingType, listingConfig)
 
+      let provider = nftProvider.borrow()
+      assert(provider != nil, message: "cannot borrow nftProvider")
+
+      // This will precondition assert if the token is not available.
+      let nft = provider!.borrowNFT(id: nftId)
+      assert(nft.isInstance(nftType), message: "token is not of specified type")
+      assert(nft.id == nftId, message: "token does not have specified id")
+
       self.details = ListingDetails(
         listingType: listingType,
         listingManagerId: listingManagerId,
@@ -233,21 +244,9 @@ pub contract MelosSettlement {
         listingEndTime: listingEndTime,
         listingConfig: listingConfig
       )
-      
       self.nftProvider = nftProvider
-
-      // Check that the provider contains the NFT.
-      // We will check it again when the token is sold.
-      // We cannot move this into a function because initializers cannot call member functions.
-      let provider = self.nftProvider.borrow()
-      assert(provider != nil, message: "cannot borrow nftProvider")
-
-      // This will precondition assert if the token is not available.
-      let nft = provider!.borrowNFT(id: self.details.nftId)
-      assert(nft.isInstance(self.details.nftType), message: "token is not of specified type")
-      assert(nft.id == self.details.nftId, message: "token does not have specified ID")
-
       self.initialized = true
+      
       emit ListingCreated(
           listingType: listingType.rawValue,
           seller: self.owner?.address!, 
@@ -271,14 +270,55 @@ pub contract MelosSettlement {
     }
 
     pub fun borrowNFT(): &NonFungibleToken.NFT {
-        let ref = self.nftProvider.borrow()!.borrowNFT(id: self.getDetails().nftId)
-        assert(ref.isInstance(self.getDetails().nftType), message: "token has wrong type")
-        assert(ref.id == self.getDetails().nftId, message: "token has wrong ID")
-        return ref
+        let nft = self.nftProvider.borrow()!.borrowNFT(id: self.getDetails().nftId)
+        assert(nft.isInstance(self.getDetails().nftType), message: "token has wrong type")
+        assert(nft.id == self.getDetails().nftId, message: "token has wrong ID")
+        return nft
     }
 
     pub fun getDetails(): ListingDetails {
       return self.details
+    }
+
+    pub fun getPrice(): UFix64 {
+      switch self.details.listingType {
+        case ListingType.Common:
+          let cfg = self.details.listingConfig as! Common
+          return cfg.price
+
+        case ListingType.OpenBid:
+          let cfg = self.details.listingConfig as! OpenBid
+          return 0.0 // TODO
+
+        case ListingType.DutchAuction:
+          let cfg = self.details.listingConfig as! DutchAuction
+          return 0.0 // TODO
+
+        case ListingType.EnglishAuction:
+          let cfg = self.details.listingConfig as! EnglishAuction
+          return 0.0 // TODO
+      }
+      panic("Unexpected listing type")
+    }
+
+    // TODO
+    pub fun purchaseCommon() {
+
+    }
+
+    // TODO
+    pub fun purchaseDutchAuction() {
+
+    }
+
+    // TODO
+    pub fun placeBidOpenBid() {
+
+    }
+
+    // TODO
+    pub fun placeBidEnglishAcution() {
+
     }
   }
 
