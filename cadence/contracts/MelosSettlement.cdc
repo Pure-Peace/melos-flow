@@ -42,7 +42,7 @@ pub contract MelosSettlement {
     listingStartTime: UFix64,
     listingEndTime: UFix64
   )
-  pub event ListingRemoved(listingId: UInt64, listingManager: UInt64)
+  pub event ListingRemoved(purchased: Bool, listingId: UInt64, listingManager: UInt64)
   pub event ListingCompleted(listingId: UInt64, listingManager: UInt64)
 
   init (
@@ -182,6 +182,8 @@ pub contract MelosSettlement {
     pub let listingEndTime: UFix64
     pub let listingConfig: {MelosSettlement.ListingConfig}
 
+    pub let receiver: Capability<&{FungibleToken.Receiver}>
+
     init (
       listingType: ListingType,
       listingManagerId: UInt64,
@@ -191,6 +193,7 @@ pub contract MelosSettlement {
       listingStartTime: UFix64,
       listingEndTime: UFix64,
       listingConfig: {MelosSettlement.ListingConfig},
+      receiver: Capability<&{FungibleToken.Receiver}>
     ) {
       self.listingType = listingType
       self.listingManagerId = listingManagerId
@@ -201,6 +204,7 @@ pub contract MelosSettlement {
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingEndTime
       self.listingConfig = listingConfig
+      self.receiver = receiver
     }
 
     access(contract) fun setToPurchased() {
@@ -222,7 +226,8 @@ pub contract MelosSettlement {
       paymentToken: Type,
       listingStartTime: UFix64,
       listingEndTime: UFix64,
-      listingConfig: {MelosSettlement.ListingConfig}
+      listingConfig: {MelosSettlement.ListingConfig},
+      receiver: Capability<&{FungibleToken.Receiver}>
     ) {
       MelosSettlement.checkListingConfig(listingType, listingConfig)
 
@@ -242,7 +247,8 @@ pub contract MelosSettlement {
         paymentToken: paymentToken,
         listingStartTime: listingStartTime,
         listingEndTime: listingEndTime,
-        listingConfig: listingConfig
+        listingConfig: listingConfig,
+        receiver: receiver
       )
       self.nftProvider = nftProvider
       self.initialized = true
@@ -261,11 +267,11 @@ pub contract MelosSettlement {
 
     destroy () {
       if self.initialized {
-        if self.details.isPurchased {
-          emit ListingCompleted(listingId: self.uuid, listingManager: self.details.listingManagerId)
-        } else {
-          emit ListingRemoved(listingId: self.uuid, listingManager: self.details.listingManagerId)
-        }
+        emit ListingRemoved(
+            purchased: self.details.isPurchased, 
+            listingId: self.uuid, 
+            listingManager: self.details.listingManagerId
+          )
       }
     }
 
@@ -301,9 +307,33 @@ pub contract MelosSettlement {
       panic("Unexpected listing type")
     }
 
-    // TODO
-    pub fun purchaseCommon() {
+    pub fun purchaseCommon(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
+      pre {
+          self.details.isPurchased == false: "listing has already been purchased"
+          payment.isInstance(self.details.paymentToken): "payment vault is not requested fungible token"
+      }
+      var price = self.getPrice()
+      assert(payment.balance >= price, message: "insufficient payments")
 
+      // Make sure the listing cannot be purchased again.
+      self.details.setToPurchased()
+
+      // Fetch the token to return to the purchaser.
+      let nft <-self.nftProvider.borrow()!.withdraw(withdrawID: self.details.nftId)
+
+      // **MUST** check nft
+      assert(nft.isInstance(self.details.nftType), message: "withdrawn NFT is not of specified type")
+      assert(nft.id == self.details.nftId, message: "withdrawn NFT does not have specified Id")
+
+      // TODO: Deducting royalties or fees
+      // payment.withdraw(amount: fees)
+
+      // Deposit the remaining amount after deducting fees and royalties to the beneficiary.
+      self.details.receiver.borrow()!.deposit(from: <- payment)
+
+      emit ListingCompleted(listingId: self.uuid, listingManager: self.details.listingManagerId)
+
+      return <- nft
     }
 
     // TODO
@@ -383,9 +413,11 @@ pub contract MelosSettlement {
       paymentToken: Type,
       listingStartTime: UFix64,
       listingEndTime: UFix64,
-      listingConfig: {MelosSettlement.ListingConfig}
+      listingConfig: {MelosSettlement.ListingConfig},
+      receiver: Capability<&{FungibleToken.Receiver}>
     ): UInt64 {
         assert(MelosSettlement.allowedPaymentTokens.contains(paymentToken) == true, message: "Payment tokens not allowed")
+        assert(receiver.borrow() != nil, message: "Cannot borrow receiver")
 
         let listing <- create Listing(
           listingType: listingType,
@@ -396,7 +428,8 @@ pub contract MelosSettlement {
           paymentToken: paymentToken,
           listingStartTime: listingStartTime,
           listingEndTime: listingEndTime,
-          listingConfig: listingConfig
+          listingConfig: listingConfig,
+          receiver: receiver
         )
         let listingId = listing.uuid
 
