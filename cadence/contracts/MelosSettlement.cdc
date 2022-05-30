@@ -60,6 +60,22 @@ pub contract MelosSettlement {
     emit MelosSettlementInitialized()
   }
 
+  pub fun checkListingConfig(_ listingType: ListingType, _ listingConfig: {MelosSettlement.ListingConfig}) {
+    var cfg: {MelosSettlement.ListingConfig}? = nil
+    switch listingType {
+      case ListingType.Common:
+        cfg = listingConfig as? Common
+      case ListingType.OpenBid:
+        cfg = listingConfig as? OpenBid
+      case ListingType.DutchAuction:
+        cfg = listingConfig as? DutchAuction
+      case ListingType.EnglishAuction:
+        cfg = listingConfig as? EnglishAuction
+
+      assert(cfg != nil, message: "Invalid listing config")
+    }
+  }
+
   pub resource Admin {
     pub fun setFeeRecipient(_ newFeeRecipient: Address) {
       MelosSettlement.feeRecipient = newFeeRecipient
@@ -85,7 +101,11 @@ pub contract MelosSettlement {
     }
   }
 
-  pub struct CommonPriceConfig {
+  pub struct interface ListingConfig {
+
+  }
+
+  pub struct Common: ListingConfig {
     pub let price: UFix64
 
     init (price: UFix64) {
@@ -93,7 +113,7 @@ pub contract MelosSettlement {
     }
   }
 
-  pub struct OpenBidPriceConfig {
+  pub struct OpenBid: ListingConfig {
     pub let basePrice: UFix64
     pub let minimumBidPercentage: UFix64
     pub let reservePrice: UFix64
@@ -109,7 +129,7 @@ pub contract MelosSettlement {
     }
   }
 
-  pub struct DutchAuctionPriceConfig {
+  pub struct DutchAuction: ListingConfig {
     pub let startingPrice: UFix64
     pub let reservePrice: UFix64
 
@@ -119,12 +139,13 @@ pub contract MelosSettlement {
     }
   }
 
-  // TODO
-  pub struct EnglishAuctionPriceConfig {
-    pub let price: UFix64 
+  pub struct EnglishAuction: ListingConfig {
+    pub let startingPrice: UFix64 
+    pub var currentPrice: UFix64
 
-    init (price: UFix64) {
-      self.price = price
+    init (startingPrice: UFix64) {
+      self.startingPrice = startingPrice
+      self.currentPrice = startingPrice
     }
   }
 
@@ -139,11 +160,7 @@ pub contract MelosSettlement {
     pub let paymentToken: Type
     pub let listingStartTime: UFix64
     pub let listingEndTime: UFix64
-
-    pub let commonPriceConfig: CommonPriceConfig?
-    pub let openBidPriceConfig: OpenBidPriceConfig?
-    pub let dutchAuctionPriceConfig: DutchAuctionPriceConfig?
-    pub let englishAuctionPriceConfig: EnglishAuctionPriceConfig?
+    pub let listingConfig: {MelosSettlement.ListingConfig}
 
     init (
       listingType: ListingType,
@@ -153,10 +170,7 @@ pub contract MelosSettlement {
       paymentToken: Type,
       listingStartTime: UFix64,
       listingEndTime: UFix64,
-      commonPriceConfig: CommonPriceConfig?,
-      openBidPriceConfig: OpenBidPriceConfig?,
-      dutchAuctionPriceConfig: DutchAuctionPriceConfig?,
-      englishAuctionPriceConfig: EnglishAuctionPriceConfig?
+      listingConfig: {MelosSettlement.ListingConfig},
     ) {
       self.listingType = listingType
       self.listingManagerId = listingManagerId
@@ -166,11 +180,7 @@ pub contract MelosSettlement {
       self.paymentToken = paymentToken
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingEndTime
-
-      self.commonPriceConfig = commonPriceConfig
-      self.openBidPriceConfig = openBidPriceConfig
-      self.dutchAuctionPriceConfig = dutchAuctionPriceConfig
-      self.englishAuctionPriceConfig = englishAuctionPriceConfig
+      self.listingConfig = listingConfig
     }
   }
 
@@ -186,6 +196,8 @@ pub contract MelosSettlement {
       return self.details
     }
 
+
+
     init(
       listingType: ListingType,
       nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>,
@@ -195,11 +207,9 @@ pub contract MelosSettlement {
       paymentToken: Type,
       listingStartTime: UFix64,
       listingEndTime: UFix64,
-      commonPriceConfig: CommonPriceConfig?,
-      openBidPriceConfig: OpenBidPriceConfig?,
-      dutchAuctionPriceConfig: DutchAuctionPriceConfig?,
-      englishAuctionPriceConfig: EnglishAuctionPriceConfig?
+      listingConfig: {MelosSettlement.ListingConfig}
     ) {
+      MelosSettlement.checkListingConfig(listingType, listingConfig)
       self.details = ListingDetails(
         listingType: listingType,
         listingManagerId: listingManagerId,
@@ -208,10 +218,7 @@ pub contract MelosSettlement {
         paymentToken: paymentToken,
         listingStartTime: listingStartTime,
         listingEndTime: listingEndTime,
-        commonPriceConfig: commonPriceConfig,
-        openBidPriceConfig: openBidPriceConfig,
-        dutchAuctionPriceConfig: dutchAuctionPriceConfig,
-        englishAuctionPriceConfig: englishAuctionPriceConfig
+        listingConfig: listingConfig
       )
       
       self.nftProvider = nftProvider
