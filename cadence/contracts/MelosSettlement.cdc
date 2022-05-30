@@ -270,6 +270,13 @@ pub contract MelosSettlement {
       }
     }
 
+    pub fun borrowNFT(): &NonFungibleToken.NFT {
+        let ref = self.nftProvider.borrow()!.borrowNFT(id: self.getDetails().nftId)
+        assert(ref.isInstance(self.getDetails().nftType), message: "token has wrong type")
+        assert(ref.id == self.getDetails().nftId, message: "token has wrong ID")
+        return ref
+    }
+
     pub fun getDetails(): ListingDetails {
       return self.details
     }
@@ -281,20 +288,18 @@ pub contract MelosSettlement {
     // Listing => Listing resource
     access(self) var listings: @{UInt64: Listing}
 
-    destroy () {
-      pre {
-        self.listings.keys.length == 0: "There are uncompleted listings"
-      }
-
-      destroy self.listings
-      emit ListingManagerDestroyed(self.uuid)
-    }
-
     init() {
       self.listedNFTs = {}
       self.listings <- {}
 
       emit ListingManagerCreated(self.uuid)
+    }
+
+    destroy () {
+      assert(self.listings.keys.length == 0, message: "There are uncompleted listings")
+
+      destroy self.listings
+      emit ListingManagerDestroyed(self.uuid)
     }
 
     pub fun getListingIds(): [UInt64] {
@@ -314,17 +319,13 @@ pub contract MelosSettlement {
     }
 
     pub fun getListingIdByNFTId(nftId: UInt64): UInt64 {
-        pre {
-          self.listedNFTs[nftId] != nil: "NFT not listed"
-        }
+        assert(self.listedNFTs[nftId] != nil, message: "NFT not listed")
 
         return self.listedNFTs[nftId]!
     }
 
     pub fun getListing(listingId: UInt64): &Listing {
-        pre {
-          self.listings[listingId] != nil: "Listing not exists"
-        }
+        assert(self.listings[listingId] != nil, message: "Listing not exists")
 
         return &self.listings[listingId] as! &Listing
     }
@@ -344,9 +345,7 @@ pub contract MelosSettlement {
       listingEndTime: UFix64,
       listingConfig: {MelosSettlement.ListingConfig}
     ): UInt64 {
-        pre {
-          MelosSettlement.allowedPaymentTokens.contains(paymentToken) == true: "Payment tokens not allowed"
-        }
+        assert(MelosSettlement.allowedPaymentTokens.contains(paymentToken) == true, message: "Payment tokens not allowed")
 
         let listing <- create Listing(
           listingType: listingType,
@@ -369,23 +368,21 @@ pub contract MelosSettlement {
     }
 
     pub fun removeListing(listingId: UInt64) {
-        pre {
-          self.listings[listingId] != nil: "Listing not exists"
-        }
+        assert(self.listings[listingId] != nil, message: "Listing not exists")
 
         let listing <- self.listings.remove(key: listingId)!
         let nftId = listing.getDetails().nftId
+
         self.listedNFTs.remove(key: nftId)
         destroy listing
     }
 
     pub fun completeListing(listingId: UInt64) {
-        pre {
-            self.listings[listingId] != nil: "Listing not exists"
-        }
+        assert(self.listings[listingId] != nil, message: "Listing not exists")
 
         let listing <- self.listings.remove(key: listingId)!
         let details = listing.getDetails()
+
         assert(details.isPurchased == true, message: "Listing is not purchased")
         self.listedNFTs.remove(key: details.nftId)
         destroy listing
