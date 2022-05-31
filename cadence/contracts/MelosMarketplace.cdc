@@ -212,6 +212,10 @@ pub contract MelosMarketplace {
     pub let price: UFix64
 
     init (listingStartTime: UFix64, listingEndTime: UFix64?, price: UFix64) {
+      if listingEndTime != nil {
+        assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
+        assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
+      }
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingEndTime
 
@@ -230,6 +234,10 @@ pub contract MelosMarketplace {
     pub let minimumPrice: UFix64
 
     init (listingStartTime: UFix64, listingEndTime: UFix64?, minimumPrice: UFix64) {
+      if listingEndTime != nil {
+        assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
+        assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
+      }
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingEndTime
 
@@ -257,6 +265,10 @@ pub contract MelosMarketplace {
       priceCutInterval: UFix64
     ) {
       assert(startingPrice >= reservePrice, message: "Starting price must be greater than or equal with reserve price")
+      assert(listingEndTime != nil, message: "Dutch auction listingEndTime must not null")
+      assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
+      assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
+      assert(priceCutInterval < (listingStartTime - listingEndTime!), message: "Dutch auction priceCutInterval must be less than listing duration")
 
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingEndTime
@@ -296,6 +308,10 @@ pub contract MelosMarketplace {
       currentPrice: UFix64
     ) {
       assert(reservePrice >= currentPrice, message: "Reserve price must be greater than or equal with current price")
+      assert(listingEndTime != nil, message: "English auction listingEndTime must not null")
+      assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
+      assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
+     
 
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingEndTime
@@ -328,17 +344,16 @@ pub contract MelosMarketplace {
   /* --------------- ↓↓ Bids ↓↓ --------------- */
 
   pub resource Bid {
-    pub let bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>
+    access(self) let bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>
+    access(self) let rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>
+    access(self) let refund: Capability<&{FungibleToken.Receiver}>
+    access(self) let payment: @FungibleToken.Vault
+
     pub let listingId: UInt64
-
-    pub let rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>
-    pub let refund: Capability<&{FungibleToken.Receiver}>
-
-    pub let payment: @FungibleToken.Vault
     pub var offerPrice: UFix64
 
     pub let bidder: Address
-    pub let bidTimestamp: UFix64
+    pub var bidTimestamp: UFix64
 
     init(
       bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
@@ -385,12 +400,12 @@ pub contract MelosMarketplace {
   }
 
   pub resource BidManager: BidManagerPublic {
+    // ListingId => [BidId]
     access(self) let listings: {UInt64: [UInt64]}
 
     init () {
       self.listings = {}
     }
-
 
     pub fun isBidExists(listingId: UInt64, bidId: UInt64): Bool {      
       if self.listings[listingId] == nil {
@@ -453,8 +468,6 @@ pub contract MelosMarketplace {
       nftType: Type,
       nftId: UInt64,
       paymentToken: Type,
-      listingStartTime: UFix64,
-      listingEndTime: UFix64?,
       listingConfig: {MelosMarketplace.ListingConfig},
       receiver: Capability<&{FungibleToken.Receiver}>
     ) {
@@ -483,7 +496,7 @@ pub contract MelosMarketplace {
     access(self) let nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
 
     access(self) let openBids: @{UInt64: Bid}
-    access(self) var englishAuctionBids: @{Address: Bid}
+    access(self) let englishAuctionBids: @{Address: Bid}
 
     init(
       listingType: ListingType,
@@ -492,25 +505,12 @@ pub contract MelosMarketplace {
       nftType: Type,
       nftId: UInt64,
       paymentToken: Type,
-      listingStartTime: UFix64,
-      listingEndTime: UFix64?,
       listingConfig: {MelosMarketplace.ListingConfig},
       receiver: Capability<&{FungibleToken.Receiver}>
     ) {
       MelosMarketplace.checkListingConfig(listingType, listingConfig)
       assert(MelosMarketplace.isTokenAllowed(paymentToken), message: "Payment tokens not allowed")
       assert(receiver.borrow() != nil, message: "Cannot borrow receiver")
-
-      if listingEndTime != nil {
-        assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
-        assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
-      }
-
-      if listingType == ListingType.DutchAuction {
-        let cfg = listingConfig as! DutchAuction
-        assert(listingEndTime != nil, message: "Dutch auction listingEndTime must not null")
-        assert(cfg.priceCutInterval < (listingStartTime - listingEndTime!), message: "Dutch auction priceCutInterval must be less than listing duration")
-      }
 
       let provider = nftProvider.borrow()
       assert(provider != nil, message: "cannot borrow nftProvider")
@@ -526,8 +526,6 @@ pub contract MelosMarketplace {
         nftType: nftType,
         nftId: nftId,
         paymentToken: paymentToken,
-        listingStartTime: listingStartTime,
-        listingEndTime: listingEndTime,
         listingConfig: listingConfig,
         receiver: receiver
       )
@@ -543,8 +541,8 @@ pub contract MelosMarketplace {
           nftId: nftId,
           nftType: nftType,
           paymentToken: paymentToken,
-          listingStartTime: listingStartTime,
-          listingEndTime: listingEndTime
+          listingStartTime: listingConfig.listingStartTime,
+          listingEndTime: listingConfig.listingEndTime
       )
     }
 
@@ -694,7 +692,6 @@ pub contract MelosMarketplace {
       // Check listing and params
       self.checkAvaliable()
       let payment <- self.checkPayment(<- payment)
-      assert(bidManager.check(), message: "Invalid bidManager")
       assert(
         offerPrice >= (self.details.listingConfig as! EnglishAuction).getNextBidMinimumPrice(), 
         message: "Offer price must be greater than or equal with currentPrice * (1 + minimum bid percentage)"
@@ -757,8 +754,6 @@ pub contract MelosMarketplace {
       nftType: Type,
       nftId: UInt64,
       paymentToken: Type,
-      listingStartTime: UFix64,
-      listingEndTime: UFix64?,
       listingConfig: {MelosMarketplace.ListingConfig},
       receiver: Capability<&{FungibleToken.Receiver}>
     ): UInt64 {
@@ -769,8 +764,6 @@ pub contract MelosMarketplace {
           nftType: nftType,
           nftId: nftId,
           paymentToken: paymentToken,
-          listingStartTime: listingStartTime,
-          listingEndTime: listingEndTime,
           listingConfig: listingConfig,
           receiver: receiver
         )
