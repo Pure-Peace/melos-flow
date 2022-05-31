@@ -33,6 +33,12 @@ pub contract MelosSettlement {
   pub event MinimumListingDurationChanged(old: UFix64, new: UFix64)
   pub event AllowedPaymentTokensChanged(old: [Type], new: [Type])
 
+  pub event OpenBidCreated(listingId: UInt64, bidId: UInt64, bidder: Address, offerPrice: UFix64)
+  pub event OpenBidRemoved(listingId: UInt64, bidId: UInt64)
+
+  pub event EnglishAuctionBidCreated(listingId: UInt64, bidder: Address, offerPrice: UFix64)
+  pub event EnglishAuctionBidRemoved(listingId: UInt64)
+
   pub event ListingCreated(
     listingType: UInt8,
     seller: Address, 
@@ -158,18 +164,10 @@ pub contract MelosSettlement {
   }
 
   pub struct OpenBid: ListingConfig {
-    pub let basePrice: UFix64
-    pub let minimumBidPercentage: UFix64
-    pub let reservePrice: UFix64
+    pub let minimumPrice: UFix64
 
-    init (
-      basePrice: UFix64,
-      minimumBidPercentage: UFix64,
-      reservePrice: UFix64
-    ) {
-      self.basePrice = basePrice
-      self.minimumBidPercentage = minimumBidPercentage
-      self.reservePrice = reservePrice
+    init (minimumPrice: UFix64) {
+      self.minimumPrice = minimumPrice
     }
   }
 
@@ -179,7 +177,7 @@ pub contract MelosSettlement {
     pub let priceCutInterval: UFix64
 
     init (startingPrice: UFix64, reservePrice: UFix64, priceCutInterval: UFix64) {
-      assert(startingPrice > reservePrice, message: "Starting price must be greater than reserve price")
+      assert(startingPrice >= reservePrice, message: "Starting price must be greater than or equal with reserve price")
 
       self.startingPrice = startingPrice
       self.reservePrice = reservePrice
@@ -188,12 +186,38 @@ pub contract MelosSettlement {
   }
 
   pub struct EnglishAuction: ListingConfig {
-    pub let startingPrice: UFix64 
-    pub var currentPrice: UFix64
+    access(self) let reservePrice: UFix64
+    pub let minimumBidPercentage: UFix64
 
-    init (startingPrice: UFix64) {
-      self.startingPrice = startingPrice
-      self.currentPrice = startingPrice
+    pub var currentBidder: Address
+    pub var currentPrice: UFix64
+    pub var bidTimestamp: UFix64
+    init (
+      reservePrice: UFix64,
+      minimumBidPercentage: UFix64,
+      currentBidder: Address,
+      currentPrice: UFix64
+    ) {
+      assert(reservePrice >= currentPrice, message: "Reserve price must be greater than or equal with current price")
+
+      // Initialize constants
+      self.reservePrice = reservePrice
+      self.minimumBidPercentage = minimumBidPercentage
+
+      // Initialize vars
+      self.currentBidder = currentBidder
+      self.currentPrice = currentPrice
+      self.bidTimestamp = getCurrentBlock().timestamp
+    }
+
+    access(contract) fun updateBid(currentBidder: Address, currentPrice: UFix64) {
+      self.currentBidder = currentBidder
+      self.currentPrice = currentPrice
+      self.bidTimestamp = getCurrentBlock().timestamp
+    }
+
+    pub fun getNextBidMinimumPrice(): UFix64 {
+      return self.currentPrice * (1.0 + self.minimumBidPercentage)
     }
   }
 
@@ -240,10 +264,33 @@ pub contract MelosSettlement {
     }
   }
 
+  pub resource Bid {
+    access(contract) let nftReceiverRef: Capability<&{NonFungibleToken.CollectionPublic}>
+    access(contract) let paymentVaultRef: Capability<&{FungibleToken.Receiver, FungibleToken.Balance, FungibleToken.Provider}>
+    pub let offerPrice: UFix64
+    pub let bidder: Address
+    pub let bidTimestamp: UFix64
+
+    init(
+      nftReceiverRef: Capability<&{NonFungibleToken.CollectionPublic}>, 
+      paymentVaultRef: Capability<&{FungibleToken.Receiver, FungibleToken.Balance, FungibleToken.Provider}>,
+      offerPrice: UFix64
+    ) {
+      self.nftReceiverRef = nftReceiverRef
+      self.paymentVaultRef = paymentVaultRef
+      self.offerPrice = offerPrice
+      self.bidder = paymentVaultRef.address
+      self.bidTimestamp = getCurrentBlock().timestamp
+    }
+  }
+
   pub resource Listing {
     access(self) let initialized: Bool
     access(self) let details: ListingDetails
-    access(contract) let nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
+    access(self) let nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
+
+    access(self) let openBids: @{UInt64: Bid}
+    access(self) var englishAuctionBids: @{Address: Bid}
 
     init(
       listingType: ListingType,
@@ -292,6 +339,8 @@ pub contract MelosSettlement {
         receiver: receiver
       )
       self.nftProvider = nftProvider
+      self.openBids <- {}
+      self.englishAuctionBids <- {}
       self.initialized = true
       
       emit ListingCreated(
@@ -314,6 +363,8 @@ pub contract MelosSettlement {
             listingManager: self.details.listingManagerId
           )
       }
+      destroy self.openBids
+      destroy self.englishAuctionBids
     }
 
     pub fun borrowNFT(): &NonFungibleToken.NFT {
@@ -334,7 +385,7 @@ pub contract MelosSettlement {
 
     pub fun getPriceOpenBid(): UFix64 {
       let cfg = self.details.listingConfig as! OpenBid
-      return 0.0
+      return cfg.minimumPrice
     }
 
     pub fun getPriceDutchAuction(): UFix64 {
@@ -350,7 +401,7 @@ pub contract MelosSettlement {
 
     pub fun getPriceEnglishAuction(): UFix64 {
       let cfg = self.details.listingConfig as! EnglishAuction
-      return 0.0
+      return cfg.currentPrice
     }
 
     pub fun getPrice(): UFix64 {
@@ -393,11 +444,14 @@ pub contract MelosSettlement {
     }
 
     pub fun purchaseCommon(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
-      // Check
+      // Check listing type
+      assert(self.details.listingType == ListingType.Common, message: "Listing type is not Common")
+
+      // Check listing and params
       self.checkAvaliable()
       let payment <- self.checkPayment(<- payment)
 
-      var price = self.getPrice()
+      var price = self.getPriceCommon()
       assert(payment.balance >= price, message: "insufficient payments")
 
       let nft <- self.withdrawNFT()
@@ -414,11 +468,14 @@ pub contract MelosSettlement {
     }
 
     pub fun purchaseDutchAuction(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
-      // Check
+      // Check listing type
+      assert(self.details.listingType == ListingType.DutchAuction, message: "Listing type is not DutchAuction")
+
+      // Check listing and params
       self.checkAvaliable()
       let payment <- self.checkPayment(<- payment)
 
-      var price = self.getPrice()
+      var price = self.getPriceDutchAuction()
       assert(payment.balance >= price, message: "insufficient payments")
 
       let nft <- self.withdrawNFT()
@@ -434,20 +491,75 @@ pub contract MelosSettlement {
       return <- nft
     }
 
-    // TODO
-    pub fun placeBidOpenBid() {
-      // Check
-      self.checkAvaliable()
-      // let payment <- self.checkPayment(<- payment)
+    pub fun openBid(
+      nftReceiverRef: Capability<&{NonFungibleToken.CollectionPublic}>,
+      paymentVaultRef: Capability<&{FungibleToken.Receiver, FungibleToken.Balance, FungibleToken.Provider}>,
+      offerPrice: UFix64
+    ): UInt64 {
+      // Check listing type
+      assert(self.details.listingType == ListingType.OpenBid, message: "Listing type is not OpenBid")
 
+      // Check listing and params
+      self.checkAvaliable()
+      assert(nftReceiverRef.check(), message: "Infalid nft receiver ref")
+      assert(paymentVaultRef.check(), message: "Invalid payment vault ref")
+      assert(paymentVaultRef.borrow()!.balance >= offerPrice, message: "Insufficient balance")
+      
+      assert(offerPrice >= (self.details.listingConfig as! OpenBid).minimumPrice, message: "Offer price must be greater than minimumPrice")
+
+      let bid <- create Bid(
+        nftReceiverRef: nftReceiverRef,
+        paymentVaultRef: paymentVaultRef,
+        offerPrice: offerPrice
+      )
+      let bidId = bid.uuid
+
+      let _ <- self.openBids[bidId] <- bid
+      destroy _
+
+      emit OpenBidCreated(listingId: self.uuid, bidId: bidId, bidder: paymentVaultRef.address, offerPrice: offerPrice)
+
+      return bidId
     }
 
-    // TODO
-    pub fun placeBidEnglishAcution() {
-      // Check
-      self.checkAvaliable()
-      // let payment <- self.checkPayment(<- payment)
+    pub fun bidEnglishAuction(
+      nftReceiverRef: Capability<&{NonFungibleToken.CollectionPublic}>,
+      paymentVaultRef: Capability<&{FungibleToken.Receiver, FungibleToken.Balance, FungibleToken.Provider}>,
+      offerPrice: UFix64
+    ): UInt64 {
+      // Check listing type
+      assert(self.details.listingType == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
 
+      // Check listing and params
+      self.checkAvaliable()
+      assert(nftReceiverRef.check(), message: "Infalid nft receiver ref")
+      assert(paymentVaultRef.check(), message: "Invalid payment vault ref")
+      assert(paymentVaultRef.borrow()!.balance >= offerPrice, message: "Insufficient balance")
+
+      assert(
+        offerPrice >= (self.details.listingConfig as! EnglishAuction).getNextBidMinimumPrice(), 
+        message: "Offer price must be greater than or equal with currentPrice * (1 + minimum bid percentage)"
+      )
+
+      let bid <- create Bid(
+        nftReceiverRef: nftReceiverRef,
+        paymentVaultRef: paymentVaultRef,
+        offerPrice: offerPrice
+      )
+      let bidId = bid.uuid
+
+      let _ <- self.englishAuctionBids[paymentVaultRef.address] <- bid
+      destroy _;
+  
+      (self.details.listingConfig as! EnglishAuction).updateBid(currentBidder: paymentVaultRef.address, currentPrice: offerPrice)
+
+      emit EnglishAuctionBidCreated(
+        listingId: self.uuid, 
+        bidder: paymentVaultRef.address, 
+        offerPrice: offerPrice
+      )
+
+      return bidId
     }
   }
 
