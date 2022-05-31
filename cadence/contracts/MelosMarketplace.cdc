@@ -305,19 +305,19 @@ pub contract MelosMarketplace {
     pub let listingEndTime: UFix64?
     
     pub let reservePrice: UFix64
-    pub let basePrice: UFix64
     pub let minimumBidPercentage: UFix64
 
-    pub var topBid: &Bid?
+    pub var currentPrice: UFix64
+    pub var topBid: UInt64?
 
     init (
       listingStartTime: UFix64, 
       listingEndTime: UFix64?, 
       reservePrice: UFix64,
-      basePrice: UFix64,
-      minimumBidPercentage: UFix64
+      minimumBidPercentage: UFix64,
+      currentPrice: UFix64
     ) {
-      assert(reservePrice >= basePrice, message: "Reserve price must be greater than or equal with current price")
+      assert(reservePrice >= currentPrice, message: "Reserve price must be greater than or equal with current price")
       assert(listingEndTime != nil, message: "English auction listingEndTime must not null")
       assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
       assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
@@ -329,14 +329,14 @@ pub contract MelosMarketplace {
       self.listingEndTime = listingEndTime
 
       self.reservePrice = reservePrice
-      self.basePrice = basePrice
       self.minimumBidPercentage = minimumBidPercentage
 
+      self.currentPrice = currentPrice
       self.topBid = nil
     }
 
     pub fun getPrice(): UFix64 {
-      return self.topBid == nil ? self.basePrice : self.topBid!.offerPrice()
+      return self.currentPrice
     }
 
     pub fun getNextBidMinimumPrice(): UFix64 {
@@ -345,7 +345,8 @@ pub contract MelosMarketplace {
 
     access(contract) fun setTopBid(newTopBid: &Bid) {
       assert(newTopBid.offerPrice() >= self.getNextBidMinimumPrice(), message: "Offer price must be greater than or equal with [CurrentPrice * (1 + Minimum bid percentage)]")
-      self.topBid = newTopBid
+      self.topBid = newTopBid.uuid
+      self.currentPrice = newTopBid.offerPrice()
     }
   }
 
@@ -361,7 +362,7 @@ pub contract MelosMarketplace {
 
     pub let listingId: UInt64
     pub let bidder: Address
-    pub var bidTimestamp: UFix64
+    access(contract) var bidTimestamp: UFix64
 
     init(
       bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
@@ -389,6 +390,10 @@ pub contract MelosMarketplace {
 
     pub fun offerPrice(): UFix64 {
       return self.payment.balance
+    }
+
+    pub fun bidTime(): UFix64 {
+      return self.bidTimestamp
     }
 
     destroy() {
@@ -507,7 +512,7 @@ pub contract MelosMarketplace {
     access(self) let openBids: @{UInt64: Bid}
 
     // Address => English auction bid id
-    access(self) let englishAuctionParticipant: {Address: UInt64}
+    access(self) var englishAuctionParticipant: {Address: UInt64}
     // English auction bid id => Bid
     access(self) let englishAuctionBids: @{UInt64: Bid}
 
@@ -579,6 +584,14 @@ pub contract MelosMarketplace {
         return nft
     }
 
+    pub fun getEnglishAuctionParticipants(): {Address: UInt64} {
+      return self.englishAuctionParticipant
+    }
+
+    pub fun getBid(bidId: UInt64): &Bid? {
+      return &self.openBids[bidId] as? &Bid
+    }
+
     pub fun getDetails(): ListingDetails {
       return self.details
     }
@@ -587,12 +600,24 @@ pub contract MelosMarketplace {
       return self.details.getPrice()
     }
 
+    pub fun isListingEnded(): Bool {
+      return self.details.listingConfig.listingEndTime != nil 
+        ? getCurrentBlock().timestamp < self.details.listingConfig.listingEndTime! 
+        : false
+    }
+
+    pub fun isListingStarted(): Bool {
+      return getCurrentBlock().timestamp >= self.details.listingConfig.listingStartTime
+    }
+
+    pub fun isPurchased(): Bool {
+      return self.details.isPurchased == false
+    }
+
     pub fun ensureAvaliable() {
-      assert(self.details.isPurchased == false, message: "Listing has already been purchased")
-      assert(getCurrentBlock().timestamp >= self.details.listingConfig.listingStartTime, message: "Listing not started")
-      if self.details.listingConfig.listingEndTime != nil {
-        assert(getCurrentBlock().timestamp < self.details.listingConfig.listingEndTime!, message: "Listing has ended")
-      }
+      assert(!self.isPurchased(), message: "Listing has already been purchased")
+      assert(self.isListingStarted(), message: "Listing not started")
+      assert(!self.isListingEnded(), message: "Listing has ended")
     }
 
     pub fun ensurePaymentTokenType(_ payment: @FungibleToken.Vault): @FungibleToken.Vault {
@@ -727,9 +752,26 @@ pub contract MelosMarketplace {
       return bidId
     }
 
-    // TODO
     pub fun completeEnglishAuction() {
+      // Check listing and params
+      assert(self.details.listingType == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
+      assert(self.isListingStarted(), message: "Listing not started")
+      assert(self.isListingEnded(), message: "Auction is not ended")
+      assert(!self.isPurchased(), message: "Listing has already been purchased")
+
+      let topBid <- self.openBids.remove(key: (self.details.listingConfig as! EnglishAuction).topBid ?? panic("No bids"))!
       
+      let nft <- self.completeListing(<- topBid.payment.withdraw(amount: topBid.payment.balance))
+      topBid.rewardCollection.borrow()!.deposit(token: <- nft)
+
+      destroy topBid
+
+      for key in self.englishAuctionBids.keys {
+        let bid <- self.englishAuctionBids.remove(key: key)
+        destroy bid
+      }
+
+      self.englishAuctionParticipant = {}
     }
   }
 
