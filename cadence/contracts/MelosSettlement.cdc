@@ -2,7 +2,7 @@ import FungibleToken from "core/FungibleToken.cdc"
 import NonFungibleToken from "core/NonFungibleToken.cdc"
 
 
-pub contract MelosSettlement {
+pub contract MelosMarketplace {
 
   pub enum ListingType: UInt8 {
     pub case Common
@@ -65,8 +65,8 @@ pub contract MelosSettlement {
     self.minimumListingDuration = 0.0
     self.allowedPaymentTokens = []
     self.AdminStoragePath = /storage/MelosSettlementAdmin
-    self.ListingManagerStoragePath = /storage/MelosSettlement
-    self.ListingManagerPublicPath = /public/MelosSettlement
+    self.ListingManagerStoragePath = /storage/MelosMarketplace
+    self.ListingManagerPublicPath = /public/MelosMarketplace
 
     // Create admint resource and do some settings
     let admin <- create Admin()
@@ -83,8 +83,8 @@ pub contract MelosSettlement {
     emit MelosSettlementInitialized()
   }
 
-  pub fun checkListingConfig(_ listingType: ListingType, _ listingConfig: {MelosSettlement.ListingConfig}) {
-    var cfg: {MelosSettlement.ListingConfig}? = nil
+  pub fun checkListingConfig(_ listingType: ListingType, _ listingConfig: {MelosMarketplace.ListingConfig}) {
+    var cfg: {MelosMarketplace.ListingConfig}? = nil
     switch listingType {
       case ListingType.Common:
         cfg = listingConfig as? Common
@@ -108,41 +108,41 @@ pub contract MelosSettlement {
 
   pub resource Admin {
     pub fun setFeeRecipient(_ newFeeRecipient: Address) {
-      MelosSettlement.feeRecipient = newFeeRecipient
+      MelosMarketplace.feeRecipient = newFeeRecipient
       emit FeeRecipientChanged(newFeeRecipient)
     }
 
     pub fun setMakerRelayerFee(_ newFee: UFix64) {
-      let oldFee = MelosSettlement.makerRelayerFee
-      MelosSettlement.makerRelayerFee = newFee
+      let oldFee = MelosMarketplace.makerRelayerFee
+      MelosMarketplace.makerRelayerFee = newFee
       emit MakerRelayerFeeChanged(old: oldFee, new: newFee)
     }
 
     pub fun setTakerRelayerFee(_ newFee: UFix64) {
-      let oldFee = MelosSettlement.takerRelayerFee
-      MelosSettlement.takerRelayerFee = newFee
+      let oldFee = MelosMarketplace.takerRelayerFee
+      MelosMarketplace.takerRelayerFee = newFee
       emit TakerRelayerFeeChanged(old: oldFee, new: newFee)
     }
 
     pub fun setMinimumListingDuration(_ newDuration: UFix64) {
-      let oldDuration = MelosSettlement.minimumListingDuration
-      MelosSettlement.minimumListingDuration = newDuration
+      let oldDuration = MelosMarketplace.minimumListingDuration
+      MelosMarketplace.minimumListingDuration = newDuration
       emit MinimumListingDurationChanged(old: oldDuration, new: newDuration)
     }
 
     pub fun setAllowedPaymentTokens(_ newAllowedPaymentTokens: [Type]) {
-      let oldAllowedPaymentTokens = MelosSettlement.allowedPaymentTokens
-      MelosSettlement.allowedPaymentTokens = newAllowedPaymentTokens
+      let oldAllowedPaymentTokens = MelosMarketplace.allowedPaymentTokens
+      MelosMarketplace.allowedPaymentTokens = newAllowedPaymentTokens
       emit AllowedPaymentTokensChanged(old: oldAllowedPaymentTokens, new: newAllowedPaymentTokens)
     }
 
     pub fun addAllowedPaymentTokens(_ newAllowedPaymentTokens: [Type]) {
-      self.setAllowedPaymentTokens(MelosSettlement.allowedPaymentTokens.concat(newAllowedPaymentTokens))
+      self.setAllowedPaymentTokens(MelosMarketplace.allowedPaymentTokens.concat(newAllowedPaymentTokens))
     }
 
     pub fun removeAllowedPaymentTokens(_ removedPaymentTokens: [Type]) {
-      var temp = MelosSettlement.allowedPaymentTokens
-      for index, token in MelosSettlement.allowedPaymentTokens {
+      var temp = MelosMarketplace.allowedPaymentTokens
+      for index, token in MelosMarketplace.allowedPaymentTokens {
         if temp.contains(token) {
           temp.remove(at: index)
         }
@@ -232,7 +232,7 @@ pub contract MelosSettlement {
     pub let paymentToken: Type
     pub let listingStartTime: UFix64
     pub let listingEndTime: UFix64?
-    pub let listingConfig: {MelosSettlement.ListingConfig}
+    pub let listingConfig: {MelosMarketplace.ListingConfig}
 
     pub let receiver: Capability<&{FungibleToken.Receiver}>
 
@@ -244,7 +244,7 @@ pub contract MelosSettlement {
       paymentToken: Type,
       listingStartTime: UFix64,
       listingEndTime: UFix64?,
-      listingConfig: {MelosSettlement.ListingConfig},
+      listingConfig: {MelosMarketplace.ListingConfig},
       receiver: Capability<&{FungibleToken.Receiver}>
     ) {
       self.listingType = listingType
@@ -316,18 +316,18 @@ pub contract MelosSettlement {
       paymentToken: Type,
       listingStartTime: UFix64,
       listingEndTime: UFix64?,
-      listingConfig: {MelosSettlement.ListingConfig},
+      listingConfig: {MelosMarketplace.ListingConfig},
       receiver: Capability<&{FungibleToken.Receiver}>
     ) {
-      assert(MelosSettlement.allowedPaymentTokens.contains(paymentToken), message: "Payment tokens not allowed")
+      assert(MelosMarketplace.allowedPaymentTokens.contains(paymentToken), message: "Payment tokens not allowed")
       assert(receiver.borrow() != nil, message: "Cannot borrow receiver")
 
       if listingEndTime != nil {
         assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
-        assert((listingEndTime! - listingStartTime) > MelosSettlement.minimumListingDuration, message: "Listing duration must be greater than minimum listing duration")
+        assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration, message: "Listing duration must be greater than minimum listing duration")
       }
 
-      MelosSettlement.checkListingConfig(listingType, listingConfig)
+      MelosMarketplace.checkListingConfig(listingType, listingConfig)
       if listingType == ListingType.DutchAuction {
         let cfg = listingConfig as! DutchAuction
         assert(listingEndTime != nil, message: "Dutch auction listingEndTime must not null")
@@ -637,7 +637,7 @@ pub contract MelosSettlement {
       paymentToken: Type,
       listingStartTime: UFix64,
       listingEndTime: UFix64?,
-      listingConfig: {MelosSettlement.ListingConfig},
+      listingConfig: {MelosMarketplace.ListingConfig},
       receiver: Capability<&{FungibleToken.Receiver}>
     ): UInt64 {
         let listing <- create Listing(

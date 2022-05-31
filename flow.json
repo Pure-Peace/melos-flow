@@ -30,7 +30,7 @@
     "FUSD": "./cadence/contracts/core/FUSD.cdc",
     "MelosNFT": "./cadence/contracts/MelosNFT.cdc",
     "FlowStorageFees": "./cadence/contracts/core/FlowStorageFees.cdc",
-    "MelosSettlement": "./cadence/contracts/MelosSettlement.cdc"
+    "MelosMarketplace": "./cadence/contracts/MelosMarketplace.cdc"
   },
   "networks": {
     "emulator": "127.0.0.1:3569",
@@ -65,7 +65,7 @@
             }
           ]
         },
-        "MelosSettlement"
+        "MelosMarketplace"
       ]
     }
   }
