@@ -278,6 +278,7 @@ pub contract MelosMarketplace {
 
   pub resource Bid {
     pub let bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>
+    pub let listingId: UInt64
 
     pub let rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>
     pub let refund: Capability<&{FungibleToken.Receiver}>
@@ -290,6 +291,7 @@ pub contract MelosMarketplace {
 
     init(
       bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
+      listingId: UInt64,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault,
@@ -301,6 +303,10 @@ pub contract MelosMarketplace {
       assert(payment.balance >= offerPrice, message: "Insufficient payments")
 
       self.bidManager = bidManager
+      self.bidManager.borrow()!.recordBid(listingId: listingId, bidId: self.uuid)
+
+      self.listingId = listingId
+
       self.rewardCollection = rewardCollection
       self.refund = refund
 
@@ -318,40 +324,59 @@ pub contract MelosMarketplace {
 
 
   pub resource interface BidManagerPublic {
+    pub fun isBidExists(listingId: UInt64, bidId: UInt64): Bool 
 
+    pub fun getRecords(): {UInt64: [UInt64]}
+
+    pub fun getBidsWithListingId(listingId: UInt64): [UInt64]
+
+    pub fun recordBid(listingId: UInt64, bidId: UInt64): Bool
   }
 
-  pub resource BidManager {
-    pub let openBids: {UInt64: [UInt64]}
-    pub let englishAuctionBids: {UInt64: [UInt64]}
+  pub resource BidManager: BidManagerPublic {
+    access(self) let listings: {UInt64: [UInt64]}
 
     init () {
-      self.openBids = {}
-      self.englishAuctionBids = {}
+      self.listings = {}
     }
 
 
-    pub fun newOpenBid(listingId: UInt64, bidId: UInt64) {
-      if let bids = self.openBids[listingId] {
-        assert(!bids.contains(bidId), message: "OpenBid already exists")
-        self.openBids[listingId]!.append(bidId)
-      } else {
-        self.openBids[listingId] = [bidId]
+    pub fun isBidExists(listingId: UInt64, bidId: UInt64): Bool {      
+      if self.listings[listingId] == nil {
+        return false
+
+      } else if self.listings[listingId]!.contains(bidId) {
+        return true
       }
+
+      return false
     }
 
-    pub fun newEnglishAuctionBid(listingId: UInt64, bidId: UInt64) {
-      if let bids = self.englishAuctionBids[listingId] {
-        assert(!bids.contains(bidId), message: "EnglishAuctionBid already exists")
-        self.englishAuctionBids[listingId]!.append(bidId)
-      } else {
-        self.englishAuctionBids[listingId] = [bidId]
+    pub fun getRecords(): {UInt64: [UInt64]} {
+      return self.listings
+    }
+
+    pub fun getBidsWithListingId(listingId: UInt64): [UInt64] {
+      return self.listings[listingId] ?? []
+    }
+
+    pub fun recordBid(listingId: UInt64, bidId: UInt64): Bool {
+      if self.listings[listingId] == nil {
+        self.listings[listingId] = [bidId]
+        return true
+
+      } else if !self.listings[listingId]!.contains(bidId) {
+        self.listings[listingId]!.append(bidId)
+        return true
       }
+
+      return false
     }
 
     destroy() {
-      assert(self.openBids.length == 0, message: "OpenBids record exists")
-      assert(self.englishAuctionBids.length == 0, message: "EnglishAuctionBids record exists")
+      for bids in self.listings.values {
+        assert(bids.length == 0, message: "Bid records exists")
+      }
     }
   }
 
@@ -579,6 +604,7 @@ pub contract MelosMarketplace {
 
       let bid <- create Bid(
         bidManager: bidManager,
+        listingId: self.uuid,
         rewardCollection: rewardCollection,
         refund: refund,
         payment: <- payment,
@@ -615,6 +641,7 @@ pub contract MelosMarketplace {
 
       let bid <- create Bid(
         bidManager: bidManager,
+        listingId: self.uuid,
         rewardCollection: rewardCollection,
         refund: refund,
         payment: <- payment,
