@@ -11,6 +11,8 @@ pub contract MelosMarketplace {
     pub case EnglishAuction
   }
 
+  /* --------------- ↓↓ Vars ↓↓ --------------- */
+
   pub let AdminStoragePath: StoragePath
   pub let ListingManagerStoragePath: StoragePath
   pub let BidManagerStoragePath: StoragePath
@@ -21,8 +23,9 @@ pub contract MelosMarketplace {
   pub var minimumListingDuration: UFix64?
 
   access(self) var listings: @{UInt64: Listing}
-
   access(self) var allowedPaymentTokens: [Type]
+
+  /* --------------- ↓↓ Events ↓↓ --------------- */
 
   pub event MelosSettlementInitialized();
   pub event FeeRecipientChanged(_ newFeeRecipient: Address?)
@@ -53,6 +56,8 @@ pub contract MelosMarketplace {
   )
   pub event ListingRemoved(purchased: Bool, listingId: UInt64, listingManager: UInt64)
   pub event ListingCompleted(listingId: UInt64, listingManager: UInt64)
+
+  /* --------------- ↓↓ Initilization ↓↓ --------------- */
 
   init (
     feeRecipient: Address?,
@@ -87,6 +92,8 @@ pub contract MelosMarketplace {
 
     emit MelosSettlementInitialized()
   }
+
+  /* --------------- ↓↓ Contract Methods ↓↓ --------------- */
 
   pub fun getListingIds(): [UInt64] {
       return self.listings.keys
@@ -137,6 +144,10 @@ pub contract MelosMarketplace {
       return <-create BidManager()
   }
 
+  /* --------------- ↑↑ Contract Methods ↑↑ --------------- */
+
+  /* --------------- ↓↓ Contract Admint ↓↓ --------------- */
+
   pub resource Admin {
     pub fun setFeeRecipient(_ newFeeRecipient: Address?) {
       MelosMarketplace.feeRecipient = newFeeRecipient
@@ -181,6 +192,10 @@ pub contract MelosMarketplace {
       self.setAllowedPaymentTokens(temp)
     }
   }
+
+  /* --------------- ↑↑ Contract Admin ↑↑ --------------- */
+
+  /* --------------- ↓↓ ListingConfigs ↓↓ --------------- */
 
   pub struct interface ListingConfig {
     pub let listingStartTime: UFix64
@@ -306,48 +321,9 @@ pub contract MelosMarketplace {
     }
   }
 
-  pub struct ListingDetails {
-    pub var listingType: ListingType
+  /* --------------- ↑↑ ListingConfigs ↑↑ --------------- */
 
-    pub var listingManagerId: UInt64
-    pub var isPurchased: Bool
-
-    pub let nftType: Type
-    pub let nftId: UInt64
-    pub let paymentToken: Type
-    pub let listingConfig: {MelosMarketplace.ListingConfig}
-
-    pub let receiver: Capability<&{FungibleToken.Receiver}>
-
-    init (
-      listingType: ListingType,
-      listingManagerId: UInt64,
-      nftType: Type,
-      nftId: UInt64,
-      paymentToken: Type,
-      listingStartTime: UFix64,
-      listingEndTime: UFix64?,
-      listingConfig: {MelosMarketplace.ListingConfig},
-      receiver: Capability<&{FungibleToken.Receiver}>
-    ) {
-      self.listingType = listingType
-      self.listingManagerId = listingManagerId
-      self.isPurchased = false
-      self.nftType = nftType
-      self.nftId = nftId
-      self.paymentToken = paymentToken
-      self.listingConfig = listingConfig
-      self.receiver = receiver
-    }
-
-    pub fun getPrice(): UFix64 {
-      return self.listingConfig.getPrice()
-    }
-
-    access(contract) fun setToPurchased() {
-        self.isPurchased = true
-    }
-  }
+  /* --------------- ↓↓ Bids ↓↓ --------------- */
 
   pub resource Bid {
     pub let bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>
@@ -450,6 +426,53 @@ pub contract MelosMarketplace {
       for bids in self.listings.values {
         assert(bids.length == 0, message: "Bid records exists")
       }
+    }
+  }
+
+  /* --------------- ↑↑ Bids ↑↑ --------------- */
+
+  /* --------------- ↓↓ Listings ↓↓ --------------- */
+
+  pub struct ListingDetails {
+    pub var listingType: ListingType
+
+    pub var listingManagerId: UInt64
+    pub var isPurchased: Bool
+
+    pub let nftType: Type
+    pub let nftId: UInt64
+    pub let paymentToken: Type
+    pub let listingConfig: {MelosMarketplace.ListingConfig}
+
+    pub let receiver: Capability<&{FungibleToken.Receiver}>
+
+    init (
+      listingType: ListingType,
+      listingManagerId: UInt64,
+      nftType: Type,
+      nftId: UInt64,
+      paymentToken: Type,
+      listingStartTime: UFix64,
+      listingEndTime: UFix64?,
+      listingConfig: {MelosMarketplace.ListingConfig},
+      receiver: Capability<&{FungibleToken.Receiver}>
+    ) {
+      self.listingType = listingType
+      self.listingManagerId = listingManagerId
+      self.isPurchased = false
+      self.nftType = nftType
+      self.nftId = nftId
+      self.paymentToken = paymentToken
+      self.listingConfig = listingConfig
+      self.receiver = receiver
+    }
+
+    pub fun getPrice(): UFix64 {
+      return self.listingConfig.getPrice()
+    }
+
+    access(contract) fun setToPurchased() {
+        self.isPurchased = true
     }
   }
 
@@ -771,4 +794,5 @@ pub contract MelosMarketplace {
 
     }
   }
+  /* --------------- ↑↑ Listings ↑↑ --------------- */
 }
