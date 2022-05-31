@@ -21,8 +21,9 @@ pub contract MelosMarketplace {
   pub var makerRelayerFee: UFix64?
   pub var takerRelayerFee: UFix64?
   pub var minimumListingDuration: UFix64?
+  pub var maxAuctionDuration: UFix64?
 
-  access(self) var listings: @{UInt64: Listing}
+  access(self) let listings: @{UInt64: Listing}
   access(self) var allowedPaymentTokens: [Type]
 
   /* --------------- ↓↓ Events ↓↓ --------------- */
@@ -36,6 +37,7 @@ pub contract MelosMarketplace {
   pub event MakerRelayerFeeChanged(old: UFix64?, new: UFix64?)
   pub event TakerRelayerFeeChanged(old: UFix64?, new: UFix64?)
   pub event MinimumListingDurationChanged(old: UFix64?, new: UFix64?)
+  pub event MaxAuctionDurationChanged(old: UFix64?, new: UFix64?)
   pub event AllowedPaymentTokensChanged(old: [Type]?, new: [Type]?)
 
   pub event OpenBidCreated(listingId: UInt64, bidId: UInt64, bidder: Address, offerPrice: UFix64)
@@ -64,12 +66,14 @@ pub contract MelosMarketplace {
     makerRelayerFee: UFix64?,
     takerRelayerFee: UFix64?,
     minimumListingDuration: UFix64?,
+    maxAuctionDuration: UFix64?,
     allowedPaymentTokens: [Type]
   ) {
     self.feeRecipient = nil
     self.makerRelayerFee = nil
     self.takerRelayerFee = nil
     self.minimumListingDuration = nil
+    self.maxAuctionDuration = nil
 
     self.listings <- {}
     self.allowedPaymentTokens = []
@@ -84,8 +88,9 @@ pub contract MelosMarketplace {
     admin.setFeeRecipient(feeRecipient)
     admin.setMakerRelayerFee(makerRelayerFee)
     admin.setTakerRelayerFee(takerRelayerFee)
-    admin.setAllowedPaymentTokens(allowedPaymentTokens)
     admin.setMinimumListingDuration(minimumListingDuration)
+    admin.setMaxAuctionDuration(maxAuctionDuration)
+    admin.setAllowedPaymentTokens(allowedPaymentTokens)
 
     // Save admin resource to account
     self.account.save(<-admin, to: self.AdminStoragePath)
@@ -174,6 +179,12 @@ pub contract MelosMarketplace {
       emit MinimumListingDurationChanged(old: oldDuration, new: newDuration)
     }
 
+    pub fun setMaxAuctionDuration(_ newDuration: UFix64?) {
+      let oldDuration = MelosMarketplace.maxAuctionDuration
+      MelosMarketplace.maxAuctionDuration = newDuration
+      emit MaxAuctionDurationChanged(old: oldDuration, new: newDuration)
+    }
+
     pub fun setAllowedPaymentTokens(_ newAllowedPaymentTokens: [Type]) {
       let oldAllowedPaymentTokens = MelosMarketplace.allowedPaymentTokens
       MelosMarketplace.allowedPaymentTokens = newAllowedPaymentTokens
@@ -185,7 +196,7 @@ pub contract MelosMarketplace {
     }
 
     pub fun removeAllowedPaymentTokens(_ removedPaymentTokens: [Type]) {
-      var temp = MelosMarketplace.allowedPaymentTokens
+      let temp = MelosMarketplace.allowedPaymentTokens
       for index, token in MelosMarketplace.allowedPaymentTokens {
         if temp.contains(token) {
           temp.remove(at: index)
@@ -311,7 +322,10 @@ pub contract MelosMarketplace {
       assert(listingEndTime != nil, message: "English auction listingEndTime must not null")
       assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
       assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
-     
+      if let maxAuctionDuration = MelosMarketplace.maxAuctionDuration {
+        assert((listingEndTime! - listingStartTime) <= maxAuctionDuration, message: "Auction duration must be less than max auction duration")
+      }
+
 
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingEndTime
@@ -606,7 +620,7 @@ pub contract MelosMarketplace {
       self.checkAvaliable()
       let payment <- self.checkPayment(<- payment)
 
-      var price = self.getPrice()
+      let price = self.getPrice()
       assert(payment.balance >= price, message: "insufficient payments")
 
       let nft <- self.withdrawNFT()
@@ -630,7 +644,7 @@ pub contract MelosMarketplace {
       self.checkAvaliable()
       let payment <- self.checkPayment(<- payment)
 
-      var price = self.getPrice()
+      let price = self.getPrice()
       assert(payment.balance >= price, message: "insufficient payments")
 
       let nft <- self.withdrawNFT()
@@ -729,7 +743,7 @@ pub contract MelosMarketplace {
 
   pub resource ListingManager {
     // Listing => Listing resource
-    access(self) var listings: {UInt64: &Listing}
+    pub let listings: {UInt64: &Listing}
 
     init() {
       self.listings = {}
