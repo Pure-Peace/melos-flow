@@ -265,22 +265,37 @@ pub contract MelosSettlement {
   }
 
   pub resource Bid {
-    access(contract) let nftReceiverRef: Capability<&{NonFungibleToken.CollectionPublic}>
-    access(contract) let paymentVaultRef: Capability<&{FungibleToken.Receiver, FungibleToken.Balance, FungibleToken.Provider}>
-    pub let offerPrice: UFix64
+    pub let rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>
+    pub let refund: Capability<&{FungibleToken.Receiver}>
+
+    pub var payment: @FungibleToken.Vault
+    pub var offerPrice: UFix64
+
     pub let bidder: Address
     pub let bidTimestamp: UFix64
 
     init(
-      nftReceiverRef: Capability<&{NonFungibleToken.CollectionPublic}>, 
-      paymentVaultRef: Capability<&{FungibleToken.Receiver, FungibleToken.Balance, FungibleToken.Provider}>,
+      rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
+      refund: Capability<&{FungibleToken.Receiver}>,
+      payment: @FungibleToken.Vault,
       offerPrice: UFix64
     ) {
-      self.nftReceiverRef = nftReceiverRef
-      self.paymentVaultRef = paymentVaultRef
+      assert(rewardCollection.check(), message: "Invalid NFT reward collection")
+      assert(refund.check(), message: "Invalid refund capability")
+      assert(payment.balance >= offerPrice, message: "Insufficient payments")
+
+      self.rewardCollection = rewardCollection
+      self.refund = refund
+
+      self.payment <- payment
       self.offerPrice = offerPrice
-      self.bidder = paymentVaultRef.address
+
+      self.bidder = self.refund.address
       self.bidTimestamp = getCurrentBlock().timestamp
+    }
+
+    destroy() {
+      self.refund.borrow()!.deposit(from: <- self.payment)
     }
   }
 
@@ -492,8 +507,9 @@ pub contract MelosSettlement {
     }
 
     pub fun openBid(
-      nftReceiverRef: Capability<&{NonFungibleToken.CollectionPublic}>,
-      paymentVaultRef: Capability<&{FungibleToken.Receiver, FungibleToken.Balance, FungibleToken.Provider}>,
+      rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
+      refund: Capability<&{FungibleToken.Receiver}>,
+      payment: @FungibleToken.Vault,
       offerPrice: UFix64
     ): UInt64 {
       // Check listing type
@@ -501,15 +517,13 @@ pub contract MelosSettlement {
 
       // Check listing and params
       self.checkAvaliable()
-      assert(nftReceiverRef.check(), message: "Infalid nft receiver ref")
-      assert(paymentVaultRef.check(), message: "Invalid payment vault ref")
-      assert(paymentVaultRef.borrow()!.balance >= offerPrice, message: "Insufficient balance")
-      
+      let payment <- self.checkPayment(<- payment)
       assert(offerPrice >= (self.details.listingConfig as! OpenBid).minimumPrice, message: "Offer price must be greater than minimumPrice")
 
       let bid <- create Bid(
-        nftReceiverRef: nftReceiverRef,
-        paymentVaultRef: paymentVaultRef,
+        rewardCollection: rewardCollection,
+        refund: refund,
+        payment: <- payment,
         offerPrice: offerPrice
       )
       let bidId = bid.uuid
@@ -517,14 +531,15 @@ pub contract MelosSettlement {
       let _ <- self.openBids[bidId] <- bid
       destroy _
 
-      emit OpenBidCreated(listingId: self.uuid, bidId: bidId, bidder: paymentVaultRef.address, offerPrice: offerPrice)
+      emit OpenBidCreated(listingId: self.uuid, bidId: bidId, bidder: refund.address, offerPrice: offerPrice)
 
       return bidId
     }
 
     pub fun bidEnglishAuction(
-      nftReceiverRef: Capability<&{NonFungibleToken.CollectionPublic}>,
-      paymentVaultRef: Capability<&{FungibleToken.Receiver, FungibleToken.Balance, FungibleToken.Provider}>,
+      rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
+      refund: Capability<&{FungibleToken.Receiver}>,
+      payment: @FungibleToken.Vault,
       offerPrice: UFix64
     ): UInt64 {
       // Check listing type
@@ -532,30 +547,28 @@ pub contract MelosSettlement {
 
       // Check listing and params
       self.checkAvaliable()
-      assert(nftReceiverRef.check(), message: "Infalid nft receiver ref")
-      assert(paymentVaultRef.check(), message: "Invalid payment vault ref")
-      assert(paymentVaultRef.borrow()!.balance >= offerPrice, message: "Insufficient balance")
-
+      let payment <- self.checkPayment(<- payment)
       assert(
         offerPrice >= (self.details.listingConfig as! EnglishAuction).getNextBidMinimumPrice(), 
         message: "Offer price must be greater than or equal with currentPrice * (1 + minimum bid percentage)"
       )
 
       let bid <- create Bid(
-        nftReceiverRef: nftReceiverRef,
-        paymentVaultRef: paymentVaultRef,
+        rewardCollection: rewardCollection,
+        refund: refund,
+        payment: <- payment,
         offerPrice: offerPrice
       )
       let bidId = bid.uuid
 
-      let _ <- self.englishAuctionBids[paymentVaultRef.address] <- bid
+      let _ <- self.englishAuctionBids[refund.address] <- bid
       destroy _;
   
-      (self.details.listingConfig as! EnglishAuction).updateBid(currentBidder: paymentVaultRef.address, currentPrice: offerPrice)
+      (self.details.listingConfig as! EnglishAuction).updateBid(currentBidder: refund.address, currentPrice: offerPrice)
 
       emit EnglishAuctionBidCreated(
         listingId: self.uuid, 
-        bidder: paymentVaultRef.address, 
+        bidder: refund.address, 
         offerPrice: offerPrice
       )
 
