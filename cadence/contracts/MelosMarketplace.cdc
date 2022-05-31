@@ -13,25 +13,27 @@ pub contract MelosMarketplace {
 
   pub let AdminStoragePath: StoragePath
   pub let ListingManagerStoragePath: StoragePath
-  pub let ListingManagerPublicPath: PublicPath
+  pub let BidManagerStoragePath: StoragePath
 
-  pub var feeRecipient: Address
-  pub var makerRelayerFee: UFix64
-  pub var takerRelayerFee: UFix64
-  pub var minimumListingDuration: UFix64
+  pub var feeRecipient: Address?
+  pub var makerRelayerFee: UFix64?
+  pub var takerRelayerFee: UFix64?
+  pub var minimumListingDuration: UFix64?
+
+  access(self) var listings: @{UInt64: Listing}
 
   access(self) var allowedPaymentTokens: [Type]
 
   pub event MelosSettlementInitialized();
-  pub event FeeRecipientChanged(_ newFeeRecipient: Address)
+  pub event FeeRecipientChanged(_ newFeeRecipient: Address?)
 
   pub event ListingManagerCreated(_ listingManagerResourceID: UInt64)
   pub event ListingManagerDestroyed(_ listingManagerResourceID: UInt64)
 
-  pub event MakerRelayerFeeChanged(old: UFix64, new: UFix64)
-  pub event TakerRelayerFeeChanged(old: UFix64, new: UFix64)
-  pub event MinimumListingDurationChanged(old: UFix64, new: UFix64)
-  pub event AllowedPaymentTokensChanged(old: [Type], new: [Type])
+  pub event MakerRelayerFeeChanged(old: UFix64?, new: UFix64?)
+  pub event TakerRelayerFeeChanged(old: UFix64?, new: UFix64?)
+  pub event MinimumListingDurationChanged(old: UFix64?, new: UFix64?)
+  pub event AllowedPaymentTokensChanged(old: [Type]?, new: [Type]?)
 
   pub event OpenBidCreated(listingId: UInt64, bidId: UInt64, bidder: Address, offerPrice: UFix64)
   pub event OpenBidRemoved(listingId: UInt64, bidId: UInt64)
@@ -53,20 +55,23 @@ pub contract MelosMarketplace {
   pub event ListingCompleted(listingId: UInt64, listingManager: UInt64)
 
   init (
-    feeRecipient: Address,
-    makerRelayerFee: UFix64,
-    takerRelayerFee: UFix64,
-    minimumListingDuration: UFix64,
+    feeRecipient: Address?,
+    makerRelayerFee: UFix64?,
+    takerRelayerFee: UFix64?,
+    minimumListingDuration: UFix64?,
     allowedPaymentTokens: [Type]
   ) {
-    self.feeRecipient = Address(0x0)
-    self.makerRelayerFee = 0.0
-    self.takerRelayerFee = 0.0
-    self.minimumListingDuration = 0.0
+    self.feeRecipient = nil
+    self.makerRelayerFee = nil
+    self.takerRelayerFee = nil
+    self.minimumListingDuration = nil
+
+    self.listings <- {}
     self.allowedPaymentTokens = []
+
     self.AdminStoragePath = /storage/MelosSettlementAdmin
     self.ListingManagerStoragePath = /storage/MelosMarketplace
-    self.ListingManagerPublicPath = /public/MelosMarketplace
+    self.BidManagerStoragePath = /storage/MelosBidManager
 
     // Create admint resource and do some settings
     let admin <- create Admin()
@@ -81,6 +86,20 @@ pub contract MelosMarketplace {
     self.account.save(<-admin, to: self.AdminStoragePath)
 
     emit MelosSettlementInitialized()
+  }
+
+  pub fun getListingIds(): [UInt64] {
+      return self.listings.keys
+  }
+
+  pub fun isListingExists(listingId: UInt64): Bool {
+      return self.listings[listingId] != nil
+  }
+
+  pub fun getListing(listingId: UInt64): &Listing {
+      assert(self.listings[listingId] != nil, message: "Listing not exists")
+
+      return &self.listings[listingId] as! &Listing
   }
 
   pub fun getAllowedTokens(): [Type] {
@@ -119,24 +138,24 @@ pub contract MelosMarketplace {
   }
 
   pub resource Admin {
-    pub fun setFeeRecipient(_ newFeeRecipient: Address) {
+    pub fun setFeeRecipient(_ newFeeRecipient: Address?) {
       MelosMarketplace.feeRecipient = newFeeRecipient
       emit FeeRecipientChanged(newFeeRecipient)
     }
 
-    pub fun setMakerRelayerFee(_ newFee: UFix64) {
+    pub fun setMakerRelayerFee(_ newFee: UFix64?) {
       let oldFee = MelosMarketplace.makerRelayerFee
       MelosMarketplace.makerRelayerFee = newFee
       emit MakerRelayerFeeChanged(old: oldFee, new: newFee)
     }
 
-    pub fun setTakerRelayerFee(_ newFee: UFix64) {
+    pub fun setTakerRelayerFee(_ newFee: UFix64?) {
       let oldFee = MelosMarketplace.takerRelayerFee
       MelosMarketplace.takerRelayerFee = newFee
       emit TakerRelayerFeeChanged(old: oldFee, new: newFee)
     }
 
-    pub fun setMinimumListingDuration(_ newDuration: UFix64) {
+    pub fun setMinimumListingDuration(_ newDuration: UFix64?) {
       let oldDuration = MelosMarketplace.minimumListingDuration
       MelosMarketplace.minimumListingDuration = newDuration
       emit MinimumListingDurationChanged(old: oldDuration, new: newDuration)
@@ -164,40 +183,87 @@ pub contract MelosMarketplace {
   }
 
   pub struct interface ListingConfig {
-
+    pub let listingStartTime: UFix64
+    pub let listingEndTime: UFix64?
+    pub fun getPrice(): UFix64
   }
 
   pub struct Common: ListingConfig {
+    pub let listingStartTime: UFix64
+    pub let listingEndTime: UFix64?
+
     pub let price: UFix64
 
-    init (price: UFix64) {
+    init (listingStartTime: UFix64, listingEndTime: UFix64?, price: UFix64) {
+      self.listingStartTime = listingStartTime
+      self.listingEndTime = listingEndTime
+
       self.price = price
+    }
+
+    pub fun getPrice(): UFix64 {
+      return self.price
     }
   }
 
   pub struct OpenBid: ListingConfig {
+    pub let listingStartTime: UFix64
+    pub let listingEndTime: UFix64?
+    
     pub let minimumPrice: UFix64
 
-    init (minimumPrice: UFix64) {
+    init (listingStartTime: UFix64, listingEndTime: UFix64?, minimumPrice: UFix64) {
+      self.listingStartTime = listingStartTime
+      self.listingEndTime = listingEndTime
+
       self.minimumPrice = minimumPrice
+    }
+
+    pub fun getPrice(): UFix64 {
+      return self.minimumPrice
     }
   }
 
   pub struct DutchAuction: ListingConfig {
+    pub let listingStartTime: UFix64
+    pub let listingEndTime: UFix64?
+    
     pub let startingPrice: UFix64
     pub let reservePrice: UFix64
     pub let priceCutInterval: UFix64
 
-    init (startingPrice: UFix64, reservePrice: UFix64, priceCutInterval: UFix64) {
+    init (
+      listingStartTime: UFix64, 
+      listingEndTime: UFix64?, 
+      startingPrice: UFix64, 
+      reservePrice: UFix64, 
+      priceCutInterval: UFix64
+    ) {
       assert(startingPrice >= reservePrice, message: "Starting price must be greater than or equal with reserve price")
+
+      self.listingStartTime = listingStartTime
+      self.listingEndTime = listingEndTime
 
       self.startingPrice = startingPrice
       self.reservePrice = reservePrice
       self.priceCutInterval = priceCutInterval
     }
+
+    pub fun getPrice(): UFix64 {
+      let duration = getCurrentBlock().timestamp - self.listingStartTime
+
+      let diff = self.startingPrice - self.reservePrice
+      let deduct = (duration - duration % self.priceCutInterval)
+         * diff / (self.listingEndTime! - self.listingStartTime - self.priceCutInterval)
+      
+      return deduct > diff ? self.reservePrice : self.reservePrice - deduct
+    }
   }
 
   pub struct EnglishAuction: ListingConfig {
+    pub let listingStartTime: UFix64
+    pub let listingEndTime: UFix64?
+    
     access(self) let reservePrice: UFix64
     pub let minimumBidPercentage: UFix64
 
@@ -205,6 +271,8 @@ pub contract MelosMarketplace {
     pub var currentPrice: UFix64
     pub var bidTimestamp: UFix64
     init (
+      listingStartTime: UFix64, 
+      listingEndTime: UFix64?, 
       reservePrice: UFix64,
       minimumBidPercentage: UFix64,
       currentBidder: Address,
@@ -212,14 +280,19 @@ pub contract MelosMarketplace {
     ) {
       assert(reservePrice >= currentPrice, message: "Reserve price must be greater than or equal with current price")
 
-      // Initialize constants
+      self.listingStartTime = listingStartTime
+      self.listingEndTime = listingEndTime
+
       self.reservePrice = reservePrice
       self.minimumBidPercentage = minimumBidPercentage
 
-      // Initialize vars
       self.currentBidder = currentBidder
       self.currentPrice = currentPrice
       self.bidTimestamp = getCurrentBlock().timestamp
+    }
+
+    pub fun getPrice(): UFix64 {
+      return self.currentPrice
     }
 
     access(contract) fun updateBid(currentBidder: Address, currentPrice: UFix64) {
@@ -242,8 +315,6 @@ pub contract MelosMarketplace {
     pub let nftType: Type
     pub let nftId: UInt64
     pub let paymentToken: Type
-    pub let listingStartTime: UFix64
-    pub let listingEndTime: UFix64?
     pub let listingConfig: {MelosMarketplace.ListingConfig}
 
     pub let receiver: Capability<&{FungibleToken.Receiver}>
@@ -265,10 +336,12 @@ pub contract MelosMarketplace {
       self.nftType = nftType
       self.nftId = nftId
       self.paymentToken = paymentToken
-      self.listingStartTime = listingStartTime
-      self.listingEndTime = listingEndTime
       self.listingConfig = listingConfig
       self.receiver = receiver
+    }
+
+    pub fun getPrice(): UFix64 {
+      return self.listingConfig.getPrice()
     }
 
     access(contract) fun setToPurchased() {
@@ -405,7 +478,7 @@ pub contract MelosMarketplace {
 
       if listingEndTime != nil {
         assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
-        assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration, message: "Listing duration must be greater than minimum listing duration")
+        assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
       }
 
       MelosMarketplace.checkListingConfig(listingType, listingConfig)
@@ -474,51 +547,15 @@ pub contract MelosMarketplace {
       return self.details
     }
 
-    pub fun getPriceCommon(): UFix64 {
-      let cfg = self.details.listingConfig as! Common
-      return cfg.price
-    }
-
-    pub fun getPriceOpenBid(): UFix64 {
-      let cfg = self.details.listingConfig as! OpenBid
-      return cfg.minimumPrice
-    }
-
-    pub fun getPriceDutchAuction(): UFix64 {
-      let cfg = self.details.listingConfig as! DutchAuction
-      let duration = getCurrentBlock().timestamp - self.details.listingStartTime
-
-      let diff = cfg.startingPrice - cfg.reservePrice
-      let deduct = (duration - duration % cfg.priceCutInterval)
-         * diff / (self.details.listingEndTime! - self.details.listingStartTime - cfg.priceCutInterval)
-      
-      return deduct > diff ? cfg.reservePrice : cfg.reservePrice - deduct
-    }
-
-    pub fun getPriceEnglishAuction(): UFix64 {
-      let cfg = self.details.listingConfig as! EnglishAuction
-      return cfg.currentPrice
-    }
-
     pub fun getPrice(): UFix64 {
-      switch self.details.listingType {
-        case ListingType.Common:
-          return self.getPriceCommon()
-        case ListingType.OpenBid:
-          return self.getPriceOpenBid()
-        case ListingType.DutchAuction:
-          return self.getPriceDutchAuction()
-        case ListingType.EnglishAuction:
-          return self.getPriceEnglishAuction()
-      }
-      panic("Unexpected listing type")
+      return self.details.getPrice()
     }
 
     pub fun checkAvaliable() {
       assert(self.details.isPurchased == false, message: "Listing has already been purchased")
-      assert(getCurrentBlock().timestamp >= self.details.listingStartTime, message: "Listing not started")
-      if self.details.listingEndTime != nil {
-        assert(getCurrentBlock().timestamp < self.details.listingEndTime!, message: "Listing has ended")
+      assert(getCurrentBlock().timestamp >= self.details.listingConfig.listingStartTime, message: "Listing not started")
+      if self.details.listingConfig.listingEndTime != nil {
+        assert(getCurrentBlock().timestamp < self.details.listingConfig.listingEndTime!, message: "Listing has ended")
       }
     }
 
@@ -547,7 +584,7 @@ pub contract MelosMarketplace {
       self.checkAvaliable()
       let payment <- self.checkPayment(<- payment)
 
-      var price = self.getPriceCommon()
+      var price = self.getPrice()
       assert(payment.balance >= price, message: "insufficient payments")
 
       let nft <- self.withdrawNFT()
@@ -571,7 +608,7 @@ pub contract MelosMarketplace {
       self.checkAvaliable()
       let payment <- self.checkPayment(<- payment)
 
-      var price = self.getPriceDutchAuction()
+      var price = self.getPrice()
       assert(payment.balance >= price, message: "insufficient payments")
 
       let nft <- self.withdrawNFT()
@@ -689,42 +726,9 @@ pub contract MelosMarketplace {
       emit ListingManagerDestroyed(self.uuid)
     }
 
-    pub fun getListingIds(): [UInt64] {
-        return self.listings.keys
-    }
-
-    pub fun getListedNFTs(): [UInt64] {
-        return self.listedNFTs.keys
-    }
-
-    pub fun isListingExists(listingId: UInt64): Bool {
-        return self.listings[listingId] != nil
-    }
-
-    pub fun isNFTListed(nftId: UInt64): Bool {
-        return self.listedNFTs[nftId] != nil
-    }
-
-    pub fun getListingIdByNFTId(nftId: UInt64): UInt64 {
-        assert(self.listedNFTs[nftId] != nil, message: "NFT not listed")
-
-        return self.listedNFTs[nftId]!
-    }
-
-    pub fun getListing(listingId: UInt64): &Listing {
-        assert(self.listings[listingId] != nil, message: "Listing not exists")
-
-        return &self.listings[listingId] as! &Listing
-    }
-
-    pub fun getListingByNFTId(nftId: UInt64): &Listing {
-        return self.getListing(listingId: self.getListingIdByNFTId(nftId: nftId))
-    }
-
     pub fun createListing(
       listingType: ListingType,
       nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>,
-      listingManagerId: UInt64,
       nftType: Type,
       nftId: UInt64,
       paymentToken: Type,
@@ -736,7 +740,7 @@ pub contract MelosMarketplace {
         let listing <- create Listing(
           listingType: listingType,
           nftProvider: nftProvider,
-          listingManagerId: listingManagerId,
+          listingManagerId: self.uuid,
           nftType: nftType,
           nftId: nftId,
           paymentToken: paymentToken,
@@ -747,20 +751,18 @@ pub contract MelosMarketplace {
         )
         let listingId = listing.uuid
 
-        self.listedNFTs[nftId] = listingId
-        let _ <- self.listings[listingId] <- listing
+        let _ <- MelosMarketplace.listings[listingId] <- listing
         destroy _
 
         return listingId
     }
 
     pub fun removeListing(listingId: UInt64) {
-        assert(self.listings[listingId] != nil, message: "Listing not exists")
+        assert(MelosMarketplace.listings[listingId] != nil, message: "Listing not exists")
 
-        let listing <- self.listings.remove(key: listingId)!
+        let listing <- MelosMarketplace.listings.remove(key: listingId)!
         let nftId = listing.getDetails().nftId
 
-        self.listedNFTs.remove(key: nftId)
         destroy listing
     }
 
