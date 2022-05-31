@@ -20,7 +20,7 @@ pub contract MelosMarketplace {
   pub var takerRelayerFee: UFix64
   pub var minimumListingDuration: UFix64
 
-  pub var allowedPaymentTokens: [Type]
+  access(self) var allowedPaymentTokens: [Type]
 
   pub event MelosSettlementInitialized();
   pub event FeeRecipientChanged(_ newFeeRecipient: Address)
@@ -83,6 +83,14 @@ pub contract MelosMarketplace {
     emit MelosSettlementInitialized()
   }
 
+  pub fun getAllowedTokens(): [Type] {
+    return MelosMarketplace.allowedPaymentTokens
+  }
+
+  pub fun isTokenAllowed(_ token: Type): Bool {
+    return MelosMarketplace.allowedPaymentTokens.contains(token)
+  }
+
   pub fun checkListingConfig(_ listingType: ListingType, _ listingConfig: {MelosMarketplace.ListingConfig}) {
     var cfg: {MelosMarketplace.ListingConfig}? = nil
     switch listingType {
@@ -104,6 +112,10 @@ pub contract MelosMarketplace {
 
   pub fun createListingManager(): @ListingManager {
       return <-create ListingManager()
+  }
+
+  pub fun createBidManager(): @BidManager {
+      return <-create BidManager()
   }
 
   pub resource Admin {
@@ -265,6 +277,8 @@ pub contract MelosMarketplace {
   }
 
   pub resource Bid {
+    pub let bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>
+
     pub let rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>
     pub let refund: Capability<&{FungibleToken.Receiver}>
 
@@ -275,15 +289,18 @@ pub contract MelosMarketplace {
     pub let bidTimestamp: UFix64
 
     init(
+      bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault,
       offerPrice: UFix64
     ) {
+      assert(bidManager.check(), message: "Invalid bidManager")
       assert(rewardCollection.check(), message: "Invalid NFT reward collection")
       assert(refund.check(), message: "Invalid refund capability")
       assert(payment.balance >= offerPrice, message: "Insufficient payments")
 
+      self.bidManager = bidManager
       self.rewardCollection = rewardCollection
       self.refund = refund
 
@@ -296,6 +313,45 @@ pub contract MelosMarketplace {
 
     destroy() {
       self.refund.borrow()!.deposit(from: <- self.payment)
+    }
+  }
+
+
+  pub resource interface BidManagerPublic {
+
+  }
+
+  pub resource BidManager {
+    pub let openBids: {UInt64: [UInt64]}
+    pub let englishAuctionBids: {UInt64: [UInt64]}
+
+    init () {
+      self.openBids = {}
+      self.englishAuctionBids = {}
+    }
+
+
+    pub fun newOpenBid(listingId: UInt64, bidId: UInt64) {
+      if let bids = self.openBids[listingId] {
+        assert(!bids.contains(bidId), message: "OpenBid already exists")
+        self.openBids[listingId]!.append(bidId)
+      } else {
+        self.openBids[listingId] = [bidId]
+      }
+    }
+
+    pub fun newEnglishAuctionBid(listingId: UInt64, bidId: UInt64) {
+      if let bids = self.englishAuctionBids[listingId] {
+        assert(!bids.contains(bidId), message: "EnglishAuctionBid already exists")
+        self.englishAuctionBids[listingId]!.append(bidId)
+      } else {
+        self.englishAuctionBids[listingId] = [bidId]
+      }
+    }
+
+    destroy() {
+      assert(self.openBids.length == 0, message: "OpenBids record exists")
+      assert(self.englishAuctionBids.length == 0, message: "EnglishAuctionBids record exists")
     }
   }
 
@@ -319,7 +375,7 @@ pub contract MelosMarketplace {
       listingConfig: {MelosMarketplace.ListingConfig},
       receiver: Capability<&{FungibleToken.Receiver}>
     ) {
-      assert(MelosMarketplace.allowedPaymentTokens.contains(paymentToken), message: "Payment tokens not allowed")
+      assert(MelosMarketplace.isTokenAllowed(paymentToken), message: "Payment tokens not allowed")
       assert(receiver.borrow() != nil, message: "Cannot borrow receiver")
 
       if listingEndTime != nil {
@@ -507,6 +563,7 @@ pub contract MelosMarketplace {
     }
 
     pub fun openBid(
+      bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault,
@@ -521,6 +578,7 @@ pub contract MelosMarketplace {
       assert(offerPrice >= (self.details.listingConfig as! OpenBid).minimumPrice, message: "Offer price must be greater than minimumPrice")
 
       let bid <- create Bid(
+        bidManager: bidManager,
         rewardCollection: rewardCollection,
         refund: refund,
         payment: <- payment,
@@ -529,7 +587,7 @@ pub contract MelosMarketplace {
       let bidId = bid.uuid
 
       let _ <- self.openBids[bidId] <- bid
-      destroy _
+      destroy _;
 
       emit OpenBidCreated(listingId: self.uuid, bidId: bidId, bidder: refund.address, offerPrice: offerPrice)
 
@@ -537,6 +595,7 @@ pub contract MelosMarketplace {
     }
 
     pub fun bidEnglishAuction(
+      bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault,
@@ -548,12 +607,14 @@ pub contract MelosMarketplace {
       // Check listing and params
       self.checkAvaliable()
       let payment <- self.checkPayment(<- payment)
+      assert(bidManager.check(), message: "Invalid bidManager")
       assert(
         offerPrice >= (self.details.listingConfig as! EnglishAuction).getNextBidMinimumPrice(), 
         message: "Offer price must be greater than or equal with currentPrice * (1 + minimum bid percentage)"
       )
 
       let bid <- create Bid(
+        bidManager: bidManager,
         rewardCollection: rewardCollection,
         refund: refund,
         payment: <- payment,
@@ -573,6 +634,11 @@ pub contract MelosMarketplace {
       )
 
       return bidId
+    }
+
+    // TODO
+    pub fun completeEnglishAuction() {
+      
     }
   }
 
@@ -669,6 +735,11 @@ pub contract MelosMarketplace {
 
         self.listedNFTs.remove(key: nftId)
         destroy listing
+    }
+
+    // TODO
+    pub fun acceptOpenBid(listingId: UInt64, bidId: UInt64) {
+
     }
   }
 }
