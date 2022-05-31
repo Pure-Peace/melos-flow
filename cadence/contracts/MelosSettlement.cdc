@@ -18,6 +18,7 @@ pub contract MelosSettlement {
   pub var feeRecipient: Address
   pub var makerRelayerFee: UFix64
   pub var takerRelayerFee: UFix64
+  pub var minimumListingDuration: UFix64
 
   pub var allowedPaymentTokens: [Type]
 
@@ -29,7 +30,7 @@ pub contract MelosSettlement {
 
   pub event MakerRelayerFeeChanged(old: UFix64, new: UFix64)
   pub event TakerRelayerFeeChanged(old: UFix64, new: UFix64)
-
+  pub event MinimumListingDurationChanged(old: UFix64, new: UFix64)
   pub event AllowedPaymentTokensChanged(old: [Type], new: [Type])
 
   pub event ListingCreated(
@@ -40,7 +41,7 @@ pub contract MelosSettlement {
     nftType: Type,
     paymentToken: Type,
     listingStartTime: UFix64,
-    listingEndTime: UFix64
+    listingEndTime: UFix64?
   )
   pub event ListingRemoved(purchased: Bool, listingId: UInt64, listingManager: UInt64)
   pub event ListingCompleted(listingId: UInt64, listingManager: UInt64)
@@ -49,11 +50,13 @@ pub contract MelosSettlement {
     feeRecipient: Address,
     makerRelayerFee: UFix64,
     takerRelayerFee: UFix64,
+    minimumListingDuration: UFix64,
     allowedPaymentTokens: [Type]
   ) {
     self.feeRecipient = Address(0x0)
     self.makerRelayerFee = 0.0
     self.takerRelayerFee = 0.0
+    self.minimumListingDuration = 0.0
     self.allowedPaymentTokens = []
     self.AdminStoragePath = /storage/MelosSettlementAdmin
     self.ListingManagerStoragePath = /storage/MelosSettlement
@@ -66,6 +69,7 @@ pub contract MelosSettlement {
     admin.setMakerRelayerFee(makerRelayerFee)
     admin.setTakerRelayerFee(takerRelayerFee)
     admin.setAllowedPaymentTokens(allowedPaymentTokens)
+    admin.setMinimumListingDuration(minimumListingDuration)
 
     // Save admin resource to account
     self.account.save(<-admin, to: self.AdminStoragePath)
@@ -114,10 +118,30 @@ pub contract MelosSettlement {
       emit TakerRelayerFeeChanged(old: oldFee, new: newFee)
     }
 
+    pub fun setMinimumListingDuration(_ newDuration: UFix64) {
+      let oldDuration = MelosSettlement.minimumListingDuration
+      MelosSettlement.minimumListingDuration = newDuration
+      emit MinimumListingDurationChanged(old: oldDuration, new: newDuration)
+    }
+
     pub fun setAllowedPaymentTokens(_ newAllowedPaymentTokens: [Type]) {
       let oldAllowedPaymentTokens = MelosSettlement.allowedPaymentTokens
       MelosSettlement.allowedPaymentTokens = newAllowedPaymentTokens
       emit AllowedPaymentTokensChanged(old: oldAllowedPaymentTokens, new: newAllowedPaymentTokens)
+    }
+
+    pub fun addAllowedPaymentTokens(_ newAllowedPaymentTokens: [Type]) {
+      self.setAllowedPaymentTokens(MelosSettlement.allowedPaymentTokens.concat(newAllowedPaymentTokens))
+    }
+
+    pub fun removeAllowedPaymentTokens(_ removedPaymentTokens: [Type]) {
+      var temp = MelosSettlement.allowedPaymentTokens
+      for index, token in MelosSettlement.allowedPaymentTokens {
+        if temp.contains(token) {
+          temp.remove(at: index)
+        }
+      }
+      self.setAllowedPaymentTokens(temp)
     }
   }
 
@@ -152,10 +176,14 @@ pub contract MelosSettlement {
   pub struct DutchAuction: ListingConfig {
     pub let startingPrice: UFix64
     pub let reservePrice: UFix64
+    pub let priceCutInterval: UFix64
 
-    init (startingPrice: UFix64, reservePrice: UFix64) {
+    init (startingPrice: UFix64, reservePrice: UFix64, priceCutInterval: UFix64) {
+      assert(startingPrice > reservePrice, message: "Starting price must be greater than reserve price")
+
       self.startingPrice = startingPrice
       self.reservePrice = reservePrice
+      self.priceCutInterval = priceCutInterval
     }
   }
 
@@ -179,7 +207,7 @@ pub contract MelosSettlement {
     pub let nftId: UInt64
     pub let paymentToken: Type
     pub let listingStartTime: UFix64
-    pub let listingEndTime: UFix64
+    pub let listingEndTime: UFix64?
     pub let listingConfig: {MelosSettlement.ListingConfig}
 
     pub let receiver: Capability<&{FungibleToken.Receiver}>
@@ -191,7 +219,7 @@ pub contract MelosSettlement {
       nftId: UInt64,
       paymentToken: Type,
       listingStartTime: UFix64,
-      listingEndTime: UFix64,
+      listingEndTime: UFix64?,
       listingConfig: {MelosSettlement.ListingConfig},
       receiver: Capability<&{FungibleToken.Receiver}>
     ) {
@@ -225,11 +253,24 @@ pub contract MelosSettlement {
       nftId: UInt64,
       paymentToken: Type,
       listingStartTime: UFix64,
-      listingEndTime: UFix64,
+      listingEndTime: UFix64?,
       listingConfig: {MelosSettlement.ListingConfig},
       receiver: Capability<&{FungibleToken.Receiver}>
     ) {
+      assert(MelosSettlement.allowedPaymentTokens.contains(paymentToken), message: "Payment tokens not allowed")
+      assert(receiver.borrow() != nil, message: "Cannot borrow receiver")
+
+      if listingEndTime != nil {
+        assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
+        assert((listingEndTime! - listingStartTime) > MelosSettlement.minimumListingDuration, message: "Listing duration must be greater than minimum listing duration")
+      }
+
       MelosSettlement.checkListingConfig(listingType, listingConfig)
+      if listingType == ListingType.DutchAuction {
+        let cfg = listingConfig as! DutchAuction
+        assert(listingEndTime != nil, message: "Dutch auction listingEndTime must not null")
+        assert(cfg.priceCutInterval < (listingStartTime - listingEndTime!), message: "Dutch auction priceCutInterval must be less than listing duration")
+      }
 
       let provider = nftProvider.borrow()
       assert(provider != nil, message: "cannot borrow nftProvider")
@@ -286,44 +327,101 @@ pub contract MelosSettlement {
       return self.details
     }
 
+    pub fun getPriceCommon(): UFix64 {
+      let cfg = self.details.listingConfig as! Common
+      return cfg.price
+    }
+
+    pub fun getPriceOpenBid(): UFix64 {
+      let cfg = self.details.listingConfig as! OpenBid
+      return 0.0
+    }
+
+    pub fun getPriceDutchAuction(): UFix64 {
+      let cfg = self.details.listingConfig as! DutchAuction
+      let duration = getCurrentBlock().timestamp - self.details.listingStartTime
+
+      let diff = cfg.startingPrice - cfg.reservePrice
+      let deduct = (duration - duration % cfg.priceCutInterval)
+         * diff / (self.details.listingEndTime! - self.details.listingStartTime - cfg.priceCutInterval)
+      
+      return deduct > diff ? cfg.reservePrice : cfg.reservePrice - deduct
+    }
+
+    pub fun getPriceEnglishAuction(): UFix64 {
+      let cfg = self.details.listingConfig as! EnglishAuction
+      return 0.0
+    }
+
     pub fun getPrice(): UFix64 {
       switch self.details.listingType {
         case ListingType.Common:
-          let cfg = self.details.listingConfig as! Common
-          return cfg.price
-
+          return self.getPriceCommon()
         case ListingType.OpenBid:
-          let cfg = self.details.listingConfig as! OpenBid
-          return 0.0 // TODO
-
+          return self.getPriceOpenBid()
         case ListingType.DutchAuction:
-          let cfg = self.details.listingConfig as! DutchAuction
-          return 0.0 // TODO
-
+          return self.getPriceDutchAuction()
         case ListingType.EnglishAuction:
-          let cfg = self.details.listingConfig as! EnglishAuction
-          return 0.0 // TODO
+          return self.getPriceEnglishAuction()
       }
       panic("Unexpected listing type")
     }
 
-    pub fun purchaseCommon(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
-      pre {
-          self.details.isPurchased == false: "listing has already been purchased"
-          payment.isInstance(self.details.paymentToken): "payment vault is not requested fungible token"
+    pub fun checkAvaliable() {
+      assert(self.details.isPurchased == false, message: "Listing has already been purchased")
+      assert(getCurrentBlock().timestamp >= self.details.listingStartTime, message: "Listing not started")
+      if self.details.listingEndTime != nil {
+        assert(getCurrentBlock().timestamp < self.details.listingEndTime!, message: "Listing has ended")
       }
-      var price = self.getPrice()
-      assert(payment.balance >= price, message: "insufficient payments")
+    }
 
+    pub fun checkPayment(_ payment: @FungibleToken.Vault): @FungibleToken.Vault {
+      assert(payment.isInstance(self.details.paymentToken), message: "payment vault is not requested fungible token")
+      return <- payment
+    }
+
+    access(self) fun withdrawNFT(): @NonFungibleToken.NFT {
       // Make sure the listing cannot be purchased again.
       self.details.setToPurchased()
-
-      // Fetch the token to return to the purchaser.
+  
       let nft <-self.nftProvider.borrow()!.withdraw(withdrawID: self.details.nftId)
 
       // **MUST** check nft
       assert(nft.isInstance(self.details.nftType), message: "withdrawn NFT is not of specified type")
       assert(nft.id == self.details.nftId, message: "withdrawn NFT does not have specified Id")
+      return <- nft
+    }
+
+    pub fun purchaseCommon(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
+      // Check
+      self.checkAvaliable()
+      let payment <- self.checkPayment(<- payment)
+
+      var price = self.getPrice()
+      assert(payment.balance >= price, message: "insufficient payments")
+
+      let nft <- self.withdrawNFT()
+
+      // TODO: Deducting royalties or fees
+      // payment.withdraw(amount: fees)
+
+      // Deposit the remaining amount after deducting fees and royalties to the beneficiary.
+      self.details.receiver.borrow()!.deposit(from: <- payment)
+
+      emit ListingCompleted(listingId: self.uuid, listingManager: self.details.listingManagerId)
+
+      return <- nft
+    }
+
+    pub fun purchaseDutchAuction(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
+      // Check
+      self.checkAvaliable()
+      let payment <- self.checkPayment(<- payment)
+
+      var price = self.getPrice()
+      assert(payment.balance >= price, message: "insufficient payments")
+
+      let nft <- self.withdrawNFT()
 
       // TODO: Deducting royalties or fees
       // payment.withdraw(amount: fees)
@@ -337,17 +435,18 @@ pub contract MelosSettlement {
     }
 
     // TODO
-    pub fun purchaseDutchAuction() {
-
-    }
-
-    // TODO
     pub fun placeBidOpenBid() {
+      // Check
+      self.checkAvaliable()
+      // let payment <- self.checkPayment(<- payment)
 
     }
 
     // TODO
     pub fun placeBidEnglishAcution() {
+      // Check
+      self.checkAvaliable()
+      // let payment <- self.checkPayment(<- payment)
 
     }
   }
@@ -412,13 +511,10 @@ pub contract MelosSettlement {
       nftId: UInt64,
       paymentToken: Type,
       listingStartTime: UFix64,
-      listingEndTime: UFix64,
+      listingEndTime: UFix64?,
       listingConfig: {MelosSettlement.ListingConfig},
       receiver: Capability<&{FungibleToken.Receiver}>
     ): UInt64 {
-        assert(MelosSettlement.allowedPaymentTokens.contains(paymentToken) == true, message: "Payment tokens not allowed")
-        assert(receiver.borrow() != nil, message: "Cannot borrow receiver")
-
         let listing <- create Listing(
           listingType: listingType,
           nftProvider: nftProvider,
@@ -447,17 +543,6 @@ pub contract MelosSettlement {
         let nftId = listing.getDetails().nftId
 
         self.listedNFTs.remove(key: nftId)
-        destroy listing
-    }
-
-    pub fun completeListing(listingId: UInt64) {
-        assert(self.listings[listingId] != nil, message: "Listing not exists")
-
-        let listing <- self.listings.remove(key: listingId)!
-        let details = listing.getDetails()
-
-        assert(details.isPurchased == true, message: "Listing is not purchased")
-        self.listedNFTs.remove(key: details.nftId)
         destroy listing
     }
   }
