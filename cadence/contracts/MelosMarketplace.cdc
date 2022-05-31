@@ -45,6 +45,7 @@ pub contract MelosMarketplace {
 
   pub event EnglishAuctionBidCreated(listingId: UInt64, bidId: UInt64, bidder: Address, offerPrice: UFix64)
   pub event EnglishAuctionBidRemoved(listingId: UInt64, bidId: UInt64)
+  pub event EnglishAuctionCompleted(listingId: UInt64, bidId: UInt64, winner: Address, price: UFix64)
 
   pub event ListingCreated(
     listingType: UInt8,
@@ -56,8 +57,7 @@ pub contract MelosMarketplace {
     listingStartTime: UFix64,
     listingEndTime: UFix64?
   )
-  pub event ListingRemoved(purchased: Bool, listingId: UInt64, listingManager: UInt64)
-  pub event ListingCompleted(listingId: UInt64, listingManager: UInt64)
+  pub event ListingRemoved(purchased: Bool, listingId: UInt64)
 
   /* --------------- ↓↓ Initilization ↓↓ --------------- */
 
@@ -569,8 +569,7 @@ pub contract MelosMarketplace {
       if self.initialized {
         emit ListingRemoved(
             purchased: self.details.isPurchased, 
-            listingId: self.uuid, 
-            listingManager: self.details.listingManagerId
+            listingId: self.uuid
           )
       }
       destroy self.openBids
@@ -645,8 +644,6 @@ pub contract MelosMarketplace {
 
       // Deposit the remaining amount after deducting fees and royalties to the beneficiary.
       self.details.receiver.borrow()!.deposit(from: <- payment)
-
-      emit ListingCompleted(listingId: self.uuid, listingManager: self.details.listingManagerId)
 
       return <- nft
     }
@@ -761,9 +758,12 @@ pub contract MelosMarketplace {
 
       let topBid <- self.openBids.remove(key: (self.details.listingConfig as! EnglishAuction).topBid ?? panic("No bids"))!
       
-      let nft <- self.completeListing(<- topBid.payment.withdraw(amount: topBid.payment.balance))
+      let price = topBid.payment.balance
+      let winner = topBid.refund.address
+      let bidId = topBid.uuid
+  
+      let nft <- self.completeListing(<- topBid.payment.withdraw(amount: price))
       topBid.rewardCollection.borrow()!.deposit(token: <- nft)
-
       destroy topBid
 
       for key in self.englishAuctionBids.keys {
@@ -772,6 +772,9 @@ pub contract MelosMarketplace {
       }
 
       self.englishAuctionParticipant = {}
+
+      emit EnglishAuctionCompleted(listingId: self.uuid, bidId: bidId, winner: winner, price: price)
+
     }
   }
 
@@ -829,8 +832,6 @@ pub contract MelosMarketplace {
       assert(self.getOwnership(listingId), message: "Invalid listing ownership")
 
       let listing <- MelosMarketplace.listings.remove(key: listingId)!
-      let nftId = listing.getDetails().nftId
-
       destroy listing
     }
 
