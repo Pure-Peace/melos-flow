@@ -43,8 +43,8 @@ pub contract MelosMarketplace {
   pub event OpenBidCreated(listingId: UInt64, bidId: UInt64, bidder: Address, offerPrice: UFix64)
   pub event OpenBidRemoved(listingId: UInt64, bidId: UInt64)
 
-  pub event EnglishAuctionBidCreated(listingId: UInt64, bidder: Address, offerPrice: UFix64)
-  pub event EnglishAuctionBidRemoved(listingId: UInt64)
+  pub event EnglishAuctionBidCreated(listingId: UInt64, bidId: UInt64, bidder: Address, offerPrice: UFix64)
+  pub event EnglishAuctionBidRemoved(listingId: UInt64, bidId: UInt64)
 
   pub event ListingCreated(
     listingType: UInt8,
@@ -304,21 +304,20 @@ pub contract MelosMarketplace {
     pub let listingStartTime: UFix64
     pub let listingEndTime: UFix64?
     
-    access(self) let reservePrice: UFix64
+    pub let reservePrice: UFix64
+    pub let basePrice: UFix64
     pub let minimumBidPercentage: UFix64
 
-    pub var currentBidder: Address
-    pub var currentPrice: UFix64
-    pub var bidTimestamp: UFix64
+    pub var topBid: &Bid?
+
     init (
       listingStartTime: UFix64, 
       listingEndTime: UFix64?, 
       reservePrice: UFix64,
-      minimumBidPercentage: UFix64,
-      currentBidder: Address,
-      currentPrice: UFix64
+      basePrice: UFix64,
+      minimumBidPercentage: UFix64
     ) {
-      assert(reservePrice >= currentPrice, message: "Reserve price must be greater than or equal with current price")
+      assert(reservePrice >= basePrice, message: "Reserve price must be greater than or equal with current price")
       assert(listingEndTime != nil, message: "English auction listingEndTime must not null")
       assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
       assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
@@ -326,30 +325,27 @@ pub contract MelosMarketplace {
         assert((listingEndTime! - listingStartTime) <= maxAuctionDuration, message: "Auction duration must be less than max auction duration")
       }
 
-
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingEndTime
 
       self.reservePrice = reservePrice
+      self.basePrice = basePrice
       self.minimumBidPercentage = minimumBidPercentage
 
-      self.currentBidder = currentBidder
-      self.currentPrice = currentPrice
-      self.bidTimestamp = getCurrentBlock().timestamp
+      self.topBid = nil
     }
 
     pub fun getPrice(): UFix64 {
-      return self.currentPrice
-    }
-
-    access(contract) fun updateBid(currentBidder: Address, currentPrice: UFix64) {
-      self.currentBidder = currentBidder
-      self.currentPrice = currentPrice
-      self.bidTimestamp = getCurrentBlock().timestamp
+      return self.topBid == nil ? self.basePrice : self.topBid!.offerPrice()
     }
 
     pub fun getNextBidMinimumPrice(): UFix64 {
-      return self.currentPrice * (1.0 + self.minimumBidPercentage)
+      return self.getPrice() * (1.0 + self.minimumBidPercentage)
+    }
+
+    access(contract) fun setTopBid(newTopBid: &Bid) {
+      assert(newTopBid.offerPrice() >= self.getNextBidMinimumPrice(), message: "Offer price must be greater than or equal with [CurrentPrice * (1 + Minimum bid percentage)]")
+      self.topBid = newTopBid
     }
   }
 
@@ -358,14 +354,12 @@ pub contract MelosMarketplace {
   /* --------------- ↓↓ Bids ↓↓ --------------- */
 
   pub resource Bid {
-    access(self) let bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>
-    access(self) let rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>
-    access(self) let refund: Capability<&{FungibleToken.Receiver}>
-    access(self) let payment: @FungibleToken.Vault
+    access(contract) let bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>
+    access(contract) let rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>
+    access(contract) let refund: Capability<&{FungibleToken.Receiver}>
+    access(contract) let payment: @FungibleToken.Vault
 
     pub let listingId: UInt64
-    pub var offerPrice: UFix64
-
     pub let bidder: Address
     pub var bidTimestamp: UFix64
 
@@ -374,13 +368,11 @@ pub contract MelosMarketplace {
       listingId: UInt64,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
-      payment: @FungibleToken.Vault,
-      offerPrice: UFix64
+      payment: @FungibleToken.Vault
     ) {
       assert(bidManager.check(), message: "Invalid bidManager")
       assert(rewardCollection.check(), message: "Invalid NFT reward collection")
       assert(refund.check(), message: "Invalid refund capability")
-      assert(payment.balance >= offerPrice, message: "Insufficient payments")
 
       self.bidManager = bidManager
       self.bidManager.borrow()!.recordBid(listingId: listingId, bidId: self.uuid)
@@ -389,12 +381,14 @@ pub contract MelosMarketplace {
 
       self.rewardCollection = rewardCollection
       self.refund = refund
-
       self.payment <- payment
-      self.offerPrice = offerPrice
 
       self.bidder = self.refund.address
       self.bidTimestamp = getCurrentBlock().timestamp
+    }
+
+    pub fun offerPrice(): UFix64 {
+      return self.payment.balance
     }
 
     destroy() {
@@ -509,8 +503,13 @@ pub contract MelosMarketplace {
     access(self) let details: ListingDetails
     access(self) let nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
 
+    // Open bid id => Bid
     access(self) let openBids: @{UInt64: Bid}
-    access(self) let englishAuctionBids: @{Address: Bid}
+
+    // Address => English auction bid id
+    access(self) let englishAuctionParticipant: {Address: UInt64}
+    // English auction bid id => Bid
+    access(self) let englishAuctionBids: @{UInt64: Bid}
 
     init(
       listingType: ListingType,
@@ -545,6 +544,7 @@ pub contract MelosMarketplace {
       )
       self.nftProvider = nftProvider
       self.openBids <- {}
+      self.englishAuctionParticipant = {}
       self.englishAuctionBids <- {}
       self.initialized = true
       
@@ -587,7 +587,7 @@ pub contract MelosMarketplace {
       return self.details.getPrice()
     }
 
-    pub fun checkAvaliable() {
+    pub fun ensureAvaliable() {
       assert(self.details.isPurchased == false, message: "Listing has already been purchased")
       assert(getCurrentBlock().timestamp >= self.details.listingConfig.listingStartTime, message: "Listing not started")
       if self.details.listingConfig.listingEndTime != nil {
@@ -595,7 +595,7 @@ pub contract MelosMarketplace {
       }
     }
 
-    pub fun checkPayment(_ payment: @FungibleToken.Vault): @FungibleToken.Vault {
+    pub fun ensurePaymentTokenType(_ payment: @FungibleToken.Vault): @FungibleToken.Vault {
       assert(payment.isInstance(self.details.paymentToken), message: "payment vault is not requested fungible token")
       return <- payment
     }
@@ -612,17 +612,7 @@ pub contract MelosMarketplace {
       return <- nft
     }
 
-    pub fun purchaseCommon(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
-      // Check listing type
-      assert(self.details.listingType == ListingType.Common, message: "Listing type is not Common")
-
-      // Check listing and params
-      self.checkAvaliable()
-      let payment <- self.checkPayment(<- payment)
-
-      let price = self.getPrice()
-      assert(payment.balance >= price, message: "insufficient payments")
-
+    access(self) fun completeListing(_ payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
       let nft <- self.withdrawNFT()
 
       // TODO: Deducting royalties or fees
@@ -636,43 +626,42 @@ pub contract MelosMarketplace {
       return <- nft
     }
 
-    pub fun purchaseDutchAuction(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
-      // Check listing type
-      assert(self.details.listingType == ListingType.DutchAuction, message: "Listing type is not DutchAuction")
-
+    pub fun purchaseCommon(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
       // Check listing and params
-      self.checkAvaliable()
-      let payment <- self.checkPayment(<- payment)
+      assert(self.details.listingType == ListingType.Common, message: "Listing type is not Common")
+      self.ensureAvaliable()
 
+      let payment <- self.ensurePaymentTokenType(<- payment)
       let price = self.getPrice()
       assert(payment.balance >= price, message: "insufficient payments")
 
-      let nft <- self.withdrawNFT()
+      return <- self.completeListing(<- payment)
+    }
 
-      // TODO: Deducting royalties or fees
-      // payment.withdraw(amount: fees)
+    pub fun purchaseDutchAuction(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
+      // Check listing and params
+      assert(self.details.listingType == ListingType.DutchAuction, message: "Listing type is not DutchAuction")
+      self.ensureAvaliable()
 
-      // Deposit the remaining amount after deducting fees and royalties to the beneficiary.
-      self.details.receiver.borrow()!.deposit(from: <- payment)
+      let payment <- self.ensurePaymentTokenType(<- payment)
+      let price = self.getPrice()
+      assert(payment.balance >= price, message: "insufficient payments")
 
-      emit ListingCompleted(listingId: self.uuid, listingManager: self.details.listingManagerId)
-
-      return <- nft
+      return <- self.completeListing(<- payment)
     }
 
     pub fun openBid(
       bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
-      payment: @FungibleToken.Vault,
-      offerPrice: UFix64
+      payment: @FungibleToken.Vault
     ): UInt64 {
-      // Check listing type
-      assert(self.details.listingType == ListingType.OpenBid, message: "Listing type is not OpenBid")
-
       // Check listing and params
-      self.checkAvaliable()
-      let payment <- self.checkPayment(<- payment)
+      assert(self.details.listingType == ListingType.OpenBid, message: "Listing type is not OpenBid")
+      self.ensureAvaliable()
+
+      let payment <- self.ensurePaymentTokenType(<- payment)
+      let offerPrice = payment.balance
       assert(offerPrice >= (self.details.listingConfig as! OpenBid).minimumPrice, message: "Offer price must be greater than minimumPrice")
 
       let bid <- create Bid(
@@ -680,8 +669,7 @@ pub contract MelosMarketplace {
         listingId: self.uuid,
         rewardCollection: rewardCollection,
         refund: refund,
-        payment: <- payment,
-        offerPrice: offerPrice
+        payment: <- payment
       )
       let bidId = bid.uuid
 
@@ -697,37 +685,41 @@ pub contract MelosMarketplace {
       bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
-      payment: @FungibleToken.Vault,
-      offerPrice: UFix64
+      payment: @FungibleToken.Vault
     ): UInt64 {
-      // Check listing type
-      assert(self.details.listingType == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
-
       // Check listing and params
-      self.checkAvaliable()
-      let payment <- self.checkPayment(<- payment)
-      assert(
-        offerPrice >= (self.details.listingConfig as! EnglishAuction).getNextBidMinimumPrice(), 
-        message: "Offer price must be greater than or equal with currentPrice * (1 + minimum bid percentage)"
-      )
+      assert(self.details.listingType == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
+      self.ensureAvaliable()
+      
+      let payment <- self.ensurePaymentTokenType(<- payment)
+
+      // Already exists handle
+      if let oldBidId = self.englishAuctionParticipant[refund.address] {
+        let oldBid <- self.englishAuctionBids.remove(key: oldBidId)!
+        payment.deposit(from: <- oldBid.payment.withdraw(amount: oldBid.payment.balance))
+        destroy oldBid
+      }
+
+      let offerPrice = payment.balance
 
       let bid <- create Bid(
         bidManager: bidManager,
         listingId: self.uuid,
         rewardCollection: rewardCollection,
         refund: refund,
-        payment: <- payment,
-        offerPrice: offerPrice
+        payment: <- payment
       )
+      let bidRef = &bid as &Bid
       let bidId = bid.uuid
 
-      let _ <- self.englishAuctionBids[refund.address] <- bid
+      let _ <- self.englishAuctionBids[bidId] <- bid
       destroy _;
-  
-      (self.details.listingConfig as! EnglishAuction).updateBid(currentBidder: refund.address, currentPrice: offerPrice)
+
+      (self.details.listingConfig as! EnglishAuction).setTopBid(newTopBid: bidRef)
 
       emit EnglishAuctionBidCreated(
         listingId: self.uuid, 
+        bidId: bidId,
         bidder: refund.address, 
         offerPrice: offerPrice
       )
