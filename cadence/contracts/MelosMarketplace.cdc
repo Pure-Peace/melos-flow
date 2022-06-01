@@ -11,31 +11,52 @@ pub contract MelosMarketplace {
     pub case EnglishAuction
   }
 
+  pub struct FeeConfig {
+    pub var receiver: Capability<&{FungibleToken.Receiver}>
+    pub var makerRelayerFeePercent: UFix64
+    pub var takerRelayerFeePercent: UFix64
+
+    init (
+      receiver: Capability<&{FungibleToken.Receiver}>,
+      makerRelayerFeePercent: UFix64,
+      takerRelayerFeePercent: UFix64
+    ) {
+      assert(receiver.borrow() != nil, message: "Cannot borrow receiver")
+      self.receiver = receiver
+      self.makerRelayerFeePercent = makerRelayerFeePercent
+      self.takerRelayerFeePercent = takerRelayerFeePercent
+    }
+  }
+
   /* --------------- ↓↓ Vars ↓↓ --------------- */
 
   pub let AdminStoragePath: StoragePath
   pub let ListingManagerStoragePath: StoragePath
   pub let BidManagerStoragePath: StoragePath
 
-  pub var feeRecipient: Address?
-  pub var makerRelayerFee: UFix64?
-  pub var takerRelayerFee: UFix64?
+
   pub var minimumListingDuration: UFix64?
   pub var maxAuctionDuration: UFix64?
 
   access(self) let listings: @{UInt64: Listing}
   access(self) var allowedPaymentTokens: [Type]
+  access(self) let feeConfigs: {String: FeeConfig}
 
   /* --------------- ↓↓ Events ↓↓ --------------- */
 
   pub event MelosSettlementInitialized();
-  pub event FeeRecipientChanged(_ newFeeRecipient: Address?)
 
   pub event ListingManagerCreated(_ listingManagerResourceID: UInt64)
   pub event ListingManagerDestroyed(_ listingManagerResourceID: UInt64)
 
-  pub event MakerRelayerFeeChanged(old: UFix64?, new: UFix64?)
-  pub event TakerRelayerFeeChanged(old: UFix64?, new: UFix64?)
+  pub event TokenFeeUpdated(
+    token: String, 
+    receiver: Address, 
+    makerRelayerFeePercent: UFix64, 
+    takerRelayerFeePercent: UFix64
+  )
+  pub event TokenFeeRemoved(token: String)
+
   pub event MinimumListingDurationChanged(old: UFix64?, new: UFix64?)
   pub event MaxAuctionDurationChanged(old: UFix64?, new: UFix64?)
   pub event AllowedPaymentTokensChanged(old: [Type]?, new: [Type]?)
@@ -65,20 +86,19 @@ pub contract MelosMarketplace {
 
   init (
     feeRecipient: Address?,
-    makerRelayerFee: UFix64?,
-    takerRelayerFee: UFix64?,
+    makerRelayerFeePercent: UFix64?,
+    takerRelayerFeePercent: UFix64?,
     minimumListingDuration: UFix64?,
     maxAuctionDuration: UFix64?,
-    allowedPaymentTokens: [Type]
+    allowedPaymentTokens: [Type],
+    feeConfigs: {String: FeeConfig}?
   ) {
-    self.feeRecipient = nil
-    self.makerRelayerFee = nil
-    self.takerRelayerFee = nil
     self.minimumListingDuration = nil
     self.maxAuctionDuration = nil
 
     self.listings <- {}
     self.allowedPaymentTokens = []
+    self.feeConfigs = feeConfigs ?? {}
 
     self.AdminStoragePath = /storage/MelosSettlementAdmin
     self.ListingManagerStoragePath = /storage/MelosMarketplace
@@ -87,9 +107,6 @@ pub contract MelosMarketplace {
     // Create admint resource and do some settings
     let admin <- create Admin()
 
-    admin.setFeeRecipient(feeRecipient)
-    admin.setMakerRelayerFee(makerRelayerFee)
-    admin.setTakerRelayerFee(takerRelayerFee)
     admin.setMinimumListingDuration(minimumListingDuration)
     admin.setMaxAuctionDuration(maxAuctionDuration)
     admin.setAllowedPaymentTokens(allowedPaymentTokens)
@@ -119,6 +136,14 @@ pub contract MelosMarketplace {
       return listing.getBid(bidId)
     }
     return nil
+  }
+
+  pub fun getFeeConfigs(): {String: FeeConfig} {
+    return self.feeConfigs
+  }
+
+  pub fun getFeeConfigByTokenType(tokenType: Type): FeeConfig? {
+    return self.feeConfigs[tokenType.identifier]
   }
 
   pub fun getListingDetails(_ listingId: UInt64): ListingDetails? {
@@ -182,21 +207,23 @@ pub contract MelosMarketplace {
   /* --------------- ↓↓ Contract Admint ↓↓ --------------- */
 
   pub resource Admin {
-    pub fun setFeeRecipient(_ newFeeRecipient: Address?) {
-      MelosMarketplace.feeRecipient = newFeeRecipient
-      emit FeeRecipientChanged(newFeeRecipient)
+    pub fun setTokenFeeConfig(
+      tokenType: Type, 
+      config: FeeConfig
+    ) {
+      MelosMarketplace.feeConfigs[tokenType.identifier] = config
+      emit TokenFeeUpdated(
+        token: tokenType.identifier, 
+        receiver: config.receiver.address, 
+        makerRelayerFeePercent: config.makerRelayerFeePercent, 
+        takerRelayerFeePercent: config.takerRelayerFeePercent
+      )
     }
 
-    pub fun setMakerRelayerFee(_ newFee: UFix64?) {
-      let oldFee = MelosMarketplace.makerRelayerFee
-      MelosMarketplace.makerRelayerFee = newFee
-      emit MakerRelayerFeeChanged(old: oldFee, new: newFee)
-    }
-
-    pub fun setTakerRelayerFee(_ newFee: UFix64?) {
-      let oldFee = MelosMarketplace.takerRelayerFee
-      MelosMarketplace.takerRelayerFee = newFee
-      emit TakerRelayerFeeChanged(old: oldFee, new: newFee)
+    pub fun removeTokenFeeConfig(_ tokenType: Type) {
+      let cfg = MelosMarketplace.feeConfigs.remove(key: tokenType.identifier)
+      assert(cfg != nil, message: "Fee config not exists")
+      emit TokenFeeRemoved(token: tokenType.identifier)
     }
 
     pub fun setMinimumListingDuration(_ newDuration: UFix64?) {
@@ -779,8 +806,12 @@ pub contract MelosMarketplace {
       let nft <- self.withdrawNFT()
 
       if let pay <- payment {
-        // TODO: Deducting royalties or fees
-        // pay.withdraw(amount: fees)
+        // Deducting platform fees
+        if let feeConfig = MelosMarketplace.getFeeConfigByTokenType(tokenType: pay.getType()) {
+          feeConfig.receiver.borrow()!.deposit(from: <- pay.withdraw(amount: (pay.balance * feeConfig.makerRelayerFeePercent) + (pay.balance * feeConfig.takerRelayerFeePercent)))
+        }
+
+        // TODO: Deducting Royalties
 
         // Deposit the remaining amount after deducting fees and royalties to the beneficiary.
         self.details.receiver.borrow()!.deposit(from: <- pay)
