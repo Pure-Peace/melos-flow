@@ -415,7 +415,7 @@ pub contract MelosMarketplace {
 
   pub resource interface BidManagerPublic {
     pub fun isBidExists(listingId: UInt64, bidId: UInt64): Bool 
-
+    pub fun getBidOwnership(listingId: UInt64, bidId: UInt64): Bool
     pub fun getRecords(): {UInt64: [UInt64]}
     pub fun findBidIndex(listingId: UInt64, bidId: UInt64): Int? 
     pub fun getBidIdsWithListingId(_ listingId: UInt64): [UInt64]
@@ -430,6 +430,11 @@ pub contract MelosMarketplace {
 
     init () {
       self.listings = {}
+    }
+
+    pub fun getBidOwnership(listingId: UInt64, bidId: UInt64): Bool {
+      let bidRef = MelosMarketplace.getBid(listingId: listingId, bidId: bidId)
+      return bidRef == nil ? false : bidRef!.bidManagerId == self.uuid
     }
 
     pub fun isBidExists(listingId: UInt64, bidId: UInt64): Bool {
@@ -537,13 +542,11 @@ pub contract MelosMarketplace {
     access(self) let details: ListingDetails
     access(self) let nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
 
-    // Open bid id => Bid
-    access(self) let openBids: @{UInt64: Bid}
+    // Bid id => Bid
+    access(self) let bids: @{UInt64: Bid}
 
-    // Address => English auction bid id
+    // Address => bid id
     access(self) var englishAuctionParticipant: {Address: UInt64}
-    // English auction bid id => Bid
-    access(self) let englishAuctionBids: @{UInt64: Bid}
 
     init(
       listingType: ListingType,
@@ -577,9 +580,8 @@ pub contract MelosMarketplace {
         receiver: receiver
       )
       self.nftProvider = nftProvider
-      self.openBids <- {}
+      self.bids <- {}
       self.englishAuctionParticipant = {}
-      self.englishAuctionBids <- {}
       self.initialized = true
       
       emit ListingCreated(
@@ -601,8 +603,7 @@ pub contract MelosMarketplace {
             listingId: self.uuid
           )
       }
-      destroy self.openBids
-      destroy self.englishAuctionBids
+      destroy self.bids
     }
 
     pub fun borrowNFT(): &NonFungibleToken.NFT {
@@ -617,7 +618,7 @@ pub contract MelosMarketplace {
     }
 
     pub fun getBid(_ bidId: UInt64): &Bid? {
-      return &self.openBids[bidId] as? &Bid
+      return &self.bids[bidId] as? &Bid
     }
 
     pub fun getDetails(): ListingDetails {
@@ -626,11 +627,6 @@ pub contract MelosMarketplace {
 
     pub fun getPrice(): UFix64 {
       return self.details.getPrice()
-    }
-
-    pub fun getBidOwnership(_ bidId: UInt64): Bool {
-      let bidRef = self.getBid(bidId)
-      return bidRef == nil ? false : bidRef!.bidManagerId == self.uuid
     }
 
     pub fun isListingEnded(): Bool {
@@ -729,7 +725,7 @@ pub contract MelosMarketplace {
       )
       let bidId = bid.uuid
 
-      let _ <- self.openBids[bidId] <- bid
+      let _ <- self.bids[bidId] <- bid
       destroy _;
 
       emit OpenBidCreated(listingId: self.uuid, bidId: bidId, bidder: refund.address, offerPrice: offerPrice)
@@ -751,7 +747,7 @@ pub contract MelosMarketplace {
 
       // Already exists handle
       if let oldBidId = self.englishAuctionParticipant[refund.address] {
-        let oldBid <- self.englishAuctionBids.remove(key: oldBidId)!
+        let oldBid <- self.bids.remove(key: oldBidId)!
         payment.deposit(from: <- oldBid.payment.withdraw(amount: oldBid.payment.balance))
         destroy oldBid
       }
@@ -768,7 +764,7 @@ pub contract MelosMarketplace {
       let bidRef = &bid as &Bid
       let bidId = bid.uuid
 
-      let _ <- self.englishAuctionBids[bidId] <- bid
+      let _ <- self.bids[bidId] <- bid
       destroy _;
 
       (self.details.listingConfig as! EnglishAuction).setTopBid(newTopBid: bidRef)
@@ -783,14 +779,34 @@ pub contract MelosMarketplace {
       return bidId
     }
 
-    pub fun completeEnglishAuction() {
+    pub fun removeBid(bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>, bidId: UInt64): Bool {
+        let bidRef = self.getBid(bidId)
+        assert(bidRef != nil, message: "Bid not exists")
+        assert(bidManager.borrow()!.uuid == bidRef!.bidManagerId, message: "Invalid bid ownership")
+  
+        let bid <- self.bids.remove(key: bidId)!
+        switch self.details.listingType {
+          case ListingType.EnglishAuction:
+            self.englishAuctionParticipant.remove(key: bid.bidder)
+            emit EnglishAuctionBidRemoved(listingId: self.uuid, bidId: bidId)
+            break
+          case ListingType.OpenBid:
+            emit OpenBidRemoved(listingId: self.uuid, bidId: bidId)
+            break
+        }
+        destroy bid
+
+        return true
+    }
+
+    pub fun completeEnglishAuction(): Bool {
       // Check listing and params
       assert(self.details.listingType == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
       assert(self.isListingStarted(), message: "Listing not started")
       assert(self.isListingEnded(), message: "Auction is not ended")
       assert(!self.isPurchased(), message: "Listing not purchased")
 
-      let topBid <- self.openBids.remove(key: (self.details.listingConfig as! EnglishAuction).topBid ?? panic("No bids"))!
+      let topBid <- self.bids.remove(key: (self.details.listingConfig as! EnglishAuction).topBid ?? panic("No bids"))!
       
       let price = topBid.payment.balance
       let winner = topBid.refund.address
@@ -800,15 +816,15 @@ pub contract MelosMarketplace {
       topBid.rewardCollection.borrow()!.deposit(token: <- nft)
       destroy topBid
 
-      for key in self.englishAuctionBids.keys {
-        let bid <- self.englishAuctionBids.remove(key: key)
+      for key in self.bids.keys {
+        let bid <- self.bids.remove(key: key)
         destroy bid
       }
 
       self.englishAuctionParticipant = {}
 
       emit EnglishAuctionCompleted(listingId: self.uuid, bidId: bidId, winner: winner, price: price)
-
+      return true
     }
   }
 
