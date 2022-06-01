@@ -102,39 +102,39 @@ pub contract MelosMarketplace {
   /* --------------- ↓↓ Contract Methods ↓↓ --------------- */
 
   pub fun getListingIds(): [UInt64] {
-      return self.listings.keys
+    return self.listings.keys
   }
 
   pub fun isListingExists(_ listingId: UInt64): Bool {
-      return self.listings[listingId] != nil
+    return self.listings[listingId] != nil
   }
 
   pub fun getListing(_ listingId: UInt64): &Listing? {
-      return &self.listings[listingId] as? &Listing
+    return &self.listings[listingId] as? &Listing
   }
 
   pub fun getBid(listingId: UInt64, bidId: UInt64): &Bid? {
-      if let listing = self.getListing(listingId) {
-        return listing.getBid(bidId)
-      }
-      return nil
+    if let listing = self.getListing(listingId) {
+      return listing.getBid(bidId)
+    }
+    return nil
   }
 
   pub fun getListingDetails(_ listingId: UInt64): ListingDetails? {
-      return self.getListing(listingId)?.getDetails()
+    return self.getListing(listingId)?.getDetails()
   }
 
   pub fun getAllowedPaymentTokens(): [Type] {
-      return self.allowedPaymentTokens
+    return self.allowedPaymentTokens
   }
 
   pub fun isTokenAllowed(_ token: Type): Bool {
-      return self.allowedPaymentTokens.contains(token)
+    return self.allowedPaymentTokens.contains(token)
   }
 
   pub fun fastSort(_ arr: [AnyStruct], fn: ((AnyStruct, AnyStruct): Bool)): [AnyStruct] {
     if (arr.length < 2) {
-        return arr
+      return arr
     }
     let left: [AnyStruct] = []
     let right: [AnyStruct] = []
@@ -142,9 +142,9 @@ pub contract MelosMarketplace {
     let p = arr.remove(at: privot)
     for i in arr {
       if fn(i, p) {
-          left.append(i)
+        left.append(i)
       } else {
-          right.append(i)
+        right.append(i)
       }
     }
     return MelosMarketplace.fastSort(left, fn: fn).concat([p]).concat(MelosMarketplace.fastSort(right, fn: fn))
@@ -170,11 +170,11 @@ pub contract MelosMarketplace {
   }
 
   pub fun createListingManager(): @ListingManager {
-      return <-create ListingManager()
+    return <-create ListingManager()
   }
 
   pub fun createBidManager(): @BidManager {
-      return <-create BidManager()
+    return <-create BidManager()
   }
 
   /* --------------- ↑↑ Contract Methods ↑↑ --------------- */
@@ -629,9 +629,9 @@ pub contract MelosMarketplace {
     destroy () {
       if self.initialized {
         emit ListingRemoved(
-            purchased: self.details.isPurchased, 
-            listingId: self.uuid
-          )
+          purchased: self.details.isPurchased, 
+          listingId: self.uuid
+        )
       }
       if let nft <- self.nft {
         self.refund.borrow()!.deposit(token: <- nft)
@@ -832,28 +832,28 @@ pub contract MelosMarketplace {
     }
 
     pub fun removeBid(bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>, removeBidId: UInt64): Bool {
-        let removeBidRef = self.getBid(removeBidId)
-        assert(removeBidRef != nil, message: "Bid not exists")
-        assert(bidManager.borrow()!.uuid == removeBidRef!.bidManagerId, message: "Invalid bid ownership")
-  
-        let removeBid <- self.bids.remove(key: removeBidId)!
-        switch self.details.listingType {
-          case ListingType.EnglishAuction:
-            let cfg = self.details.listingConfig as! EnglishAuction
-            if removeBidId == cfg.topBidId {
-              cfg.setTopBid(newTopBid: self.getTopBidFromBids())
-            }
-            
-            self.englishAuctionParticipant.remove(key: removeBid.bidder)
-            emit EnglishAuctionBidRemoved(listingId: self.uuid, bidId: removeBidId)
-            break
-          case ListingType.OpenBid:
-            emit OpenBidRemoved(listingId: self.uuid, bidId: removeBidId)
-            break
-        }
-        destroy removeBid
+      let removeBidRef = self.getBid(removeBidId)
+      assert(removeBidRef != nil, message: "Bid not exists")
+      assert(bidManager.borrow()!.uuid == removeBidRef!.bidManagerId, message: "Invalid bid ownership")
 
-        return true
+      let removeBid <- self.bids.remove(key: removeBidId)!
+      switch self.details.listingType {
+        case ListingType.EnglishAuction:
+          let cfg = self.details.listingConfig as! EnglishAuction
+          if removeBidId == cfg.topBidId {
+            cfg.setTopBid(newTopBid: self.getTopBidFromBids())
+          }
+          
+          self.englishAuctionParticipant.remove(key: removeBid.bidder)
+          emit EnglishAuctionBidRemoved(listingId: self.uuid, bidId: removeBidId)
+          break
+        case ListingType.OpenBid:
+          emit OpenBidRemoved(listingId: self.uuid, bidId: removeBidId)
+          break
+      }
+      destroy removeBid
+
+      return true
     }
 
     access(contract) fun clearBids() {
@@ -928,23 +928,23 @@ pub contract MelosMarketplace {
       listingConfig: {MelosMarketplace.ListingConfig},
       receiver: Capability<&{FungibleToken.Receiver}>
     ): UInt64 {
-        let listing <- create Listing(
-          listingType: listingType,
-          nftCollection: nftCollection,
-          nftId: nftId,
-          paymentToken: paymentToken,
-          refund: refund,
-          listingConfig: listingConfig,
-          receiver: receiver,
-          listingManagerId: self.uuid
-        )
-        let listingId = listing.uuid
+      let listing <- create Listing(
+        listingType: listingType,
+        nftCollection: nftCollection,
+        nftId: nftId,
+        paymentToken: paymentToken,
+        refund: refund,
+        listingConfig: listingConfig,
+        receiver: receiver,
+        listingManagerId: self.uuid
+      )
+      let listingId = listing.uuid
 
-        self.listings[listingId] = &listing as &Listing
-        let _ <- MelosMarketplace.listings[listingId] <- listing
-        destroy _
+      self.listings[listingId] = &listing as &Listing
+      let _ <- MelosMarketplace.listings[listingId] <- listing
+      destroy _
 
-        return listingId
+      return listingId
     }
 
     pub fun removeListing(listingId: UInt64) {
