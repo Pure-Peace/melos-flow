@@ -42,6 +42,7 @@ pub contract MelosMarketplace {
 
   pub event OpenBidCreated(listingId: UInt64, bidId: UInt64, bidder: Address, offerPrice: UFix64)
   pub event OpenBidRemoved(listingId: UInt64, bidId: UInt64)
+  pub event OpenBidCompleted(listingId: UInt64, bidId: UInt64, winner: Address, price: UFix64)
 
   pub event EnglishAuctionBidCreated(listingId: UInt64, bidId: UInt64, bidder: Address, offerPrice: UFix64)
   pub event EnglishAuctionBidRemoved(listingId: UInt64, bidId: UInt64)
@@ -589,13 +590,13 @@ pub contract MelosMarketplace {
     pub fun ensurePaymentTokenType(_ payment: @FungibleToken.Vault): @FungibleToken.Vault
     pub fun purchaseCommon(payment: @FungibleToken.Vault): @NonFungibleToken.NFT
     pub fun purchaseDutchAuction(payment: @FungibleToken.Vault): @NonFungibleToken.NFT
-    pub fun openBid(
+    pub fun createOpenBid(
         bidManager: Capability<&MelosMarketplace.BidManager>,
         rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
         refund: Capability<&{FungibleToken.Receiver}>,
         payment: @FungibleToken.Vault
     ): UInt64
-    pub fun bidEnglishAuction(
+    pub fun createEnglishAuctionBid(
         bidManager: Capability<&MelosMarketplace.BidManager>,
         rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
         refund: Capability<&{FungibleToken.Receiver}>,
@@ -815,7 +816,7 @@ pub contract MelosMarketplace {
       return <- self.completeListing(<- payment)
     }
 
-    pub fun openBid(
+    pub fun createOpenBid(
       bidManager: Capability<&MelosMarketplace.BidManager>,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
@@ -846,7 +847,7 @@ pub contract MelosMarketplace {
       return bidId
     }
 
-    pub fun bidEnglishAuction(
+    pub fun createEnglishAuctionBid(
       bidManager: Capability<&MelosMarketplace.BidManager>,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
@@ -947,6 +948,31 @@ pub contract MelosMarketplace {
       emit EnglishAuctionCompleted(listingId: self.uuid, bidId: bidId, winner: winner, price: price)
       return true
     }
+
+    pub fun acceptOpenBid(listingManagerCapability: Capability<&MelosMarketplace.ListingManager>, bidId: UInt64): Bool {
+      // Check listing and params
+      assert(self.listingType() == ListingType.OpenBid, message: "Listing type is not EnglishAuction")
+      self.ensureAvaliable()
+      assert(self.getBid(bidId) != nil, message: "Bid not exists")
+
+      let listingManager = listingManagerCapability.borrow()
+      assert(listingManager != nil, message: "Cannot borrow listingManager")
+      assert(listingManager!.uuid == self.details.listingManagerId, message: "Invalid listing ownership")
+
+      let targetBid <- self.bids.remove(key: bidId)!
+      let price = targetBid.payment.balance
+      let winner = targetBid.refund.address
+      let bidId = targetBid.uuid
+
+      let nft <- self.completeListing(<- targetBid.payment.withdraw(amount: price))
+      targetBid.rewardCollection.borrow()!.deposit(token: <- nft)
+      destroy targetBid
+
+      self.clearBids()
+
+      emit OpenBidCompleted(listingId: self.uuid, bidId: bidId, winner: winner, price: price)
+      return true
+    }
   }
 
   pub resource interface ListingManagerPublic {
@@ -1013,10 +1039,12 @@ pub contract MelosMarketplace {
       destroy listing
     }
 
-    pub fun acceptOpenBid(listingId: UInt64, bidId: UInt64) {
+    pub fun acceptOpenBid(listingManagerCapability: Capability<&MelosMarketplace.ListingManager>, listingId: UInt64, bidId: UInt64): Bool {
       assert(MelosMarketplace.isListingExists(listingId), message: "Listing not exists")
       assert(self.getListingOwnership(listingId), message: "Invalid listing ownership")
 
+      let listingRef = &MelosMarketplace.listings[listingId] as &Listing
+      return listingRef.acceptOpenBid(listingManagerCapability: listingManagerCapability, bidId: bidId)
     }
   }
   /* --------------- ↑↑ Listings ↑↑ --------------- */
