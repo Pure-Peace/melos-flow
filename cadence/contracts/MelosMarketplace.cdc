@@ -112,16 +112,23 @@ pub contract MelosMarketplace {
       return &self.listings[listingId] as? &Listing
   }
 
+  pub fun getBid(listingId: UInt64, bidId: UInt64): &Bid? {
+      if let listing = self.getListing(listingId) {
+        return listing.getBid(bidId)
+      }
+      return nil
+  }
+
   pub fun getListingDetails(_ listingId: UInt64): ListingDetails? {
-      return MelosMarketplace.getListing(listingId)?.getDetails()
+      return self.getListing(listingId)?.getDetails()
   }
 
   pub fun getAllowedPaymentTokens(): [Type] {
-    return MelosMarketplace.allowedPaymentTokens
+      return self.allowedPaymentTokens
   }
 
   pub fun isTokenAllowed(_ token: Type): Bool {
-    return MelosMarketplace.allowedPaymentTokens.contains(token)
+      return self.allowedPaymentTokens.contains(token)
   }
 
   pub fun checkListingConfig(_ listingType: ListingType, _ listingConfig: {MelosMarketplace.ListingConfig}) {
@@ -362,6 +369,7 @@ pub contract MelosMarketplace {
 
     pub let listingId: UInt64
     pub let bidder: Address
+    pub let bidManagerId: UInt64
     access(contract) var bidTimestamp: UFix64
 
     init(
@@ -376,7 +384,8 @@ pub contract MelosMarketplace {
       assert(refund.check(), message: "Invalid refund capability")
 
       self.bidManager = bidManager
-      self.bidManager.borrow()!.recordBid(listingId: listingId, bidId: self.uuid)
+      let bidManagerRef = self.bidManager.borrow()!
+      bidManagerRef.recordBid(listingId: listingId, bidId: self.uuid)
 
       self.listingId = listingId
 
@@ -385,6 +394,7 @@ pub contract MelosMarketplace {
       self.payment <- payment
 
       self.bidder = self.refund.address
+      self.bidManagerId = bidManagerRef.uuid
       self.bidTimestamp = getCurrentBlock().timestamp
     }
 
@@ -397,6 +407,7 @@ pub contract MelosMarketplace {
     }
 
     destroy() {
+      self.bidManager.borrow()!.removeBid(listingId: self.listingId, bidId: self.uuid)
       self.refund.borrow()!.deposit(from: <- self.payment)
     }
   }
@@ -406,10 +417,11 @@ pub contract MelosMarketplace {
     pub fun isBidExists(listingId: UInt64, bidId: UInt64): Bool 
 
     pub fun getRecords(): {UInt64: [UInt64]}
+    pub fun findBidIndex(listingId: UInt64, bidId: UInt64): Int? 
+    pub fun getBidIdsWithListingId(_ listingId: UInt64): [UInt64]
 
-    pub fun getBidsWithListingId(listingId: UInt64): [UInt64]
-
-    pub fun recordBid(listingId: UInt64, bidId: UInt64): Bool
+    access(contract) fun recordBid(listingId: UInt64, bidId: UInt64): Bool
+    access(contract) fun removeBid(listingId: UInt64, bidId: UInt64): Bool
   }
 
   pub resource BidManager: BidManagerPublic {
@@ -420,35 +432,52 @@ pub contract MelosMarketplace {
       self.listings = {}
     }
 
-    pub fun isBidExists(listingId: UInt64, bidId: UInt64): Bool {      
-      if self.listings[listingId] == nil {
-        return false
-
-      } else if self.listings[listingId]!.contains(bidId) {
-        return true
+    pub fun isBidExists(listingId: UInt64, bidId: UInt64): Bool {
+      if let bids = self.listings[listingId] {
+        if bids.contains(bidId) {
+          return true
+        }
       }
-
       return false
+    }
+
+    pub fun findBidIndex(listingId: UInt64, bidId: UInt64): Int? {
+      if let bids = self.listings[listingId] {
+        for index, id in bids {
+          if id == bidId {
+            return index
+          }
+        }
+      }
+      return nil
     }
 
     pub fun getRecords(): {UInt64: [UInt64]} {
       return self.listings
     }
 
-    pub fun getBidsWithListingId(listingId: UInt64): [UInt64] {
+    pub fun getBidIdsWithListingId(_ listingId: UInt64): [UInt64] {
       return self.listings[listingId] ?? []
     }
 
-    pub fun recordBid(listingId: UInt64, bidId: UInt64): Bool {
+    access(contract) fun recordBid(listingId: UInt64, bidId: UInt64): Bool {
       if self.listings[listingId] == nil {
         self.listings[listingId] = [bidId]
         return true
-
       } else if !self.listings[listingId]!.contains(bidId) {
         self.listings[listingId]!.append(bidId)
         return true
       }
+      return false
+    }
 
+    access(contract) fun removeBid(listingId: UInt64, bidId: UInt64): Bool {
+      if self.listings[listingId] != nil {
+        if let index = self.findBidIndex(listingId: listingId, bidId: bidId) {
+          self.listings[listingId]!.remove(at: index)
+          return true
+        }
+      }
       return false
     }
 
@@ -587,7 +616,7 @@ pub contract MelosMarketplace {
       return self.englishAuctionParticipant
     }
 
-    pub fun getBid(bidId: UInt64): &Bid? {
+    pub fun getBid(_ bidId: UInt64): &Bid? {
       return &self.openBids[bidId] as? &Bid
     }
 
@@ -597,6 +626,11 @@ pub contract MelosMarketplace {
 
     pub fun getPrice(): UFix64 {
       return self.details.getPrice()
+    }
+
+    pub fun getBidOwnership(_ bidId: UInt64): Bool {
+      let bidRef = self.getBid(bidId)
+      return bidRef == nil ? false : bidRef!.bidManagerId == self.uuid
     }
 
     pub fun isListingEnded(): Bool {
@@ -754,7 +788,7 @@ pub contract MelosMarketplace {
       assert(self.details.listingType == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
       assert(self.isListingStarted(), message: "Listing not started")
       assert(self.isListingEnded(), message: "Auction is not ended")
-      assert(!self.isPurchased(), message: "Listing has already been purchased")
+      assert(!self.isPurchased(), message: "Listing not purchased")
 
       let topBid <- self.openBids.remove(key: (self.details.listingConfig as! EnglishAuction).topBid ?? panic("No bids"))!
       
