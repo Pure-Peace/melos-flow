@@ -109,11 +109,11 @@ pub contract MelosMarketplace {
     return self.listings[listingId] != nil
   }
 
-  pub fun getListing(_ listingId: UInt64): &Listing? {
+  pub fun getListing(_ listingId: UInt64): &{ListingPublic}? {
     return &self.listings[listingId] as? &Listing
   }
 
-  pub fun getBid(listingId: UInt64, bidId: UInt64): &Bid? {
+  pub fun getBid(listingId: UInt64, bidId: UInt64): &{BidPublic}? {
     if let listing = self.getListing(listingId) {
       return listing.getBid(bidId)
     }
@@ -138,8 +138,7 @@ pub contract MelosMarketplace {
     }
     let left: [AnyStruct] = []
     let right: [AnyStruct] = []
-    let privot = arr.length / 2
-    let p = arr.remove(at: privot)
+    let p = arr.remove(at: arr.length / 2)
     for i in arr {
       if fn(i, p) {
         left.append(i)
@@ -371,7 +370,7 @@ pub contract MelosMarketplace {
       return self.getPrice() * (1.0 + self.minimumBidPercentage)
     }
 
-    access(contract) fun setTopBid(newTopBid: &Bid?) {
+    access(contract) fun setTopBid(newTopBid: &{BidPublic}?) {
       if newTopBid != nil {
         assert(newTopBid!.offerPrice() >= self.getNextBidMinimumPrice(), message: "Offer price must be greater than or equal with [CurrentPrice * (1 + Minimum bid percentage)]")
       }
@@ -384,8 +383,16 @@ pub contract MelosMarketplace {
 
   /* --------------- ↓↓ Bids ↓↓ --------------- */
 
-  pub resource Bid {
-    access(contract) let bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>
+  pub resource interface BidPublic {
+    pub let listingId: UInt64
+    pub let bidder: Address
+    pub let bidManagerId: UInt64
+    pub fun offerPrice(): UFix64
+    pub fun bidTime(): UFix64
+  }
+
+  pub resource Bid: BidPublic {
+    access(contract) let bidManager: Capability<&MelosMarketplace.BidManager>
     access(contract) let rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>
     access(contract) let refund: Capability<&{FungibleToken.Receiver}>
     access(contract) let payment: @FungibleToken.Vault
@@ -396,7 +403,7 @@ pub contract MelosMarketplace {
     access(contract) var bidTimestamp: UFix64
 
     init(
-      bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
+      bidManager: Capability<&MelosMarketplace.BidManager>,
       listingId: UInt64,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
@@ -437,14 +444,12 @@ pub contract MelosMarketplace {
 
 
   pub resource interface BidManagerPublic {
-    pub fun isBidExists(listingId: UInt64, bidId: UInt64): Bool 
+    pub fun getListings(): {UInt64: [UInt64]}
     pub fun getBidOwnership(listingId: UInt64, bidId: UInt64): Bool
+    pub fun isBidExists(listingId: UInt64, bidId: UInt64): Bool 
     pub fun getRecords(): {UInt64: [UInt64]}
     pub fun findBidIndex(listingId: UInt64, bidId: UInt64): Int? 
     pub fun getBidIdsWithListingId(_ listingId: UInt64): [UInt64]
-
-    access(contract) fun recordBid(listingId: UInt64, bidId: UInt64): Bool
-    access(contract) fun removeBid(listingId: UInt64, bidId: UInt64): Bool
   }
 
   pub resource BidManager: BidManagerPublic {
@@ -453,6 +458,10 @@ pub contract MelosMarketplace {
 
     init () {
       self.listings = {}
+    }
+
+    pub fun getListings(): {UInt64: [UInt64]} {
+      return self.listings
     }
 
     pub fun getBidOwnership(listingId: UInt64, bidId: UInt64): Bool {
@@ -563,7 +572,40 @@ pub contract MelosMarketplace {
     }
   }
 
-  pub resource Listing {
+  pub resource interface ListingPublic {
+    pub fun listingType(): ListingType
+    pub fun config(): {MelosMarketplace.ListingConfig}
+    pub fun getEnglishAuctionParticipants(): {Address: UInt64}
+    pub fun getBids(): [&{BidPublic}]
+    pub fun getSortedBids(): [&{BidPublic}]
+    pub fun getTopBidFromBids(): &{BidPublic}?
+    pub fun getBid(_ bidId: UInt64): &{BidPublic}?
+    pub fun getDetails(): ListingDetails
+    pub fun getPrice(): UFix64
+    pub fun isListingEnded(): Bool
+    pub fun isListingStarted(): Bool
+    pub fun isPurchased(): Bool
+    pub fun ensureAvaliable()
+    pub fun ensurePaymentTokenType(_ payment: @FungibleToken.Vault): @FungibleToken.Vault
+    pub fun purchaseCommon(payment: @FungibleToken.Vault): @NonFungibleToken.NFT
+    pub fun purchaseDutchAuction(payment: @FungibleToken.Vault): @NonFungibleToken.NFT
+    pub fun openBid(
+        bidManager: Capability<&MelosMarketplace.BidManager>,
+        rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
+        refund: Capability<&{FungibleToken.Receiver}>,
+        payment: @FungibleToken.Vault
+    ): UInt64
+    pub fun bidEnglishAuction(
+        bidManager: Capability<&MelosMarketplace.BidManager>,
+        rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
+        refund: Capability<&{FungibleToken.Receiver}>,
+        payment: @FungibleToken.Vault
+    ): UInt64
+    pub fun removeBid(bidManager: Capability<&MelosMarketplace.BidManager>, removeBidId: UInt64): Bool
+    pub fun completeEnglishAuction(): Bool
+  }
+
+  pub resource Listing: ListingPublic {
     access(self) let initialized: Bool
     access(self) let details: ListingDetails
     access(self) var nft: @NonFungibleToken.NFT?
@@ -638,14 +680,23 @@ pub contract MelosMarketplace {
       } else {
         destroy self.nft
       }
+      self.clearBids()
       destroy self.bids
+    }
+
+    pub fun listingType(): ListingType {
+      return self.details.listingType
+    }
+
+    pub fun config(): {MelosMarketplace.ListingConfig} {
+      return self.details.listingConfig
     }
 
     pub fun getEnglishAuctionParticipants(): {Address: UInt64} {
       return self.englishAuctionParticipant
     }
 
-    pub fun getBids(): [&Bid] {
+    pub fun getBids(): [&{BidPublic}] {
       let temp: [&Bid] = []
       for bidId in self.bids.keys {
         temp.append(&self.bids[bidId] as &Bid)
@@ -653,7 +704,7 @@ pub contract MelosMarketplace {
       return temp
     }
 
-    pub fun getSortedBids(): [&Bid] {
+    pub fun getSortedBids(): [&{BidPublic}] {
       let temp: [&Bid] = []
       let sortFn = fun (pre: AnyStruct, cur: AnyStruct): Bool {
         return (pre as! &Bid).offerPrice() > (cur as! &Bid).offerPrice()
@@ -665,11 +716,11 @@ pub contract MelosMarketplace {
       return temp
     }
 
-    pub fun getTopBidFromBids(): &Bid? {
+    pub fun getTopBidFromBids(): &{BidPublic}? {
       return self.getSortedBids()[0]
     }
 
-    pub fun getBid(_ bidId: UInt64): &Bid? {
+    pub fun getBid(_ bidId: UInt64): &{BidPublic}? {
       return &self.bids[bidId] as? &Bid
     }
 
@@ -682,13 +733,13 @@ pub contract MelosMarketplace {
     }
 
     pub fun isListingEnded(): Bool {
-      return self.details.listingConfig.listingEndTime != nil 
-        ? getCurrentBlock().timestamp < self.details.listingConfig.listingEndTime! 
+      return self.config().listingEndTime != nil 
+        ? getCurrentBlock().timestamp < self.config().listingEndTime! 
         : false
     }
 
     pub fun isListingStarted(): Bool {
-      return getCurrentBlock().timestamp >= self.details.listingConfig.listingStartTime
+      return getCurrentBlock().timestamp >= self.config().listingStartTime
     }
 
     pub fun isPurchased(): Bool {
@@ -704,6 +755,16 @@ pub contract MelosMarketplace {
     pub fun ensurePaymentTokenType(_ payment: @FungibleToken.Vault): @FungibleToken.Vault {
       assert(payment.isInstance(self.details.paymentToken), message: "payment vault is not requested fungible token")
       return <- payment
+    }
+
+    access(contract) fun clearBids() {
+      for key in self.bids.keys {
+        let bid <- self.bids.remove(key: key)
+        destroy bid
+      }
+      if self.listingType() == ListingType.EnglishAuction {
+        self.englishAuctionParticipant = {}
+      }
     }
 
     access(self) fun withdrawNFT(): @NonFungibleToken.NFT {
@@ -732,7 +793,7 @@ pub contract MelosMarketplace {
 
     pub fun purchaseCommon(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
       // Check listing and params
-      assert(self.details.listingType == ListingType.Common, message: "Listing type is not Common")
+      assert(self.listingType() == ListingType.Common, message: "Listing type is not Common")
       self.ensureAvaliable()
 
       let payment <- self.ensurePaymentTokenType(<- payment)
@@ -744,7 +805,7 @@ pub contract MelosMarketplace {
 
     pub fun purchaseDutchAuction(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
       // Check listing and params
-      assert(self.details.listingType == ListingType.DutchAuction, message: "Listing type is not DutchAuction")
+      assert(self.listingType() == ListingType.DutchAuction, message: "Listing type is not DutchAuction")
       self.ensureAvaliable()
 
       let payment <- self.ensurePaymentTokenType(<- payment)
@@ -755,18 +816,18 @@ pub contract MelosMarketplace {
     }
 
     pub fun openBid(
-      bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
+      bidManager: Capability<&MelosMarketplace.BidManager>,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
     ): UInt64 {
       // Check listing and params
-      assert(self.details.listingType == ListingType.OpenBid, message: "Listing type is not OpenBid")
+      assert(self.listingType() == ListingType.OpenBid, message: "Listing type is not OpenBid")
       self.ensureAvaliable()
 
       let payment <- self.ensurePaymentTokenType(<- payment)
       let offerPrice = payment.balance
-      assert(offerPrice >= (self.details.listingConfig as! OpenBid).minimumPrice, message: "Offer price must be greater than minimumPrice")
+      assert(offerPrice >= (self.config() as! OpenBid).minimumPrice, message: "Offer price must be greater than minimumPrice")
 
       let bid <- create Bid(
         bidManager: bidManager,
@@ -786,13 +847,13 @@ pub contract MelosMarketplace {
     }
 
     pub fun bidEnglishAuction(
-      bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
+      bidManager: Capability<&MelosMarketplace.BidManager>,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
     ): UInt64 {
       // Check listing and params
-      assert(self.details.listingType == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
+      assert(self.listingType() == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
       self.ensureAvaliable()
       
       let payment <- self.ensurePaymentTokenType(<- payment)
@@ -819,7 +880,7 @@ pub contract MelosMarketplace {
       let _ <- self.bids[bidId] <- bid
       destroy _;
 
-      (self.details.listingConfig as! EnglishAuction).setTopBid(newTopBid: bidRef)
+      (self.config() as! EnglishAuction).setTopBid(newTopBid: bidRef)
 
       emit EnglishAuctionBidCreated(
         listingId: self.uuid, 
@@ -831,15 +892,15 @@ pub contract MelosMarketplace {
       return bidId
     }
 
-    pub fun removeBid(bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>, removeBidId: UInt64): Bool {
+    pub fun removeBid(bidManager: Capability<&MelosMarketplace.BidManager>, removeBidId: UInt64): Bool {
       let removeBidRef = self.getBid(removeBidId)
       assert(removeBidRef != nil, message: "Bid not exists")
       assert(bidManager.borrow()!.uuid == removeBidRef!.bidManagerId, message: "Invalid bid ownership")
 
       let removeBid <- self.bids.remove(key: removeBidId)!
-      switch self.details.listingType {
+      switch self.listingType() {
         case ListingType.EnglishAuction:
-          let cfg = self.details.listingConfig as! EnglishAuction
+          let cfg = self.config() as! EnglishAuction
           if removeBidId == cfg.topBidId {
             cfg.setTopBid(newTopBid: self.getTopBidFromBids())
           }
@@ -856,24 +917,14 @@ pub contract MelosMarketplace {
       return true
     }
 
-    access(contract) fun clearBids() {
-      for key in self.bids.keys {
-        let bid <- self.bids.remove(key: key)
-        destroy bid
-      }
-      if self.details.listingType == ListingType.EnglishAuction {
-        self.englishAuctionParticipant = {}
-      }
-    }
-
     pub fun completeEnglishAuction(): Bool {
       // Check listing and params
-      assert(self.details.listingType == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
+      assert(self.listingType() == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
       assert(self.isListingStarted(), message: "Listing not started")
       assert(self.isListingEnded(), message: "Auction is not ended")
       assert(!self.isPurchased(), message: "Listing has already been purchased")
 
-      let cfg = self.details.listingConfig as! EnglishAuction
+      let cfg = self.config() as! EnglishAuction
       // The result should be 'Not traded'
       if cfg.topBidId == nil {
         let nft <- self.completeListing(nil)
@@ -898,13 +949,16 @@ pub contract MelosMarketplace {
     }
   }
 
-  pub resource ListingManager {
+  pub resource interface ListingManagerPublic {
+    pub fun getlistings(): {UInt64: &{ListingPublic}}
+  }
+
+  pub resource ListingManager: ListingManagerPublic {
     // Listing => Listing resource
-    pub let listings: {UInt64: &Listing}
+    access(self) let listings: {UInt64: &{ListingPublic}}
 
     init() {
       self.listings = {}
-
       emit ListingManagerCreated(self.uuid)
     }
 
@@ -912,6 +966,10 @@ pub contract MelosMarketplace {
       assert(self.listings.keys.length == 0, message: "There are uncompleted listings")
 
       emit ListingManagerDestroyed(self.uuid)
+    }
+
+    pub fun getlistings(): {UInt64: &{ListingPublic}} {
+      return self.listings
     }
 
     pub fun getListingOwnership(_ listingId: UInt64): Bool {
