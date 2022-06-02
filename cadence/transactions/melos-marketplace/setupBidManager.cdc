@@ -1,6 +1,5 @@
 import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 
-
 transaction {
   prepare(account: AuthAccount) {
     let PUBLIC_PATH = MelosMarketplace.BidManagerPublicPath
