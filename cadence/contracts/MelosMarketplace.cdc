@@ -32,7 +32,9 @@ pub contract MelosMarketplace {
 
   pub let AdminStoragePath: StoragePath
   pub let ListingManagerStoragePath: StoragePath
+  pub let ListingManagerPublicPath: PublicPath
   pub let BidManagerStoragePath: StoragePath
+  pub let BidManagerPublicPath: PublicPath
 
 
   pub var minimumListingDuration: UFix64?
@@ -101,7 +103,9 @@ pub contract MelosMarketplace {
     self.feeConfigs = feeConfigs ?? {}
 
     self.AdminStoragePath = /storage/MelosSettlementAdmin
+    self.ListingManagerPublicPath = /public/MelosMarketplace
     self.ListingManagerStoragePath = /storage/MelosMarketplace
+    self.BidManagerPublicPath = /public/MelosBidManager
     self.BidManagerStoragePath = /storage/MelosBidManager
 
     // Create admint resource and do some settings
