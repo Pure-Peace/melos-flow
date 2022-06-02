@@ -198,6 +198,47 @@ pub contract MelosMarketplace {
     assert(cfg != nil, message: "Invalid listing config")
   }
 
+  /* pub fun removeListing(listingId: UInt64) {
+    let listingRef = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
+    assert(listingRef.isPurchased(), message: message)
+
+    let listing <- MelosMarketplace.listings.remove(key: listingId)!
+    destroy listing
+  } */
+
+  /* pub fun completeEnglishAuction(listingId: UInt64): Bool {
+    let listingRef = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
+
+    // Check listing and params
+    assert(listingRef.listingType() == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
+    assert(listingRef.isListingStarted(), message: "Listing not started")
+    assert(listingRef.isListingExpired(), message: "Auction is not ended")
+    assert(listingRef.nft != nil, message: "Listing has already been purchased")
+
+    let cfg = self.config() as! EnglishAuction
+    // The result should be 'Not traded'
+    if cfg.topBidId == nil {
+      let nft <- self.completeListing(nil)
+      self.refund.borrow()!.deposit(token: <- nft)
+      return false
+    }
+    
+    let topBid <- self.bids.remove(key: cfg.topBidId!)!
+    
+    let price = topBid.payment.balance
+    let winner = topBid.refund.address
+    let bidId = topBid.uuid
+
+    let nft <- self.completeListing(<- topBid.payment.withdraw(amount: price))
+    topBid.rewardCollection.borrow()!.deposit(token: <- nft)
+    destroy topBid
+
+    self.clearBids()
+
+    emit EnglishAuctionCompleted(listingId: self.uuid, bidId: bidId, winner: winner, price: price)
+    return true
+  } */
+
   pub fun createListingManager(): @ListingManager {
     return <-create ListingManager()
   }
@@ -403,9 +444,6 @@ pub contract MelosMarketplace {
     }
 
     access(contract) fun setTopBid(newTopBid: &{BidPublic}?) {
-      if newTopBid != nil {
-        assert(newTopBid!.offerPrice() >= self.getNextBidMinimumPrice(), message: "Offer price must be greater than or equal with [CurrentPrice * (1 + Minimum bid percentage)]")
-      }
       self.topBidId = newTopBid?.uuid ?? nil
       self.currentPrice = newTopBid?.offerPrice() ?? self.basePrice
     }
@@ -614,27 +652,21 @@ pub contract MelosMarketplace {
     pub fun getBid(_ bidId: UInt64): &{BidPublic}?
     pub fun getDetails(): ListingDetails
     pub fun getPrice(): UFix64
+    pub fun isValid(): Bool
     pub fun isListingEnded(): Bool
     pub fun isListingStarted(): Bool
     pub fun isPurchased(): Bool
     pub fun ensureAvaliable()
     pub fun ensurePaymentTokenType(_ payment: @FungibleToken.Vault): @FungibleToken.Vault
-    pub fun purchaseCommon(payment: @FungibleToken.Vault): @NonFungibleToken.NFT
-    pub fun purchaseDutchAuction(payment: @FungibleToken.Vault): @NonFungibleToken.NFT
-    pub fun createOpenBid(
-        bidManager: Capability<&MelosMarketplace.BidManager>,
-        rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
-        refund: Capability<&{FungibleToken.Receiver}>,
-        payment: @FungibleToken.Vault
-    ): UInt64
-    pub fun createEnglishAuctionBid(
+
+    pub fun purchase(payment: @FungibleToken.Vault): @NonFungibleToken.NFT
+    pub fun createBid(
         bidManager: Capability<&MelosMarketplace.BidManager>,
         rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
         refund: Capability<&{FungibleToken.Receiver}>,
         payment: @FungibleToken.Vault
     ): UInt64
     pub fun removeBid(bidManager: Capability<&MelosMarketplace.BidManager>, removeBidId: UInt64): Bool
-    pub fun completeEnglishAuction(): Bool
   }
 
   pub resource Listing: ListingPublic {
@@ -770,6 +802,10 @@ pub contract MelosMarketplace {
         : false
     }
 
+    pub fun isValid(): Bool {
+      return self.nft != nil
+    }
+
     pub fun isListingStarted(): Bool {
       return getCurrentBlock().timestamp >= self.config().listingStartTime
     }
@@ -827,9 +863,9 @@ pub contract MelosMarketplace {
       return <- nft
     }
 
-    pub fun purchaseCommon(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
+    pub fun purchase(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
       // Check listing and params
-      assert(self.listingType() == ListingType.Common, message: "Listing type is not Common")
+      assert([ListingType.Common, ListingType.DutchAuction].contains(self.listingType()), message: "Listing type is not supported")
       self.ensureAvaliable()
 
       let payment <- self.ensurePaymentTokenType(<- payment)
@@ -839,19 +875,7 @@ pub contract MelosMarketplace {
       return <- self.completeListing(<- payment)
     }
 
-    pub fun purchaseDutchAuction(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
-      // Check listing and params
-      assert(self.listingType() == ListingType.DutchAuction, message: "Listing type is not DutchAuction")
-      self.ensureAvaliable()
-
-      let payment <- self.ensurePaymentTokenType(<- payment)
-      let price = self.getPrice()
-      assert(payment.balance >= price, message: "insufficient payments")
-
-      return <- self.completeListing(<- payment)
-    }
-
-    pub fun createOpenBid(
+    access(self) fun createOpenBid(
       bidManager: Capability<&MelosMarketplace.BidManager>,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
@@ -882,7 +906,7 @@ pub contract MelosMarketplace {
       return bidId
     }
 
-    pub fun createEnglishAuctionBid(
+    access(self) fun createEnglishAuctionBid(
       bidManager: Capability<&MelosMarketplace.BidManager>,
       rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
       refund: Capability<&{FungibleToken.Receiver}>,
@@ -893,15 +917,18 @@ pub contract MelosMarketplace {
       self.ensureAvaliable()
       
       let payment <- self.ensurePaymentTokenType(<- payment)
+      let offerPrice = payment.balance
+      let cfg = self.config() as! EnglishAuction
+      assert(offerPrice >= cfg.getNextBidMinimumPrice(), 
+        message: "Offer price must be greater than or equal with [CurrentPrice * (1 + Minimum bid percentage)]"
+      )
 
-      // Already exists handle
+      // If account has bid before
       if let oldBidId = self.englishAuctionParticipant[refund.address] {
         let oldBid <- self.bids.remove(key: oldBidId)!
         payment.deposit(from: <- oldBid.payment.withdraw(amount: oldBid.payment.balance))
         destroy oldBid
       }
-
-      let offerPrice = payment.balance
 
       let bid <- create Bid(
         bidManager: bidManager,
@@ -916,7 +943,7 @@ pub contract MelosMarketplace {
       let _ <- self.bids[bidId] <- bid
       destroy _;
 
-      (self.config() as! EnglishAuction).setTopBid(newTopBid: bidRef)
+      cfg.setTopBid(newTopBid: bidRef)
 
       emit EnglishAuctionBidCreated(
         listingId: self.uuid, 
@@ -926,6 +953,31 @@ pub contract MelosMarketplace {
       )
 
       return bidId
+    }
+
+    pub fun createBid(
+      bidManager: Capability<&MelosMarketplace.BidManager>,
+      rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
+      refund: Capability<&{FungibleToken.Receiver}>,
+      payment: @FungibleToken.Vault
+    ): UInt64 {
+      switch self.listingType() {
+        case ListingType.OpenBid:
+          return self.createOpenBid(
+            bidManager: bidManager, 
+            rewardCollection: rewardCollection, 
+            refund: refund, 
+            payment: <- payment
+          )
+        case ListingType.EnglishAuction:
+          return self.createEnglishAuctionBid(
+            bidManager: bidManager, 
+            rewardCollection: rewardCollection, 
+            refund: refund, 
+            payment: <- payment
+          )
+      }
+      panic("Listing type not support")
     }
 
     pub fun removeBid(bidManager: Capability<&MelosMarketplace.BidManager>, removeBidId: UInt64): Bool {
@@ -950,37 +1002,6 @@ pub contract MelosMarketplace {
       }
       destroy removeBid
 
-      return true
-    }
-
-    pub fun completeEnglishAuction(): Bool {
-      // Check listing and params
-      assert(self.listingType() == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
-      assert(self.isListingStarted(), message: "Listing not started")
-      assert(self.isListingEnded(), message: "Auction is not ended")
-      assert(!self.isPurchased(), message: "Listing has already been purchased")
-
-      let cfg = self.config() as! EnglishAuction
-      // The result should be 'Not traded'
-      if cfg.topBidId == nil {
-        let nft <- self.completeListing(nil)
-        self.refund.borrow()!.deposit(token: <- nft)
-        return false
-      }
-      
-      let topBid <- self.bids.remove(key: cfg.topBidId!)!
-      
-      let price = topBid.payment.balance
-      let winner = topBid.refund.address
-      let bidId = topBid.uuid
-  
-      let nft <- self.completeListing(<- topBid.payment.withdraw(amount: price))
-      topBid.rewardCollection.borrow()!.deposit(token: <- nft)
-      destroy topBid
-
-      self.clearBids()
-
-      emit EnglishAuctionCompleted(listingId: self.uuid, bidId: bidId, winner: winner, price: price)
       return true
     }
 
@@ -1067,8 +1088,19 @@ pub contract MelosMarketplace {
     }
 
     pub fun removeListing(listingId: UInt64) {
-      assert(MelosMarketplace.isListingExists(listingId), message: "Listing not exists")
-      assert(self.getListingOwnership(listingId), message: "Invalid listing ownership")
+      let listingRef = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
+      let listingDetails = listingRef.getDetails()
+      assert(listingDetails.listingManagerId == self.uuid, message: "Invalid listing ownership")
+      
+      let cfg = listingRef.config() as! EnglishAuction
+
+      if listingDetails.listingType == ListingType.EnglishAuction
+        && listingRef.isListingEnded()
+        && cfg.topBidId != nil 
+        && !listingDetails.isPurchased {
+        panic("")
+      }
+      
 
       let listing <- MelosMarketplace.listings.remove(key: listingId)!
       destroy listing
