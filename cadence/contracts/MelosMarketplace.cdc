@@ -1011,12 +1011,12 @@ pub contract MelosMarketplace {
   }
 
   pub resource interface ListingManagerPublic {
-    pub fun getlistings(): {UInt64: &{ListingPublic}}
+    pub fun getlistings(): {UInt64: UInt64}
   }
 
   pub resource ListingManager: ListingManagerPublic {
-    // Listing => Listing resource
-    access(self) let listings: {UInt64: &{ListingPublic}}
+    // Listing => NFT id
+    access(self) let listings: {UInt64: UInt64}
 
     init() {
       self.listings = {}
@@ -1029,7 +1029,7 @@ pub contract MelosMarketplace {
       emit ListingManagerDestroyed(self.uuid)
     }
 
-    pub fun getlistings(): {UInt64: &{ListingPublic}} {
+    pub fun getlistings(): {UInt64: UInt64} {
       return self.listings
     }
 
@@ -1059,7 +1059,7 @@ pub contract MelosMarketplace {
       )
       let listingId = listing.uuid
 
-      self.listings[listingId] = &listing as &Listing
+      self.listings[listingId] = nftId
       let _ <- MelosMarketplace.listings[listingId] <- listing
       destroy _
 
