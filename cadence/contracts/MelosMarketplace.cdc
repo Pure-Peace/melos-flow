@@ -152,6 +152,11 @@ pub contract MelosMarketplace {
     return self.listings.keys
   }
 
+  // Get current listing counts
+  pub fun getListingCount(): Int {
+    return self.listings.length
+  }
+
   // Checks whether the specified listing id exists
   pub fun isListingExists(_ listingId: UInt64): Bool {
     return self.listings[listingId] != nil
