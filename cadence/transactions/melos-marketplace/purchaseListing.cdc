@@ -23,19 +23,6 @@ pub fun getOrCreateNFTCollection(account: AuthAccount): &MelosNFT.Collection{Non
     return collectionRef
 }
 
-pub fun purchase(
-  listing: &{MelosMarketplace.ListingPublic}, 
-  payment: @FungibleToken.Vault
-): @NonFungibleToken.NFT {
-  switch listing.listingType() {
-    case MelosMarketplace.ListingType.Common:
-      return <- listing.purchaseCommon(payment: <- payment)
-    case MelosMarketplace.ListingType.DutchAuction:
-      return <- listing.purchaseDutchAuction(payment: <- payment)
-  }
-  panic("Not supported listing type")
-}
-
 transaction(
   listingId: UInt64
 ) {
@@ -55,7 +42,7 @@ transaction(
   }
 
   execute {
-    let nft <- purchase(listing: self.listing, payment: <- self.payment)
+    let nft <- self.listing.purchase(payment: <- self.payment)
     self.collection.deposit(token: <- nft)
   }
 }

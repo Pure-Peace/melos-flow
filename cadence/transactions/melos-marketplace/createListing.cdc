@@ -67,7 +67,7 @@ transaction(
 ) {
   let listingType: MelosMarketplace.ListingType
   let listingConfig: {MelosMarketplace.ListingConfig}
-  let nftCollection: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
+  let nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
   let refund: Capability<&{NonFungibleToken.CollectionPublic}>
   let receiver: Capability<&{FungibleToken.Receiver}>
   let listingManager: &MelosMarketplace.ListingManager
@@ -79,7 +79,7 @@ transaction(
 
     self.receiver = account.getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 
-    self.nftCollection = account.getCapability<&MelosNFT.Collection{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(
+    self.nftProvider = account.getCapability<&MelosNFT.Collection{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(
       MelosNFT.CollectionPublicPath)
 
     self.refund = account.getCapability<&MelosNFT.Collection{NonFungibleToken.CollectionPublic}>(
@@ -91,7 +91,7 @@ transaction(
   execute {
     let listingId = self.listingManager.createListing(
       listingType: self.listingType,
-      nftCollection: self.nftCollection,
+      nftProvider: self.nftProvider,
       nftId: nftId,
       paymentToken: Type<@FlowToken.Vault>(),
       refund: self.refund,
