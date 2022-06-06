@@ -4,6 +4,7 @@ import NonFungibleToken from "core/NonFungibleToken.cdc"
 
 pub contract MelosMarketplace {
 
+  // Type of each listing
   pub enum ListingType: UInt8 {
     pub case Common
     pub case OpenBid
@@ -11,6 +12,9 @@ pub contract MelosMarketplace {
     pub case EnglishAuction
   }
 
+  // Platform fee configuration
+  // 
+  // Fee deducted when the order is completed, including tx fees and royalties
   pub struct FungibleTokenFeeConfig {
     pub var txFeeReceiver: Capability<&{FungibleToken.Receiver}>
     pub var txFeePercent: UFix64
@@ -33,11 +37,18 @@ pub contract MelosMarketplace {
     }
   }
 
-  /* --------------- ↓↓ Vars ↓↓ --------------- */
+  // -----------------------------------------------------------------------
+  // Contract-level vars
+  // -----------------------------------------------------------------------
 
+  // Admin resources
   pub let AdminStoragePath: StoragePath
+
+  // Listing manager resource
   pub let ListingManagerStoragePath: StoragePath
   pub let ListingManagerPublicPath: PublicPath
+
+  // Bid manager resource
   pub let BidManagerStoragePath: StoragePath
   pub let BidManagerPublicPath: PublicPath
 
@@ -49,13 +60,19 @@ pub contract MelosMarketplace {
   access(self) var allowedPaymentTokens: [Type]
   access(self) let feeConfigs: {String: FungibleTokenFeeConfig}
 
-  /* --------------- ↓↓ Events ↓↓ --------------- */
+  // -----------------------------------------------------------------------
+  // Events
+  // -----------------------------------------------------------------------
 
+  // Emitted when contract is initialized
   pub event MelosSettlementInitialized();
 
+  // Emitted when ListingManager is initialized
   pub event ListingManagerCreated(_ listingManagerResourceID: UInt64)
+  // Emitted when ListingManager is destroyed
   pub event ListingManagerDestroyed(_ listingManagerResourceID: UInt64)
 
+  // Fee events
   pub event FungibleTokenFeeUpdated(
     token: String, 
     txFeeReceiver: Address, 
@@ -66,18 +83,19 @@ pub contract MelosMarketplace {
   pub event TxFeeCutted(listingId: UInt64, txFee: UFix64?, royalty: UFix64?)
   pub event FungibleTokenFeeRemoved(token: String)
 
+  // Contract config events
   pub event MinimumListingDurationChanged(old: UFix64?, new: UFix64?)
   pub event MaxAuctionDurationChanged(old: UFix64?, new: UFix64?)
   pub event AllowedPaymentTokensChanged(old: [Type]?, new: [Type]?)
 
-  pub event OpenBidCreated(listingId: UInt64, bidId: UInt64, bidder: Address, offerPrice: UFix64)
-  pub event OpenBidRemoved(listingId: UInt64, bidId: UInt64)
-  pub event OpenBidCompleted(listingId: UInt64, bidId: UInt64, winner: Address, price: UFix64)
+  // Bid listing events
+  //
+  // Includes English auctions and open-bid
+  pub event BidCreated(listingId: UInt64, bidId: UInt64, bidder: Address, offerPrice: UFix64)
+  pub event BidRemoved(listingId: UInt64, bidId: UInt64)
+  pub event BidListingCompleted(listingId: UInt64, topBid: UInt64?, winner: Address?, price: UFix64)
 
-  pub event EnglishAuctionBidCreated(listingId: UInt64, bidId: UInt64, bidder: Address, offerPrice: UFix64)
-  pub event EnglishAuctionBidRemoved(listingId: UInt64, bidId: UInt64)
-  pub event EnglishAuctionCompleted(listingId: UInt64, topBid: UInt64?, winner: Address?, price: UFix64)
-
+  // Listing events
   pub event ListingCreated(
     listingType: UInt8,
     seller: Address, 
@@ -91,7 +109,9 @@ pub contract MelosMarketplace {
   )
   pub event ListingRemoved(purchased: Bool, listingId: UInt64)
 
-  /* --------------- ↓↓ Initilization ↓↓ --------------- */
+  // -----------------------------------------------------------------------
+  // Contract Initilization
+  // -----------------------------------------------------------------------
 
   init (
     feeRecipient: Address?,
@@ -126,20 +146,31 @@ pub contract MelosMarketplace {
     emit MelosSettlementInitialized()
   }
 
-  /* --------------- ↓↓ Contract Methods ↓↓ --------------- */
+  // -----------------------------------------------------------------------
+  // Contract-level Functions
+  // -----------------------------------------------------------------------
 
+  // Get all current listing ids
   pub fun getListingIds(): [UInt64] {
     return self.listings.keys
   }
 
+  // Checks whether the specified listing id exists
   pub fun isListingExists(_ listingId: UInt64): Bool {
     return self.listings[listingId] != nil
   }
 
+  // Get the public interface of the specified listing
   pub fun getListing(_ listingId: UInt64): &{ListingPublic}? {
     return &self.listings[listingId] as? &Listing
   }
 
+  // Get the details struct of the specified listing
+  pub fun getListingDetails(_ listingId: UInt64): ListingDetails? {
+    return self.getListing(listingId)?.getDetails()
+  }
+
+  // Get the public interface of the specified bid
   pub fun getBid(listingId: UInt64, bidId: UInt64): &{BidPublic}? {
     if let listing = self.getListing(listingId) {
       return listing.getBid(bidId)
@@ -147,22 +178,22 @@ pub contract MelosMarketplace {
     return nil
   }
 
+  // Get the fungibletoken fee configuration of the contract
   pub fun getFeeConfigs(): {String: FungibleTokenFeeConfig} {
     return self.feeConfigs
   }
 
+  // Get the fungibletoken fee of the specified token
   pub fun getFeeConfigByTokenType(tokenType: Type): FungibleTokenFeeConfig? {
     return self.feeConfigs[tokenType.identifier]
   }
 
-  pub fun getListingDetails(_ listingId: UInt64): ListingDetails? {
-    return self.getListing(listingId)?.getDetails()
-  }
-
+  // Get the fungibletokens currently supported by the contract
   pub fun getAllowedPaymentTokens(): [Type] {
     return self.allowedPaymentTokens
   }
 
+  // Check if the token is allowed
   pub fun isTokenAllowed(_ token: Type): Bool {
     return self.allowedPaymentTokens.contains(token)
   }
@@ -184,6 +215,7 @@ pub contract MelosMarketplace {
     return MelosMarketplace.fastSort(left, fn: fn).concat([p]).concat(MelosMarketplace.fastSort(right, fn: fn))
   }
 
+  // Check if the type of the listing matches
   pub fun checkListingConfig(_ listingType: ListingType, _ listingConfig: {MelosMarketplace.ListingConfig}) {
     var cfg: {MelosMarketplace.ListingConfig}? = nil
     switch listingType {
@@ -203,6 +235,10 @@ pub contract MelosMarketplace {
     assert(cfg != nil, message: "Invalid listing config")
   }
 
+  // Allow anyone to remove listings that matches the condition
+  //
+  // 1. listing is started
+  // 2. [listing is purchased] or [NFT is not avaliable] or [listing is ended]
   pub fun removeListing(listingId: UInt64): Bool {
     let listingRef = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
     if listingRef.isListingStarted() 
@@ -224,9 +260,9 @@ pub contract MelosMarketplace {
     return <-create BidManager()
   }
 
-  /* --------------- ↑↑ Contract Methods ↑↑ --------------- */
-
-  /* --------------- ↓↓ Contract Admint ↓↓ --------------- */
+  // -----------------------------------------------------------------------
+  // Admin resource
+  // -----------------------------------------------------------------------
 
   pub resource Admin {
     pub fun setTokenFeeConfig(
@@ -282,9 +318,9 @@ pub contract MelosMarketplace {
     }
   }
 
-  /* --------------- ↑↑ Contract Admin ↑↑ --------------- */
-
-  /* --------------- ↓↓ ListingConfigs ↓↓ --------------- */
+  // -----------------------------------------------------------------------
+  // ListingConfig structs
+  // -----------------------------------------------------------------------
 
   pub struct interface ListingConfig {
     pub let listingStartTime: UFix64
@@ -427,9 +463,9 @@ pub contract MelosMarketplace {
     }
   }
 
-  /* --------------- ↑↑ ListingConfigs ↑↑ --------------- */
-
-  /* --------------- ↓↓ Bids ↓↓ --------------- */
+  // -----------------------------------------------------------------------
+  // Bid resources
+  // -----------------------------------------------------------------------
 
   pub resource interface BidPublic {
     pub let listingId: UInt64
@@ -490,6 +526,9 @@ pub contract MelosMarketplace {
     }
   }
 
+  // -----------------------------------------------------------------------
+  // BidManager resources
+  // -----------------------------------------------------------------------
 
   pub resource interface BidManagerPublic {
     pub fun getListings(): {UInt64: [UInt64]}
@@ -573,9 +612,9 @@ pub contract MelosMarketplace {
     }
   }
 
-  /* --------------- ↑↑ Bids ↑↑ --------------- */
-
-  /* --------------- ↓↓ Listings ↓↓ --------------- */
+  // -----------------------------------------------------------------------
+  // Listings
+  // -----------------------------------------------------------------------
 
   pub struct ListingDetails {
     pub let listingType: ListingType
@@ -900,7 +939,7 @@ pub contract MelosMarketplace {
       let _ <- self.bids[bidId] <- bid
       destroy _;
 
-      emit OpenBidCreated(listingId: self.uuid, bidId: bidId, bidder: refund.address, offerPrice: offerPrice)
+      emit BidCreated(listingId: self.uuid, bidId: bidId, bidder: refund.address, offerPrice: offerPrice)
 
       return bidId
     }
@@ -946,7 +985,7 @@ pub contract MelosMarketplace {
 
       cfg.setTopBid(newTopBid: bidRef)
 
-      emit EnglishAuctionBidCreated(
+      emit BidCreated(
         listingId: self.uuid, 
         bidId: bidId,
         bidder: refund.address, 
@@ -987,20 +1026,16 @@ pub contract MelosMarketplace {
       assert(bidManager.borrow()!.uuid == removeBidRef!.bidManagerId, message: "Invalid bid ownership")
 
       let removeBid <- self.bids.remove(key: removeBidId)!
-      switch self.getListingType() {
-        case ListingType.EnglishAuction:
-          let cfg = self.config() as! EnglishAuction
-          if removeBidId == cfg.topBidId {
-            cfg.setTopBid(newTopBid: self.getTopBidFromBids())
-          }
-          
-          self.englishAuctionParticipant.remove(key: removeBid.bidder)
-          emit EnglishAuctionBidRemoved(listingId: self.uuid, bidId: removeBidId)
-          break
-        case ListingType.OpenBid:
-          emit OpenBidRemoved(listingId: self.uuid, bidId: removeBidId)
-          break
+      if self.isListingType(ListingType.EnglishAuction) {
+        let cfg = self.config() as! EnglishAuction
+        if removeBidId == cfg.topBidId {
+          cfg.setTopBid(newTopBid: self.getTopBidFromBids())
+        }
+        
+        self.englishAuctionParticipant.remove(key: removeBid.bidder)
       }
+
+      emit BidRemoved(listingId: self.uuid, bidId: removeBidId)
       destroy removeBid
 
       return true
@@ -1029,7 +1064,7 @@ pub contract MelosMarketplace {
 
       self.clearBids()
 
-      emit OpenBidCompleted(listingId: self.uuid, bidId: bidId, winner: winner, price: price)
+      emit BidListingCompleted(listingId: self.uuid, topBid: bidId, winner: winner, price: price)
       return true
     }
 
@@ -1047,7 +1082,7 @@ pub contract MelosMarketplace {
         let nft <- self.completeListing(nil)
         self.refund.borrow()!.deposit(token: <- nft)
 
-        emit EnglishAuctionCompleted(listingId: self.uuid, topBid: nil, winner: nil, price: cfg.currentPrice)
+        emit BidListingCompleted(listingId: self.uuid, topBid: nil, winner: nil, price: cfg.currentPrice)
         return false
       }
       
@@ -1063,10 +1098,15 @@ pub contract MelosMarketplace {
       destroy topBid
       self.clearBids()
 
-      emit EnglishAuctionCompleted(listingId: self.uuid, topBid: bidId, winner: winner, price: price)
+      emit BidListingCompleted(listingId: self.uuid, topBid: bidId, winner: winner, price: price)
       return true
     }
   }
+
+  // -----------------------------------------------------------------------
+  // ListingManager resource
+  // -----------------------------------------------------------------------
+
 
   pub resource interface ListingManagerPublic {
     pub fun getlistings(): {UInt64: UInt64}
@@ -1143,5 +1183,4 @@ pub contract MelosMarketplace {
       return listingRef.acceptOpenBid(listingManagerCapability: listingManagerCapability, bidId: bidId)
     }
   }
-  /* --------------- ↑↑ Listings ↑↑ --------------- */
 }
