@@ -65,7 +65,10 @@
             }
           ]
         },
-        "MelosMarketplace"
+        {
+          "name": "MelosMarketplace",
+          "args": []
+        }
       ]
     }
   }

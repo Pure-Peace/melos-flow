@@ -113,11 +113,7 @@ pub contract MelosMarketplace {
   // Contract Initilization
   // -----------------------------------------------------------------------
 
-  init (
-    feeRecipient: Address?,
-    minimumListingDuration: UFix64?,
-    maxAuctionDuration: UFix64?
-  ) {
+  init () {
     self.minimumListingDuration = nil
     self.maxAuctionDuration = nil
 
@@ -133,9 +129,6 @@ pub contract MelosMarketplace {
 
     // Create admint resource and do some settings
     let admin <- create Admin()
-
-    admin.setMinimumListingDuration(minimumListingDuration)
-    admin.setMaxAuctionDuration(maxAuctionDuration)
 
     // Save admin resource to account
     self.account.save(<-admin, to: self.AdminStoragePath)
