@@ -11,20 +11,25 @@ pub contract MelosMarketplace {
     pub case EnglishAuction
   }
 
-  pub struct FeeConfig {
-    pub var receiver: Capability<&{FungibleToken.Receiver}>
-    pub var makerRelayerFeePercent: UFix64
-    pub var takerRelayerFeePercent: UFix64
+  pub struct FungibleTokenFeeConfig {
+    pub var txFeeReceiver: Capability<&{FungibleToken.Receiver}>
+    pub var txFeePercent: UFix64
+    pub var royaltyReceiver: Capability<&{FungibleToken.Receiver}>
+    pub var royaltyPercent: UFix64
 
     init (
-      receiver: Capability<&{FungibleToken.Receiver}>,
-      makerRelayerFeePercent: UFix64,
-      takerRelayerFeePercent: UFix64
+      txFeeReceiver: Capability<&{FungibleToken.Receiver}>,
+      txFeePercent: UFix64,
+      royaltyReceiver: Capability<&{FungibleToken.Receiver}>,
+      royaltyPercent: UFix64
     ) {
-      assert(receiver.borrow() != nil, message: "Cannot borrow receiver")
-      self.receiver = receiver
-      self.makerRelayerFeePercent = makerRelayerFeePercent
-      self.takerRelayerFeePercent = takerRelayerFeePercent
+      assert(txFeeReceiver.borrow() != nil, message: "Cannot borrow txFeeReceiver")
+      assert(royaltyReceiver.borrow() != nil, message: "Cannot borrow royaltyReceiver")
+
+      self.txFeeReceiver = txFeeReceiver
+      self.txFeePercent = txFeePercent
+      self.royaltyReceiver = royaltyReceiver
+      self.royaltyPercent = royaltyPercent
     }
   }
 
@@ -42,7 +47,7 @@ pub contract MelosMarketplace {
 
   access(self) let listings: @{UInt64: Listing}
   access(self) var allowedPaymentTokens: [Type]
-  access(self) let feeConfigs: {String: FeeConfig}
+  access(self) let feeConfigs: {String: FungibleTokenFeeConfig}
 
   /* --------------- ↓↓ Events ↓↓ --------------- */
 
@@ -51,13 +56,15 @@ pub contract MelosMarketplace {
   pub event ListingManagerCreated(_ listingManagerResourceID: UInt64)
   pub event ListingManagerDestroyed(_ listingManagerResourceID: UInt64)
 
-  pub event TokenFeeUpdated(
+  pub event FungibleTokenFeeUpdated(
     token: String, 
-    receiver: Address, 
-    makerRelayerFeePercent: UFix64, 
-    takerRelayerFeePercent: UFix64
+    txFeeReceiver: Address, 
+    txFeePercent: UFix64,
+    royaltyReceiver: Address, 
+    royaltyPercent: UFix64
   )
-  pub event TokenFeeRemoved(token: String)
+  pub event TxFeeCutted(listingId: UInt64, txFee: UFix64?, royalty: UFix64?)
+  pub event FungibleTokenFeeRemoved(token: String)
 
   pub event MinimumListingDurationChanged(old: UFix64?, new: UFix64?)
   pub event MaxAuctionDurationChanged(old: UFix64?, new: UFix64?)
@@ -69,7 +76,7 @@ pub contract MelosMarketplace {
 
   pub event EnglishAuctionBidCreated(listingId: UInt64, bidId: UInt64, bidder: Address, offerPrice: UFix64)
   pub event EnglishAuctionBidRemoved(listingId: UInt64, bidId: UInt64)
-  pub event EnglishAuctionCompleted(listingId: UInt64, bidId: UInt64, winner: Address, price: UFix64)
+  pub event EnglishAuctionCompleted(listingId: UInt64, topBid: UInt64?, winner: Address?, price: UFix64)
 
   pub event ListingCreated(
     listingType: UInt8,
@@ -88,12 +95,10 @@ pub contract MelosMarketplace {
 
   init (
     feeRecipient: Address?,
-    makerRelayerFeePercent: UFix64?,
-    takerRelayerFeePercent: UFix64?,
     minimumListingDuration: UFix64?,
     maxAuctionDuration: UFix64?,
     allowedPaymentTokens: [Type],
-    feeConfigs: {String: FeeConfig}?
+    feeConfigs: {String: FungibleTokenFeeConfig}?
   ) {
     self.minimumListingDuration = nil
     self.maxAuctionDuration = nil
@@ -142,11 +147,11 @@ pub contract MelosMarketplace {
     return nil
   }
 
-  pub fun getFeeConfigs(): {String: FeeConfig} {
+  pub fun getFeeConfigs(): {String: FungibleTokenFeeConfig} {
     return self.feeConfigs
   }
 
-  pub fun getFeeConfigByTokenType(tokenType: Type): FeeConfig? {
+  pub fun getFeeConfigByTokenType(tokenType: Type): FungibleTokenFeeConfig? {
     return self.feeConfigs[tokenType.identifier]
   }
 
@@ -198,46 +203,18 @@ pub contract MelosMarketplace {
     assert(cfg != nil, message: "Invalid listing config")
   }
 
-  /* pub fun removeListing(listingId: UInt64) {
+  pub fun removeListing(listingId: UInt64): Bool {
     let listingRef = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
-    assert(listingRef.isPurchased(), message: message)
-
-    let listing <- MelosMarketplace.listings.remove(key: listingId)!
-    destroy listing
-  } */
-
-  /* pub fun completeEnglishAuction(listingId: UInt64): Bool {
-    let listingRef = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
-
-    // Check listing and params
-    assert(listingRef.listingType() == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
-    assert(listingRef.isListingStarted(), message: "Listing not started")
-    assert(listingRef.isListingExpired(), message: "Auction is not ended")
-    assert(listingRef.nft != nil, message: "Listing has already been purchased")
-
-    let cfg = self.config() as! EnglishAuction
-    // The result should be 'Not traded'
-    if cfg.topBidId == nil {
-      let nft <- self.completeListing(nil)
-      self.refund.borrow()!.deposit(token: <- nft)
-      return false
+    if listingRef.isListingStarted() 
+        && (listingRef.isPurchased() 
+        || !listingRef.isNFTAvaliable()
+        || listingRef.isListingEnded()) {
+      destroy MelosMarketplace.listings.remove(key: listingId)
+      return true
     }
-    
-    let topBid <- self.bids.remove(key: cfg.topBidId!)!
-    
-    let price = topBid.payment.balance
-    let winner = topBid.refund.address
-    let bidId = topBid.uuid
 
-    let nft <- self.completeListing(<- topBid.payment.withdraw(amount: price))
-    topBid.rewardCollection.borrow()!.deposit(token: <- nft)
-    destroy topBid
-
-    self.clearBids()
-
-    emit EnglishAuctionCompleted(listingId: self.uuid, bidId: bidId, winner: winner, price: price)
-    return true
-  } */
+    return false
+  }
 
   pub fun createListingManager(): @ListingManager {
     return <-create ListingManager()
@@ -254,21 +231,22 @@ pub contract MelosMarketplace {
   pub resource Admin {
     pub fun setTokenFeeConfig(
       tokenType: Type, 
-      config: FeeConfig
+      config: FungibleTokenFeeConfig
     ) {
       MelosMarketplace.feeConfigs[tokenType.identifier] = config
-      emit TokenFeeUpdated(
+      emit FungibleTokenFeeUpdated(
         token: tokenType.identifier, 
-        receiver: config.receiver.address, 
-        makerRelayerFeePercent: config.makerRelayerFeePercent, 
-        takerRelayerFeePercent: config.takerRelayerFeePercent
+        txFeeReceiver: config.txFeeReceiver.address, 
+        txFeePercent: config.txFeePercent,
+        royaltyReceiver: config.royaltyReceiver.address, 
+        royaltyPercent: config.royaltyPercent
       )
     }
 
     pub fun removeTokenFeeConfig(_ tokenType: Type) {
       let cfg = MelosMarketplace.feeConfigs.remove(key: tokenType.identifier)
       assert(cfg != nil, message: "Fee config not exists")
-      emit TokenFeeRemoved(token: tokenType.identifier)
+      emit FungibleTokenFeeRemoved(token: tokenType.identifier)
     }
 
     pub fun setMinimumListingDuration(_ newDuration: UFix64?) {
@@ -638,12 +616,14 @@ pub contract MelosMarketplace {
     }
 
     access(contract) fun setToPurchased() {
+        assert(!self.isPurchased, message: "Listing is already purchased")
         self.isPurchased = true
     }
   }
 
   pub resource interface ListingPublic {
-    pub fun listingType(): ListingType
+    pub fun getListingType(): ListingType
+    pub fun isListingType(_ typ: ListingType): Bool
     pub fun config(): {MelosMarketplace.ListingConfig}
     pub fun getEnglishAuctionParticipants(): {Address: UInt64}
     pub fun getBids(): [&{BidPublic}]
@@ -652,11 +632,10 @@ pub contract MelosMarketplace {
     pub fun getBid(_ bidId: UInt64): &{BidPublic}?
     pub fun getDetails(): ListingDetails
     pub fun getPrice(): UFix64
-    pub fun isValid(): Bool
+    pub fun isNFTAvaliable(): Bool
     pub fun isListingEnded(): Bool
     pub fun isListingStarted(): Bool
     pub fun isPurchased(): Bool
-    pub fun ensureAvaliable()
     pub fun ensurePaymentTokenType(_ payment: @FungibleToken.Vault): @FungibleToken.Vault
 
     pub fun purchase(payment: @FungibleToken.Vault): @NonFungibleToken.NFT
@@ -670,9 +649,8 @@ pub contract MelosMarketplace {
   }
 
   pub resource Listing: ListingPublic {
-    access(self) let initialized: Bool
     access(self) let details: ListingDetails
-    access(self) var nft: @NonFungibleToken.NFT?
+    access(self) var nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
     access(self) let refund: Capability<&{NonFungibleToken.CollectionPublic}>
 
     // Bid id => Bid
@@ -683,7 +661,7 @@ pub contract MelosMarketplace {
 
     init(
       listingType: ListingType,
-      nftCollection: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>,
+      nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>,
       nftId: UInt64,
       paymentToken: Type,
       refund: Capability<&{NonFungibleToken.CollectionPublic}>,
@@ -696,36 +674,34 @@ pub contract MelosMarketplace {
       assert(receiver.borrow() != nil, message: "Cannot borrow receiver")
       assert(refund.borrow() != nil, message: "Cannot borrow refund")
 
-      let nft <- nftCollection.borrow()!.withdraw(withdrawID: nftId)
-      assert(nft != nil, message: "Cannot get token from collection")
-      assert(nft.id == nftId, message: "Invalid NFT id")
+      let collection = nftProvider.borrow() ?? panic("Cannot borrow NFT collection")
+      let nftRef = collection.borrowNFT(id: nftId)
+      assert(nftRef.id == nftId, message: "Invalid NFT id")
 
-      let nftType = nft.getType()
-      let nftResourceUUID = nft.uuid
+      let nftType = nftRef.getType()
 
       self.details = ListingDetails(
         listingType: listingType,
         listingManagerId: listingManagerId,
         nftType: nftType,
         nftId: nftId,
-        nftResourceUUID: nftResourceUUID,
+        nftResourceUUID: nftRef.uuid,
         paymentToken: paymentToken,
         listingConfig: listingConfig,
         receiver: receiver
       )
-      self.nft <- nft
+      self.nftProvider = nftProvider
       self.refund = refund
       self.bids <- {}
       self.englishAuctionParticipant = {}
-      self.initialized = true
       
       emit ListingCreated(
           listingType: listingType.rawValue,
-          seller: self.owner?.address!, 
+          seller: nftProvider.address, 
           listingId: self.uuid,
           nftId: nftId,
           nftType: nftType,
-          nftResourceUUID: nftResourceUUID,
+          nftResourceUUID: nftRef.uuid,
           paymentToken: paymentToken,
           listingStartTime: listingConfig.listingStartTime,
           listingEndTime: listingConfig.listingEndTime
@@ -733,23 +709,27 @@ pub contract MelosMarketplace {
     }
 
     destroy () {
-      if self.initialized {
-        emit ListingRemoved(
-          purchased: self.details.isPurchased, 
-          listingId: self.uuid
-        )
+      if self.isListingType(ListingType.EnglishAuction) 
+          && self.isListingStarted()
+          && self.isListingEnded()
+          && !self.isPurchased() {
+        self.completeEnglishAuction()
       }
-      if let nft <- self.nft {
-        self.refund.borrow()!.deposit(token: <- nft)
-      } else {
-        destroy self.nft
-      }
-      self.clearBids()
+
       destroy self.bids
+
+      emit ListingRemoved(
+        purchased: self.details.isPurchased, 
+        listingId: self.uuid
+      )
     }
 
-    pub fun listingType(): ListingType {
+    pub fun getListingType(): ListingType {
       return self.details.listingType
+    }
+
+    pub fun isListingType(_ typ: ListingType): Bool {
+      return self.details.listingType == typ
     }
 
     pub fun config(): {MelosMarketplace.ListingConfig} {
@@ -797,13 +777,17 @@ pub contract MelosMarketplace {
     }
 
     pub fun isListingEnded(): Bool {
-      return self.config().listingEndTime != nil 
-        ? getCurrentBlock().timestamp < self.config().listingEndTime! 
-        : false
+      if let endTime = self.config().listingEndTime {
+        return getCurrentBlock().timestamp < endTime
+      }
+      return false
     }
 
-    pub fun isValid(): Bool {
-      return self.nft != nil
+    pub fun isNFTAvaliable(): Bool {
+      if let _ = self.nftProvider.borrow() {
+        return true
+      }
+      return false
     }
 
     pub fun isListingStarted(): Bool {
@@ -814,12 +798,6 @@ pub contract MelosMarketplace {
       return self.details.isPurchased == false
     }
 
-    pub fun ensureAvaliable() {
-      assert(!self.isPurchased(), message: "Listing has already been purchased")
-      assert(self.isListingStarted(), message: "Listing not started")
-      assert(!self.isListingEnded(), message: "Listing has ended")
-    }
-
     pub fun ensurePaymentTokenType(_ payment: @FungibleToken.Vault): @FungibleToken.Vault {
       assert(payment.isInstance(self.details.paymentToken), message: "payment vault is not requested fungible token")
       return <- payment
@@ -827,46 +805,65 @@ pub contract MelosMarketplace {
 
     access(contract) fun clearBids() {
       for key in self.bids.keys {
-        let bid <- self.bids.remove(key: key)
-        destroy bid
+        destroy self.bids.remove(key: key)
       }
-      if self.listingType() == ListingType.EnglishAuction {
+      if self.isListingType(ListingType.EnglishAuction)  {
         self.englishAuctionParticipant = {}
       }
     }
 
     access(self) fun withdrawNFT(): @NonFungibleToken.NFT {
-      assert(self.nft != nil, message: "Already withdrawn")
       self.details.setToPurchased()
-      let token <- self.nft <- nil
-      return <- token!
+      return <- self.nftProvider.borrow()!.withdraw(withdrawID: self.details.nftId)
+    }
+
+    access(self) fun deductFees(_ payment: @FungibleToken.Vault): @FungibleToken.Vault {
+
+      return <- payment
     }
 
     access(self) fun completeListing(_ payment: @FungibleToken.Vault?): @NonFungibleToken.NFT {
-      let nft <- self.withdrawNFT()
-
-      if let pay <- payment {
-        // Deducting platform fees
-        if let feeConfig = MelosMarketplace.getFeeConfigByTokenType(tokenType: pay.getType()) {
-          feeConfig.receiver.borrow()!.deposit(from: <- pay.withdraw(amount: (pay.balance * feeConfig.makerRelayerFeePercent) + (pay.balance * feeConfig.takerRelayerFeePercent)))
-        }
-
-        // TODO: Deducting Royalties
-
-        // Deposit the remaining amount after deducting fees and royalties to the beneficiary.
-        self.details.receiver.borrow()!.deposit(from: <- pay)
-      } else {
-        // Should be nil
+      if payment == nil {
         destroy payment
+        return <- self.withdrawNFT()
       }
 
-      return <- nft
+      let pay <- payment!
+      var txFee: UFix64? = nil
+      var royalty: UFix64? = nil
+      // Deducting platform fees
+      if let feeConfig = MelosMarketplace.getFeeConfigByTokenType(tokenType: pay.getType()) {
+        if let txFeeReceiver = feeConfig.txFeeReceiver.borrow() {
+          txFee = pay.balance * feeConfig.txFeePercent
+          txFeeReceiver.deposit(
+            from: <- pay.withdraw(
+              amount: txFee!
+            )
+          )
+        }
+        if let royaltyReceiver = feeConfig.royaltyReceiver.borrow() {
+          royalty = pay.balance * feeConfig.royaltyPercent
+          royaltyReceiver.deposit(
+            from: <- pay.withdraw(
+              amount: royalty!
+            )
+          )
+        }
+      }
+      emit TxFeeCutted(listingId: self.uuid, txFee: txFee, royalty: royalty)
+
+      // Deposit the remaining amount after deducting fees and royalties to the beneficiary.
+      self.details.receiver.borrow()!.deposit(from: <- pay)
+
+      return <- self.withdrawNFT()
     }
 
     pub fun purchase(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
       // Check listing and params
-      assert([ListingType.Common, ListingType.DutchAuction].contains(self.listingType()), message: "Listing type is not supported")
-      self.ensureAvaliable()
+      assert([ListingType.Common, ListingType.DutchAuction].contains(self.getListingType()), message: "Listing type is not supported")
+      assert(!self.isPurchased(), message: "Listing has already been purchased")
+      assert(self.isListingStarted(), message: "Listing not started")
+      assert(!self.isListingEnded(), message: "Listing has ended")
 
       let payment <- self.ensurePaymentTokenType(<- payment)
       let price = self.getPrice()
@@ -882,9 +879,11 @@ pub contract MelosMarketplace {
       payment: @FungibleToken.Vault
     ): UInt64 {
       // Check listing and params
-      assert(self.listingType() == ListingType.OpenBid, message: "Listing type is not OpenBid")
-      self.ensureAvaliable()
-
+      assert(self.isListingType(ListingType.OpenBid), message: "Listing type is not OpenBid")
+      assert(!self.isPurchased(), message: "Listing has already been purchased")
+      assert(self.isListingStarted(), message: "Listing not started")
+      assert(!self.isListingEnded(), message: "Listing has ended")
+  
       let payment <- self.ensurePaymentTokenType(<- payment)
       let offerPrice = payment.balance
       assert(offerPrice >= (self.config() as! OpenBid).minimumPrice, message: "Offer price must be greater than minimumPrice")
@@ -913,8 +912,10 @@ pub contract MelosMarketplace {
       payment: @FungibleToken.Vault
     ): UInt64 {
       // Check listing and params
-      assert(self.listingType() == ListingType.EnglishAuction, message: "Listing type is not EnglishAuction")
-      self.ensureAvaliable()
+      assert(self.isListingType(ListingType.EnglishAuction), message: "Listing type is not EnglishAuction")
+      assert(!self.isPurchased(), message: "Listing has already been purchased")
+      assert(self.isListingStarted(), message: "Listing not started")
+      assert(!self.isListingEnded(), message: "Listing has ended")
       
       let payment <- self.ensurePaymentTokenType(<- payment)
       let offerPrice = payment.balance
@@ -961,7 +962,7 @@ pub contract MelosMarketplace {
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
     ): UInt64 {
-      switch self.listingType() {
+      switch self.getListingType() {
         case ListingType.OpenBid:
           return self.createOpenBid(
             bidManager: bidManager, 
@@ -986,7 +987,7 @@ pub contract MelosMarketplace {
       assert(bidManager.borrow()!.uuid == removeBidRef!.bidManagerId, message: "Invalid bid ownership")
 
       let removeBid <- self.bids.remove(key: removeBidId)!
-      switch self.listingType() {
+      switch self.getListingType() {
         case ListingType.EnglishAuction:
           let cfg = self.config() as! EnglishAuction
           if removeBidId == cfg.topBidId {
@@ -1007,8 +1008,10 @@ pub contract MelosMarketplace {
 
     pub fun acceptOpenBid(listingManagerCapability: Capability<&MelosMarketplace.ListingManager>, bidId: UInt64): Bool {
       // Check listing and params
-      assert(self.listingType() == ListingType.OpenBid, message: "Listing type is not EnglishAuction")
-      self.ensureAvaliable()
+      assert(self.isListingType(ListingType.OpenBid), message: "Listing type is not EnglishAuction")
+      assert(!self.isPurchased(), message: "Listing has already been purchased")
+      assert(self.isListingStarted(), message: "Listing not started")
+      assert(!self.isListingEnded(), message: "Listing has ended")
       assert(self.getBid(bidId) != nil, message: "Bid not exists")
 
       let listingManager = listingManagerCapability.borrow()
@@ -1027,6 +1030,40 @@ pub contract MelosMarketplace {
       self.clearBids()
 
       emit OpenBidCompleted(listingId: self.uuid, bidId: bidId, winner: winner, price: price)
+      return true
+    }
+
+    pub fun completeEnglishAuction(): Bool {
+      // Check listing and params
+      assert(self.isListingType(ListingType.EnglishAuction), message: "Listing type is not EnglishAuction")
+      assert(self.isListingStarted(), message: "Listing not started")
+      assert(self.isListingEnded(), message: "English auction is not ended")
+      assert(!self.isPurchased(), message: "Listing has already been purchased")
+
+      let cfg = self.config() as! EnglishAuction
+  
+      // The result should be 'Not traded'
+      if cfg.topBidId == nil || cfg.currentPrice <= cfg.reservePrice {
+        let nft <- self.completeListing(nil)
+        self.refund.borrow()!.deposit(token: <- nft)
+
+        emit EnglishAuctionCompleted(listingId: self.uuid, topBid: nil, winner: nil, price: cfg.currentPrice)
+        return false
+      }
+      
+      let topBid <- self.bids.remove(key: cfg.topBidId!)!
+
+      let price = topBid.payment.balance
+      let winner = topBid.refund.address
+      let bidId = topBid.uuid
+
+      let nft <- self.completeListing(<- topBid.payment.withdraw(amount: price))
+      topBid.rewardCollection.borrow()!.deposit(token: <- nft)
+
+      destroy topBid
+      self.clearBids()
+
+      emit EnglishAuctionCompleted(listingId: self.uuid, topBid: bidId, winner: winner, price: price)
       return true
     }
   }
@@ -1055,13 +1092,15 @@ pub contract MelosMarketplace {
     }
 
     pub fun getListingOwnership(_ listingId: UInt64): Bool {
-      let details = MelosMarketplace.getListingDetails(listingId)
-      return details == nil ? false : details!.listingManagerId == self.uuid
+      if let details = MelosMarketplace.getListingDetails(listingId) {
+        return details.listingManagerId == self.uuid
+      }
+      return false
     }
 
     pub fun createListing(
       listingType: ListingType,
-      nftCollection: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>,
+      nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>,
       nftId: UInt64,
       paymentToken: Type,
       refund: Capability<&{NonFungibleToken.CollectionPublic}>,
@@ -1070,7 +1109,7 @@ pub contract MelosMarketplace {
     ): UInt64 {
       let listing <- create Listing(
         listingType: listingType,
-        nftCollection: nftCollection,
+        nftProvider: nftProvider,
         nftId: nftId,
         paymentToken: paymentToken,
         refund: refund,
@@ -1091,17 +1130,7 @@ pub contract MelosMarketplace {
       let listingRef = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
       let listingDetails = listingRef.getDetails()
       assert(listingDetails.listingManagerId == self.uuid, message: "Invalid listing ownership")
-      
-      let cfg = listingRef.config() as! EnglishAuction
-
-      if listingDetails.listingType == ListingType.EnglishAuction
-        && listingRef.isListingEnded()
-        && cfg.topBidId != nil 
-        && !listingDetails.isPurchased {
-        panic("")
-      }
-      
-
+    
       let listing <- MelosMarketplace.listings.remove(key: listingId)!
       destroy listing
     }
