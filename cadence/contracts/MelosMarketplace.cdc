@@ -476,8 +476,8 @@ pub contract MelosMarketplace {
   }
 
   pub resource Bid: BidPublic {
-    access(contract) let bidManager: Capability<&MelosMarketplace.BidManager>
-    access(contract) let rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>
+    access(contract) let bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>
+    access(contract) let rewardCollection: Capability<&{NonFungibleToken.Receiver}>
     access(contract) let refund: Capability<&{FungibleToken.Receiver}>
     access(contract) let payment: @FungibleToken.Vault
 
@@ -487,9 +487,9 @@ pub contract MelosMarketplace {
     access(contract) var bidTimestamp: UFix64
 
     init(
-      bidManager: Capability<&MelosMarketplace.BidManager>,
+      bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
       listingId: UInt64,
-      rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
+      rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
     ) {
@@ -537,6 +537,9 @@ pub contract MelosMarketplace {
     pub fun getRecords(): {UInt64: [UInt64]}
     pub fun findBidIndex(listingId: UInt64, bidId: UInt64): Int? 
     pub fun getBidIdsWithListingId(_ listingId: UInt64): [UInt64]
+
+    access(contract) fun recordBid(listingId: UInt64, bidId: UInt64): Bool
+    access(contract) fun removeBid(listingId: UInt64, bidId: UInt64): Bool
   }
 
   pub resource BidManager: BidManagerPublic {
@@ -678,13 +681,25 @@ pub contract MelosMarketplace {
     pub fun ensurePaymentTokenType(_ payment: @FungibleToken.Vault): @FungibleToken.Vault
 
     pub fun purchase(payment: @FungibleToken.Vault): @NonFungibleToken.NFT
+    pub fun createOpenBid(
+      bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
+      rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
+      refund: Capability<&{FungibleToken.Receiver}>,
+      payment: @FungibleToken.Vault
+    ): UInt64
+    pub fun createEnglishAuctionBid(
+      bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
+      rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
+      refund: Capability<&{FungibleToken.Receiver}>,
+      payment: @FungibleToken.Vault
+    ): UInt64
     pub fun createBid(
-        bidManager: Capability<&MelosMarketplace.BidManager>,
-        rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
+        bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
+        rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
         refund: Capability<&{FungibleToken.Receiver}>,
         payment: @FungibleToken.Vault
     ): UInt64
-    pub fun removeBid(bidManager: Capability<&MelosMarketplace.BidManager>, removeBidId: UInt64): Bool
+    pub fun removeBid(bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>, removeBidId: UInt64): Bool
   }
 
   pub resource Listing: ListingPublic {
@@ -911,9 +926,9 @@ pub contract MelosMarketplace {
       return <- self.completeListing(<- payment)
     }
 
-    access(self) fun createOpenBid(
-      bidManager: Capability<&MelosMarketplace.BidManager>,
-      rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
+    pub fun createOpenBid(
+      bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
+      rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
     ): UInt64 {
@@ -944,9 +959,9 @@ pub contract MelosMarketplace {
       return bidId
     }
 
-    access(self) fun createEnglishAuctionBid(
-      bidManager: Capability<&MelosMarketplace.BidManager>,
-      rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
+    pub fun createEnglishAuctionBid(
+      bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
+      rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
     ): UInt64 {
@@ -996,8 +1011,8 @@ pub contract MelosMarketplace {
     }
 
     pub fun createBid(
-      bidManager: Capability<&MelosMarketplace.BidManager>,
-      rewardCollection: Capability<&{NonFungibleToken.CollectionPublic}>,
+      bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
+      rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
     ): UInt64 {
@@ -1020,7 +1035,7 @@ pub contract MelosMarketplace {
       panic("Listing type not support")
     }
 
-    pub fun removeBid(bidManager: Capability<&MelosMarketplace.BidManager>, removeBidId: UInt64): Bool {
+    pub fun removeBid(bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>, removeBidId: UInt64): Bool {
       let removeBidRef = self.getBid(removeBidId)
       assert(removeBidRef != nil, message: "Bid not exists")
       assert(bidManager.borrow()!.uuid == removeBidRef!.bidManagerId, message: "Invalid bid ownership")
