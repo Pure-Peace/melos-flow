@@ -116,16 +116,14 @@ pub contract MelosMarketplace {
   init (
     feeRecipient: Address?,
     minimumListingDuration: UFix64?,
-    maxAuctionDuration: UFix64?,
-    allowedPaymentTokens: [Type],
-    feeConfigs: {String: FungibleTokenFeeConfig}?
+    maxAuctionDuration: UFix64?
   ) {
     self.minimumListingDuration = nil
     self.maxAuctionDuration = nil
 
     self.listings <- {}
     self.allowedPaymentTokens = []
-    self.feeConfigs = feeConfigs ?? {}
+    self.feeConfigs = {}
 
     self.AdminStoragePath = /storage/MelosSettlementAdmin
     self.ListingManagerPublicPath = /public/MelosMarketplace
@@ -138,7 +136,6 @@ pub contract MelosMarketplace {
 
     admin.setMinimumListingDuration(minimumListingDuration)
     admin.setMaxAuctionDuration(maxAuctionDuration)
-    admin.setAllowedPaymentTokens(allowedPaymentTokens)
 
     // Save admin resource to account
     self.account.save(<-admin, to: self.AdminStoragePath)
@@ -239,6 +236,8 @@ pub contract MelosMarketplace {
   //
   // 1. listing is started
   // 2. [listing is purchased] or [NFT is not avaliable] or [listing is ended]
+  //
+  // If the listing type is english auction, it will be done automatically when the condition is matched
   pub fun removeListing(listingId: UInt64): Bool {
     let listingRef = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
     if listingRef.isListingStarted() 
@@ -266,12 +265,12 @@ pub contract MelosMarketplace {
 
   pub resource Admin {
     pub fun setTokenFeeConfig(
-      tokenType: Type, 
+      token: String, 
       config: FungibleTokenFeeConfig
     ) {
-      MelosMarketplace.feeConfigs[tokenType.identifier] = config
+      MelosMarketplace.feeConfigs[token] = config
       emit FungibleTokenFeeUpdated(
-        token: tokenType.identifier, 
+        token: token, 
         txFeeReceiver: config.txFeeReceiver.address, 
         txFeePercent: config.txFeePercent,
         royaltyReceiver: config.royaltyReceiver.address, 
@@ -279,10 +278,10 @@ pub contract MelosMarketplace {
       )
     }
 
-    pub fun removeTokenFeeConfig(_ tokenType: Type) {
-      let cfg = MelosMarketplace.feeConfigs.remove(key: tokenType.identifier)
+    pub fun removeTokenFeeConfig(_ token: String) {
+      let cfg = MelosMarketplace.feeConfigs.remove(key: token)
       assert(cfg != nil, message: "Fee config not exists")
-      emit FungibleTokenFeeRemoved(token: tokenType.identifier)
+      emit FungibleTokenFeeRemoved(token: token)
     }
 
     pub fun setMinimumListingDuration(_ newDuration: UFix64?) {
