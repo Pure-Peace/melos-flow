@@ -1057,16 +1057,20 @@ pub contract MelosMarketplace {
     }
 
     pub fun acceptOpenBid(listingManagerCapability: Capability<&MelosMarketplace.ListingManager>, bidId: UInt64): Bool {
+      let listingManager = listingManagerCapability.borrow()
+      assert(listingManager != nil, message: "Cannot borrow listingManager")
+      assert(listingManager!.uuid == self.details.listingManagerId, message: "Invalid listing ownership")
+
+      return self.processAcceptOpenBid(listingManager: listingManager!, bidId: bidId)
+    }
+
+    access(contract) fun processAcceptOpenBid(listingManager: &MelosMarketplace.ListingManager, bidId: UInt64): Bool {
       // Check listing and params
       assert(self.isListingType(ListingType.OpenBid), message: "Listing type is not EnglishAuction")
       assert(!self.isPurchased(), message: "Listing has already been purchased")
       assert(self.isListingStarted(), message: "Listing not started")
       assert(!self.isListingEnded(), message: "Listing has ended")
       assert(self.getBid(bidId) != nil, message: "Bid not exists")
-
-      let listingManager = listingManagerCapability.borrow()
-      assert(listingManager != nil, message: "Cannot borrow listingManager")
-      assert(listingManager!.uuid == self.details.listingManagerId, message: "Invalid listing ownership")
 
       let targetBid <- self.bids.remove(key: bidId)!
       let price = targetBid.payment.balance
@@ -1190,12 +1194,12 @@ pub contract MelosMarketplace {
       destroy listing
     }
 
-    pub fun acceptOpenBid(listingManagerCapability: Capability<&MelosMarketplace.ListingManager>, listingId: UInt64, bidId: UInt64): Bool {
+    pub fun acceptOpenBid(listingId: UInt64, bidId: UInt64): Bool {
       assert(MelosMarketplace.isListingExists(listingId), message: "Listing not exists")
       assert(self.getListingOwnership(listingId), message: "Invalid listing ownership")
 
       let listingRef = &MelosMarketplace.listings[listingId] as &Listing
-      return listingRef.acceptOpenBid(listingManagerCapability: listingManagerCapability, bidId: bidId)
+      return listingRef.processAcceptOpenBid(listingManager: &self as &ListingManager, bidId: bidId)
     }
   }
 }
