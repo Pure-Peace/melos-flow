@@ -872,7 +872,28 @@ pub contract MelosMarketplace {
     }
 
     access(self) fun deductFees(_ payment: @FungibleToken.Vault): @FungibleToken.Vault {
-
+      var txFee: UFix64? = nil
+      var royalty: UFix64? = nil
+      // Deducting platform fees
+      if let feeConfig = MelosMarketplace.getFeeConfigByTokenType(tokenType: payment.getType()) {
+        if let txFeeReceiver = feeConfig.txFeeReceiver.borrow() {
+          txFee = payment.balance * feeConfig.txFeePercent
+          txFeeReceiver.deposit(
+            from: <- payment.withdraw(
+              amount: txFee!
+            )
+          )
+        }
+        if let royaltyReceiver = feeConfig.royaltyReceiver.borrow() {
+          royalty = payment.balance * feeConfig.royaltyPercent
+          royaltyReceiver.deposit(
+            from: <- payment.withdraw(
+              amount: royalty!
+            )
+          )
+        }
+      }
+      emit TxFeeCutted(listingId: self.uuid, txFee: txFee, royalty: royalty)
       return <- payment
     }
 
@@ -882,32 +903,10 @@ pub contract MelosMarketplace {
         return <- self.withdrawNFT()
       }
 
-      let pay <- payment!
-      var txFee: UFix64? = nil
-      var royalty: UFix64? = nil
-      // Deducting platform fees
-      if let feeConfig = MelosMarketplace.getFeeConfigByTokenType(tokenType: pay.getType()) {
-        if let txFeeReceiver = feeConfig.txFeeReceiver.borrow() {
-          txFee = pay.balance * feeConfig.txFeePercent
-          txFeeReceiver.deposit(
-            from: <- pay.withdraw(
-              amount: txFee!
-            )
-          )
-        }
-        if let royaltyReceiver = feeConfig.royaltyReceiver.borrow() {
-          royalty = pay.balance * feeConfig.royaltyPercent
-          royaltyReceiver.deposit(
-            from: <- pay.withdraw(
-              amount: royalty!
-            )
-          )
-        }
-      }
-      emit TxFeeCutted(listingId: self.uuid, txFee: txFee, royalty: royalty)
+      let payment <- self.deductFees(<- payment!)
 
       // Deposit the remaining amount after deducting fees and royalties to the beneficiary.
-      self.details.receiver.borrow()!.deposit(from: <- pay)
+      self.details.receiver.borrow()!.deposit(from: <- payment)
 
       return <- self.withdrawNFT()
     }
