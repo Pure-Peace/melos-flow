@@ -1,13 +1,27 @@
 import {mintFlow} from 'flow-js-testing';
-import {emulator, assertTx, getAccount, setupProject, prepareEmulator, toUFix64} from './utils/helpers';
+import {
+  emulator,
+  assertTx,
+  getAccount,
+  deployContractsIfNotDeployed,
+  prepareEmulator,
+  toUFix64,
+  eventFilter,
+} from './utils/helpers';
 import {balanceOf, mint, setupCollection, getAccountNFTs} from './utils/melos-nft';
 import {
   createListing,
-  getListingCount,
+  Events,
+  getAccountListingCount,
+  getAllowedPaymentTokens,
+  getContractIdentifier,
+  ListingType,
   purchaseListing,
   removeListing,
+  setAllowedPaymentTokens,
   setupListingManager,
 } from './utils/melos-marketplace';
+import {assert} from 'console';
 
 // Increase timeout if your tests failing due to timeout
 jest.setTimeout(100000);
@@ -30,31 +44,50 @@ describe('Melos marketplace tests', () => {
 
   it('should be able to create an empty ListingManager on alice', async () => {
     // Setup
-    await setupProject();
+    await deployContractsIfNotDeployed();
     const {address} = await getAccount('alice');
 
     assertTx(await setupListingManager(address));
   });
 
   it('should be able to create a listing', async () => {
-    // Setup
-    await setupProject();
-    const {address} = await getAccount('alice');
-    assertTx(await setupListingManager(address));
+    // Deploy contracts
+    await deployContractsIfNotDeployed();
 
+    const melosMarketplaceIdentifier = assertTx(await getContractIdentifier());
+
+    // Set allowed payment tokens
+    assertTx(await setAllowedPaymentTokens('emulator-account'));
+    const allowedPaymentTokens = assertTx(await getAllowedPaymentTokens());
+    console.log('allowedPaymentTokens: ', allowedPaymentTokens);
+    expect(allowedPaymentTokens.length).toBeGreaterThan(0);
+
+    const {address} = await getAccount('alice');
+
+    // Setup NFT collection and mint NFT for user
     assertTx(await setupCollection(address));
     assertTx(await mint(address));
-
     const nfts = assertTx(await getAccountNFTs(address));
-    console.log(nfts);
-    const itemID = 0;
+    expect(nfts.length).toBeGreaterThan(0);
+    const nftId = nfts[0];
 
-    // assertTx(await createListing(address));
+    // Setup listing manager for user
+    assertTx(await setupListingManager(address));
+    const res = eventFilter(
+      assertTx(await createListing(address, nftId, ListingType.Common, {price: 1, listingStartTime: 1})),
+      melosMarketplaceIdentifier,
+      Events[Events.ListingCreated]
+    );
+    console.log(res);
+    expect(res.filtedEvents.length).toBeGreaterThan(0);
+
+    const aliceListingCount = assertTx(await getAccountListingCount(address));
+    expect(aliceListingCount).toBeGreaterThan(0);
   });
 
   /* it('should be able to create a listing', async () => {
     // Setup
-    await setupProject();
+    await deployContractsIfNotDeployed();
 
     const {address} = await getAccount('alice');
     assertTx(await setupListingManager(address));
@@ -69,7 +102,7 @@ describe('Melos marketplace tests', () => {
 
   it('should be able to accept a listing', async () => {
     // Setup
-    await setupProject();
+    await deployContractsIfNotDeployed();
 
     // Setup seller account
     const alice = await getAccount('alice');
@@ -101,7 +134,7 @@ describe('Melos marketplace tests', () => {
   });
 
   it('should be able to remove a listing', async () => {
-    await setupProject();
+    await deployContractsIfNotDeployed();
 
     // Setup alice account
     const alice = await getAccount('alice');

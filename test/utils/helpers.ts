@@ -44,7 +44,8 @@ export type AccountsConfig = Record<string, Account>;
 
 export const BASE_PATH = path.join(__dirname, '../../cadence');
 
-export const toUFix64 = (value: number) => value.toFixed(UFIX64_PRECISION);
+export const toUFix64 = (value?: number) =>
+  [null, undefined, NaN].includes(value) ? null : value!.toFixed(UFIX64_PRECISION);
 
 export const getCode = (filePath: string) => {
   return readFileSync(path.join(BASE_PATH, filePath.endsWith('.cdc') ? filePath : `${filePath}.cdc`), {
@@ -187,8 +188,21 @@ export async function deployProject(log = false) {
   });
 }
 
-export async function setupProject() {
+export async function deployContractsIfNotDeployed() {
   if (!(await checkProjectDeployments())) {
     await deployProject();
   }
+}
+
+export function eventFilter<T>(txResult: any, contract: string, event: string) {
+  const filtedEvents = [];
+  for (const ev of txResult.events) {
+    if (ev.type.endsWith(`${contract}.${event}`)) {
+      filtedEvents.push(ev.data as T);
+    }
+  }
+  return {
+    ...txResult,
+    filtedEvents,
+  };
 }

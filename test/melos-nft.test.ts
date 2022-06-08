@@ -1,4 +1,4 @@
-import {emulator, assertTx, getAccount, prepareEmulator, setupProject} from './utils/helpers';
+import {emulator, assertTx, getAccount, prepareEmulator, deployContractsIfNotDeployed} from './utils/helpers';
 import {balanceOf, totalSupply, mint, setupCollection, transfer} from './utils/melos-nft';
 
 // Increase timeout if your tests failing due to timeout
@@ -16,7 +16,7 @@ describe('Melos NFT test', () => {
   });
 
   it('supply should be 0 after contract is deployed', async () => {
-    await setupProject();
+    await deployContractsIfNotDeployed();
 
     assertTx(await setupCollection('emulator-account'));
 
@@ -25,7 +25,7 @@ describe('Melos NFT test', () => {
   });
 
   it('should be able to mint a MelosNFT', async () => {
-    await setupProject();
+    await deployContractsIfNotDeployed();
 
     const {address} = await getAccount('alice');
     assertTx(await setupCollection(address));
@@ -35,7 +35,7 @@ describe('Melos NFT test', () => {
   });
 
   it('should be able to create a new empty NFT Collection', async () => {
-    await setupProject();
+    await deployContractsIfNotDeployed();
 
     const {address} = await getAccount('emulator-account');
     assertTx(await setupCollection(address));
@@ -46,7 +46,7 @@ describe('Melos NFT test', () => {
   });
 
   it("should not be able to withdraw an NFT that doesn't exist in a collection", async () => {
-    await setupProject();
+    await deployContractsIfNotDeployed();
 
     const Alice = await getAccount('alice');
     const Bob = await getAccount('bob');
@@ -59,7 +59,7 @@ describe('Melos NFT test', () => {
   });
 
   it('should be able to withdraw an NFT and deposit to another accounts collection', async () => {
-    await setupProject();
+    await deployContractsIfNotDeployed();
 
     const Alice = await getAccount('alice');
     const Bob = await getAccount('bob');
