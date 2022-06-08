@@ -1,5 +1,5 @@
-import {emulator, ensureTxResult, getAccount, prepareEmulator, setupProject} from './utils/helpers';
-import {getMelosCount, getMelosSupply, mintMelos, setupMelosOnAccount, transferMelos} from './utils/melos-nft';
+import {emulator, assertTx, getAccount, prepareEmulator, setupProject} from './utils/helpers';
+import {balanceOf, totalSupply, mint, setupCollection, transfer} from './utils/melos-nft';
 
 // Increase timeout if your tests failing due to timeout
 jest.setTimeout(100000);
@@ -18,9 +18,9 @@ describe('Melos NFT test', () => {
   it('supply should be 0 after contract is deployed', async () => {
     await setupProject();
 
-    ensureTxResult(await setupMelosOnAccount('emulator-account'));
+    assertTx(await setupCollection('emulator-account'));
 
-    const [supply] = await getMelosSupply();
+    const [supply] = await totalSupply();
     expect(supply).toBe(0);
   });
 
@@ -28,20 +28,20 @@ describe('Melos NFT test', () => {
     await setupProject();
 
     const {address} = await getAccount('alice');
-    ensureTxResult(await setupMelosOnAccount(address));
+    assertTx(await setupCollection(address));
 
     // Mint instruction for Alice account shall be resolved
-    ensureTxResult(await mintMelos(address));
+    assertTx(await mint(address));
   });
 
   it('should be able to create a new empty NFT Collection', async () => {
     await setupProject();
 
     const {address} = await getAccount('emulator-account');
-    ensureTxResult(await setupMelosOnAccount(address));
+    assertTx(await setupCollection(address));
 
     // shall be able te read Alice collection and ensure it's empty
-    const [itemCount] = ensureTxResult(await getMelosCount(address));
+    const itemCount = assertTx(await balanceOf(address));
     expect(itemCount).toBe(0);
   });
 
@@ -50,11 +50,11 @@ describe('Melos NFT test', () => {
 
     const Alice = await getAccount('alice');
     const Bob = await getAccount('bob');
-    await setupMelosOnAccount(Alice.address);
-    await setupMelosOnAccount(Bob.address);
+    await setupCollection(Alice.address);
+    await setupCollection(Bob.address);
 
     // Transfer transaction shall fail for non-existent item
-    const [res, err] = await transferMelos(Alice.address, Bob.address, 1337);
+    const [res, err] = await transfer(Alice.address, Bob.address, 1337);
     expect(!!err).toBe(true);
   });
 
@@ -63,13 +63,13 @@ describe('Melos NFT test', () => {
 
     const Alice = await getAccount('alice');
     const Bob = await getAccount('bob');
-    await setupMelosOnAccount(Alice.address);
-    await setupMelosOnAccount(Bob.address);
+    await setupCollection(Alice.address);
+    await setupCollection(Bob.address);
 
     // Mint instruction for Alice account shall be resolved
-    ensureTxResult(await mintMelos(Alice.address));
+    assertTx(await mint(Alice.address));
 
     // Transfer transaction shall pass
-    ensureTxResult(await transferMelos(Alice.address, Bob.address, 0));
+    assertTx(await transfer(Alice.address, Bob.address, 0));
   });
 });

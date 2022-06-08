@@ -6,32 +6,66 @@ const limit = 999;
 const addressMap = {
   NonFungibleToken: '0xf8d6e0586b0a20c7',
   MelosNFT: '0xf8d6e0586b0a20c7',
-  NFTStorefront: '0xf8d6e0586b0a20c7',
+  MelosMarketplace: '0xf8d6e0586b0a20c7',
 };
 
+export enum ListingType {
+  Common,
+  OpenBid,
+  DutchAuction,
+  EnglishAuction,
+}
+
+export interface ListingConfig {
+  listingStartTime: number;
+  listingEndTime?: number;
+}
+
+export interface Common extends ListingConfig {
+  price: number;
+}
+
+export interface OpenBid extends ListingConfig {
+  minimumPrice: number;
+}
+
+export interface DutchAuction extends ListingConfig {
+  startingPrice: number;
+  reservePrice: number;
+  priceCutInterval: number;
+}
+
+export interface EnglishAuction extends ListingConfig {
+  reservePrice: number;
+  minimumBidPercentage: number;
+
+  basePrice: number;
+  currentPrice: number;
+  topBidId?: number;
+}
+
 /**
- * Sets up NFTStorefront.Storefront on account and exposes public capability.
+ * Sets up MelosMarketplace.ListingManager on account and exposes public capability.
  * @param {string} account - account address
  * @throws Will throw an error if transaction is reverted.
  * */
-export const setupStorefrontOnAccount = async (account: string) => {
+export const setupListingManager = async (account: string) => {
   const {auth} = await getAuthAccount(account);
 
-  return sendTransaction({code: txCode('nft-storefront/setup_account'), payer: auth, addressMap, limit});
+  return sendTransaction({code: txCode('melos-marketplace/setupListingManager'), payer: auth, addressMap, limit});
 };
 
-/**
- * Lists item with id equal to **item** id for sale with specified **price**.
- * @param {string} seller - seller account address
- * @param {UInt64} itemId - id of item to sell
- * @param {UFix64} price - price
- * */
-export const createListing = async (seller: string, itemId: number, price: string) => {
+export const createListing = async (
+  seller: string,
+  nftId: number,
+  listingType: ListingType,
+  listingConfig: Common | OpenBid | DutchAuction | EnglishAuction
+) => {
   const {auth} = await getAuthAccount(seller);
 
   return sendTransaction({
     code: txCode('nft-storefront/create_listing'),
-    args: [itemId, price],
+    args: [nftId, Number(listingType), listingConfig],
     payer: auth,
     addressMap,
     limit,

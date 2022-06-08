@@ -68,10 +68,10 @@ export const txCode = (file: string) => {
   return getCodeWithType(file, 'transactions');
 };
 
-export const ensureTxResult = (response: [TxResult | any, any]) => {
+export const assertTx = (response: [TxResult | any, any]) => {
   const [res, err] = response;
   if (err) throw new Error(err);
-  return [res, err];
+  return res;
 };
 
 export async function prepareEmulator(params: CreateFlowEmulatorParams) {
