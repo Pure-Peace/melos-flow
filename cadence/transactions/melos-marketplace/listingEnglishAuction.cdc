@@ -22,6 +22,17 @@ pub fun getOrCreateListingManager(account: AuthAccount): &MelosMarketplace.Listi
     return listingManagerRef
 }
 
+pub fun getOrCreateNFTProvider(account: AuthAccount): Capability<&MelosNFT.Collection{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}> {
+  let MelosNFTCollectionProviderPrivatePath = /private/MelosNFTCollectionProviderPrivatePath
+  if !account.getCapability<&MelosNFT.Collection{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(
+    MelosNFTCollectionProviderPrivatePath).check() {
+      account.link<&MelosNFT.Collection{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(
+        MelosNFTCollectionProviderPrivatePath, target: MelosNFT.CollectionStoragePath)
+  }
+
+  return account.getCapability<&MelosNFT.Collection{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(MelosNFTCollectionProviderPrivatePath)
+}
+
 
 transaction(
   nftId: UInt64,
@@ -46,13 +57,8 @@ transaction(
     )
 
     self.receiver = account.getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
-
-    self.nftProvider = account.getCapability<&MelosNFT.Collection{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(
-      MelosNFT.CollectionPublicPath)
-
-    self.refund = account.getCapability<&MelosNFT.Collection{NonFungibleToken.CollectionPublic}>(
-      MelosNFT.CollectionPublicPath)
-
+    self.nftProvider = getOrCreateNFTProvider(account: account)
+    self.refund = account.getCapability<&{NonFungibleToken.CollectionPublic}>(MelosNFT.CollectionPublicPath)
     self.listingManager = getOrCreateListingManager(account: account)
   }
 
