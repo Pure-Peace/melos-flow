@@ -17,7 +17,7 @@ export const setupCollection = async (account: AuthAccount) => {
  * @throws Will throw an error if execution will be halted
  * */
 export const totalSupply = async () => {
-  return executeScript({code: scriptCode('melos-nft/totalSupply'), addressMap, limit});
+  return executeScript<number>({code: scriptCode('melos-nft/totalSupply'), addressMap, limit});
 };
 
 /**
@@ -44,7 +44,7 @@ export const transfer = async (sender: AuthAccount, recipient: string, itemId: n
 };
 
 export const getAccountNFTs = async (address: string) => {
-  return executeScript({code: scriptCode('melos-nft/getAccountNFTs'), args: [address], addressMap, limit});
+  return executeScript<number[]>({code: scriptCode('melos-nft/getAccountNFTs'), args: [address], addressMap, limit});
 };
 
 /**
@@ -52,5 +52,5 @@ export const getAccountNFTs = async (address: string) => {
  * @param {string} account - account address
  * */
 export const balanceOf = async (address: string) => {
-  return executeScript({code: scriptCode('melos-nft/getAccountBalance'), args: [address], addressMap, limit});
+  return executeScript<number>({code: scriptCode('melos-nft/getAccountBalance'), args: [address], addressMap, limit});
 };

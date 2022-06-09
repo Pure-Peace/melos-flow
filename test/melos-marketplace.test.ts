@@ -1,31 +1,30 @@
 import {
   emulator,
   assertTx,
-  getAccount,
   deployContractsIfNotDeployed,
   prepareEmulator,
-  toUFix64,
   eventFilter,
   getAuthAccountByName,
 } from './utils/helpers';
 import {balanceOf, mint, setupCollection, getAccountNFTs} from './utils/melos-nft';
 import {
   createListing,
-  Events,
+  MarketplaceEvents,
+  FixedPricesListingCompletedEvent,
   getAccountListingCount,
   getAllowedPaymentTokens,
   getContractIdentifier,
   getFlowBalance,
   getListingDetails,
-  ListingCreated,
+  ListingCreatedEvent,
   ListingType,
   purchaseListing,
   removeListing,
   setAllowedPaymentTokens,
   setupListingManager,
+  getListingPurachased,
 } from './utils/melos-marketplace';
-import {assert, Console} from 'console';
-import {getAccountAddress, mintFlow} from 'flow-js-testing';
+import {mintFlow} from 'flow-js-testing';
 
 // Increase timeout if your tests failing due to timeout
 jest.setTimeout(100000);
@@ -75,24 +74,25 @@ describe('Melos marketplace tests', () => {
 
     // Create listing with NFT
     const nftId = nfts[0];
-    const res = eventFilter<ListingCreated>(
-      assertTx(await createListing(alice, nftId, ListingType.Common, {price: 5, listingStartTime: 1})),
+    const listingCreatedEvents = eventFilter<ListingCreatedEvent, MarketplaceEvents>(
+      assertTx(
+        await createListing(alice, nftId, ListingType.Common, {price: 5, listingStartTime: 1, royaltyPercent: 0})
+      ),
       melosMarketplaceIdentifier,
-      Events[Events.ListingCreated]
+      'ListingCreated'
     );
-    console.log('ListingCreated events: ', res.filtedEvents);
-    expect(res.filtedEvents.length).toBeGreaterThan(0);
+    console.log('ListingCreated events: ', listingCreatedEvents);
+    expect(listingCreatedEvents.length).toBeGreaterThan(0);
 
     const aliceListingCount = assertTx(await getAccountListingCount(alice.address));
     expect(aliceListingCount).toBeGreaterThan(0);
 
-    const listingId = res.filtedEvents[0].listingId;
+    const listingId = listingCreatedEvents[0].listingId;
     const listing = assertTx(await getListingDetails(listingId));
     console.log('listingDetails: ', listing);
 
     // Mint flow to bob
     const bob = await getAuthAccountByName('bob');
-    await getAccountAddress('bob'); // Fix flow-jest-test bug
 
     const expectBalance = 666;
     await mintFlow(bob.address, expectBalance.toFixed(8));
@@ -103,7 +103,18 @@ describe('Melos marketplace tests', () => {
 
     // Bob purachase listing
     const result = assertTx(await purchaseListing(bob, listingId));
-    console.log(result);
+    const fixedPricesListingCompleted = eventFilter<FixedPricesListingCompletedEvent, MarketplaceEvents>(
+      result,
+      melosMarketplaceIdentifier,
+      'FixedPricesListingCompleted'
+    );
+    // console.log(getTxEvents(result))
+    console.log('fixedPricesListingCompleted: ', fixedPricesListingCompleted);
+    expect(fixedPricesListingCompleted.length).toBeGreaterThan(0);
+
+    // Listing should be purachased
+    const listingIsPurchased = assertTx(await getListingPurachased(listingId));
+    expect(listingIsPurchased).toBe(true);
   });
 
   /* it('should be able to create a listing', async () => {
