@@ -97,9 +97,9 @@ pub contract MelosMarketplace {
 
   // Listing events
   pub event ListingCreated(
+    listingId: UInt64,
     listingType: UInt8,
     seller: Address, 
-    listingId: UInt64,
     nftId: UInt64,
     nftType: Type,
     nftResourceUUID: UInt64,
@@ -107,7 +107,8 @@ pub contract MelosMarketplace {
     listingStartTime: UFix64,
     listingEndTime: UFix64?
   )
-  pub event ListingRemoved(purchased: Bool, listingId: UInt64)
+  pub event ListingRemoved(listingId: UInt64, purchased: Bool)
+  pub event FixedPricesListingCompleted(listingId: UInt64, payment: UFix64, buyer: Address)
 
   // -----------------------------------------------------------------------
   // Contract Initilization
@@ -676,7 +677,7 @@ pub contract MelosMarketplace {
     pub fun isPurchased(): Bool
     pub fun ensurePaymentTokenType(_ payment: @FungibleToken.Vault): @FungibleToken.Vault
 
-    pub fun purchase(payment: @FungibleToken.Vault): @NonFungibleToken.NFT
+    pub fun purchase(payment: @FungibleToken.Vault, rewardCollection: Capability<&{NonFungibleToken.Receiver}>): Bool
     pub fun createOpenBid(
       bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>,
       rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
@@ -746,9 +747,9 @@ pub contract MelosMarketplace {
       self.englishAuctionParticipant = {}
       
       emit ListingCreated(
+          listingId: self.uuid,
           listingType: listingType.rawValue,
           seller: nftProvider.address, 
-          listingId: self.uuid,
           nftId: nftId,
           nftType: nftType,
           nftResourceUUID: nftRef.uuid,
@@ -769,8 +770,8 @@ pub contract MelosMarketplace {
       destroy self.bids
 
       emit ListingRemoved(
-        purchased: self.details.isPurchased, 
-        listingId: self.uuid
+        listingId: self.uuid,
+        purchased: self.details.isPurchased,
       )
     }
 
@@ -907,7 +908,7 @@ pub contract MelosMarketplace {
       return <- self.withdrawNFT()
     }
 
-    pub fun purchase(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
+    pub fun purchase(payment: @FungibleToken.Vault, rewardCollection: Capability<&{NonFungibleToken.Receiver}>): Bool {
       // Check listing and params
       assert([ListingType.Common, ListingType.DutchAuction].contains(
         ListingType(rawValue: self.details.listingType)!), message: "Listing type is not supported")
@@ -915,11 +916,20 @@ pub contract MelosMarketplace {
       assert(self.isListingStarted(), message: "Listing not started")
       assert(!self.isListingEnded(), message: "Listing has ended")
 
-      let payment <- self.ensurePaymentTokenType(<- payment)
-      let price = self.getPrice()
-      assert(payment.balance >= price, message: "insufficient payments")
+      let reward = rewardCollection.borrow() ?? panic("Cannot borrow reward NFT collection")
 
-      return <- self.completeListing(<- payment)
+      let payment <- self.ensurePaymentTokenType(<- payment)
+      let paymentBalance = payment.balance
+  
+      let price = self.getPrice()
+      assert(paymentBalance >= price, message: "insufficient payments")
+
+      let nft <- self.completeListing(<- payment)
+      reward.deposit(token: <- nft)
+      
+      emit FixedPricesListingCompleted(listingId: self.uuid, payment: paymentBalance, buyer: rewardCollection.address)
+
+      return true
     }
 
     pub fun createOpenBid(
