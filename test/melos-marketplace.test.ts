@@ -8,6 +8,8 @@ import {
   getTxEvents,
   Account,
   AuthAccount,
+  SECOND,
+  sleep,
 } from './utils/helpers';
 import {balanceOf, mint, setupCollection, getAccountNFTs} from './utils/melos-nft';
 import {
@@ -29,14 +31,40 @@ import {
   publicRemoveListing,
   ListingRemovedEvent,
   getListingExists,
+  MelosNFTMintedEvent,
+  MelosNFTEvents,
+  getBlockTime,
+  getListingPrice,
 } from './utils/melos-marketplace';
 import {mintFlow} from 'flow-js-testing';
 import {TxResult} from 'flow-cadut';
 
 // Increase timeout if your tests failing due to timeout
-jest.setTimeout(100000);
+jest.setTimeout(300 * SECOND);
 
-const readyToListing = async () => {
+const setupCollectionAndMintNFT = async (account: AuthAccount) => {
+  const admin = await getAuthAccountByName('emulator-account');
+
+  // Setup NFT collection and mint NFT for account
+  assertTx(await setupCollection(account));
+  const mintResult = assertTx(await mint(admin, account.address));
+  const nfts = assertTx(await getAccountNFTs(account.address));
+  expect(nfts.length).toBeGreaterThan(0);
+
+  const mintedEvents = eventFilter<MelosNFTMintedEvent, MelosNFTEvents>(mintResult, 'MelosNFT', 'Minted');
+  expect(mintedEvents.length).toBeGreaterThan(0);
+
+  return {nfts, nft: mintedEvents[0].id, mintResult};
+};
+
+const setupSeller = async (name: string) => {
+  const userResult = await setupUser(name);
+  const mintResult = await setupCollectionAndMintNFT(userResult.user);
+  assertTx(await setupListingManager(userResult.user));
+  return {...userResult, ...mintResult};
+};
+
+const initializeMarketplace = async () => {
   const melosMarketplaceIdentifier = assertTx(await getContractIdentifier());
 
   // Set allowed payment tokens
@@ -46,40 +74,28 @@ const readyToListing = async () => {
   console.log('allowedPaymentTokens: ', allowedPaymentTokens);
   expect(allowedPaymentTokens.length).toBeGreaterThan(0);
 
-  const alice = await getAuthAccountByName('alice');
-
-  // Setup NFT collection and mint NFT for alice
-  assertTx(await setupCollection(alice));
-  assertTx(await mint(admin, alice.address));
-  const nfts = assertTx(await getAccountNFTs(alice.address));
-  expect(nfts.length).toBeGreaterThan(0);
-
-  // Setup listing manager for alice
-  assertTx(await setupListingManager(alice));
-  const nftId = nfts[0];
-
-  return {nftId, alice, admin, melosMarketplaceIdentifier, allowedPaymentTokens};
+  return {admin, allowedPaymentTokens, melosMarketplaceIdentifier};
 };
 
-const setupBob = async () => {
-  // Mint flow to bob
-  const bob = await getAuthAccountByName('bob');
+const setupUser = async (name: string, airdropFlow = 1000) => {
+  // Mint flow to user
+  const user = await getAuthAccountByName(name);
 
-  const expectBalance = 666;
-  await mintFlow(bob.address, expectBalance.toFixed(8));
-  const balanceBob = Number(assertTx(await getFlowBalance(bob.address)));
+  await mintFlow(user.address, airdropFlow.toFixed(8));
+  const balance = Number(assertTx(await getFlowBalance(user.address)));
 
-  console.log('bob flow balance: ', balanceBob);
-  expect(balanceBob).toBeGreaterThanOrEqual(expectBalance);
+  console.log(`${name} flow balance: `, balance);
+  expect(balance).toBeGreaterThanOrEqual(airdropFlow);
 
-  return {bob, balanceBob};
+  return {user, balance};
 };
 
-const checkCreateListing = async (
+const handleCreateListing = async (
   seller: Account,
   melosMarketplaceIdentifier: string,
-  createListingResult: TxResult
+  createListingFunction: () => Promise<TxResult>
 ) => {
+  const createListingResult = await createListingFunction();
   const listingCreatedEvents = eventFilter<ListingCreatedEvent, MarketplaceEvents>(
     createListingResult,
     melosMarketplaceIdentifier,
@@ -92,13 +108,13 @@ const checkCreateListing = async (
   expect(aliceListingCount).toBeGreaterThan(0);
 
   const listingId = listingCreatedEvents[0].listingId;
-  const listing = assertTx(await getListingDetails(listingId));
-  console.log('listingDetails: ', listing);
+  const listingDetails = assertTx(await getListingDetails(listingId));
+  console.log('listingDetails: ', listingDetails);
 
-  return {listingCreatedEvents, aliceListingCount, listingId, listing};
+  return {listingCreatedEvents, createListingResult, aliceListingCount, listingId, listingDetails};
 };
 
-const afterPurachasedCheck = async (
+const removePurachasedListing = async (
   listingId: number,
   melosMarketplaceIdentifier: string,
   listingRemover: AuthAccount
@@ -144,27 +160,86 @@ describe('Melos marketplace tests', () => {
   it('Common listing tests: Create listing and purachase', async () => {
     // Deploy contracts
     await deployContractsIfNotDeployed();
+    const {melosMarketplaceIdentifier} = await initializeMarketplace();
 
-    const {nftId, alice, melosMarketplaceIdentifier} = await readyToListing();
+    // Setup seller and mint NFT
+    const {user: alice, nft} = await setupSeller('alice');
 
     // Create listing with NFT
-    const createListingResult = assertTx(
-      await createListing(alice, nftId, ListingType.Common, {price: 5, listingStartTime: 1, royaltyPercent: 0})
-    );
-    const {listingId} = await checkCreateListing(alice, melosMarketplaceIdentifier, createListingResult);
-    const {bob} = await setupBob();
+    const {listingId} = await handleCreateListing(alice, melosMarketplaceIdentifier, async () => {
+      return assertTx(await createListing(alice, nft, ListingType.Common, {price: 5, royaltyPercent: 0}));
+    });
 
     // Bob purachase listing
+    const {user: bob} = await setupUser('bob');
     const result = assertTx(await purchaseListing(bob, listingId));
     const fixedPricesListingCompleted = eventFilter<FixedPricesListingCompletedEvent, MarketplaceEvents>(
       result,
       melosMarketplaceIdentifier,
       'FixedPricesListingCompleted'
     );
-    // console.log(getTxEvents(result))
+    console.log('purchase events: ', getTxEvents(result));
     console.log('fixedPricesListingCompleted: ', fixedPricesListingCompleted);
     expect(fixedPricesListingCompleted.length).toBeGreaterThan(0);
 
-    await afterPurachasedCheck(listingId, melosMarketplaceIdentifier, bob);
+    await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
+  });
+
+  it('DutchAuction listing tests: Create listing and purachase', async () => {
+    // Deploy contracts
+    await deployContractsIfNotDeployed();
+    const {melosMarketplaceIdentifier} = await initializeMarketplace();
+
+    // Setup seller and mint NFT
+    const {user: alice, nft} = await setupSeller('alice');
+
+    // Create listing with NFT
+    const startingPrice = 10;
+    const reservePrice = 1;
+    const priceCutInterval = 1;
+    const {listingId, listingDetails} = await handleCreateListing(alice, melosMarketplaceIdentifier, async () => {
+      return assertTx(
+        await createListing(alice, nft, ListingType.DutchAuction, {
+          royaltyPercent: 0,
+          startingPrice,
+          listingDuration: 60,
+          reservePrice,
+          priceCutInterval,
+        })
+      );
+    });
+    const listingStartTime = listingDetails.details.listingConfig.listingStartTime;
+
+    // Bob purachase listing
+    const {user: bob} = await setupUser('bob');
+
+    // Sleep random time for dutch auction drop price
+    for (let i = 0; i < 100; i++) {
+      await mintFlow(alice.address, '0.1');
+    }
+    const afterPrice = assertTx(await getListingPrice(listingId));
+    const currentBlockTime = assertTx(await getBlockTime());
+    const priceDiff = Number(startingPrice) - Number(afterPrice);
+    const timeDuration = Number(currentBlockTime) - Number(listingStartTime);
+    console.log(
+      `[DUTCH AUCTION] startingPrice: ${startingPrice}, afterPrice: ${afterPrice}, price diff: ${priceDiff}, listingStartTime: ${listingStartTime}, currentBlockTime: ${currentBlockTime}, duration: ${timeDuration}s`
+    );
+
+    // If duration exists, price should dropped
+    if (timeDuration > priceCutInterval) {
+      expect(afterPrice).toBeLessThan(startingPrice);
+    }
+
+    const result = assertTx(await purchaseListing(bob, listingId));
+    const fixedPricesListingCompleted = eventFilter<FixedPricesListingCompletedEvent, MarketplaceEvents>(
+      result,
+      melosMarketplaceIdentifier,
+      'FixedPricesListingCompleted'
+    );
+    console.log('[DUTCH AUCTION] purchase events: ', getTxEvents(result));
+    console.log('[DUTCH AUCTION] fixedPricesListingCompleted: ', fixedPricesListingCompleted);
+    expect(fixedPricesListingCompleted.length).toBeGreaterThan(0);
+
+    await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
   });
 });
