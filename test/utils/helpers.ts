@@ -78,11 +78,11 @@ export const txCode = (file: string) => {
   return getCodeWithType(file, 'transactions');
 };
 
-export const assertTx = (response: [TxResult | any, any]) => {
+export function assertTx<T>(response: [T, any]) {
   const [res, err] = response;
   if (err) throw new Error(err);
-  return res;
-};
+  return res!;
+}
 
 export async function prepareEmulator(params: CreateFlowEmulatorParams) {
   await startEmulator(params);
@@ -237,15 +237,18 @@ export async function deployContractsIfNotDeployed() {
   }
 }
 
-export function eventFilter<T>(txResult: TxResult, contract: string, event: string) {
+export function eventFilter<T, E>(txResult: TxResult, contract: string, event: E) {
   const filtedEvents = [];
   for (const ev of txResult.events) {
     if (ev.type.endsWith(`${contract}.${event}`)) {
       filtedEvents.push(ev.data as T);
     }
   }
-  return {
-    ...txResult,
-    filtedEvents,
-  };
+  return filtedEvents;
+}
+
+export function getTxEvents(txResult: TxResult) {
+  return txResult.events.map((ev: any) => {
+    return {type: ev.type, data: ev.data};
+  });
 }

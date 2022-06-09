@@ -37,7 +37,7 @@ declare module 'flow-cadut' {
     } = {wait: 'seal'}
   ): Promise<[TxResult | null, any]>;
 
-  async function executeScript(
+  async function executeScript<T>(
     props: {
       code?: string;
       cadence?: string;
@@ -47,7 +47,7 @@ declare module 'flow-cadut' {
       processed?: boolean;
       raw?: boolean;
     } = {raw: false}
-  ): Promise<[any, any]>;
+  ): Promise<[T?, any]>;
 }
 declare module 'flow-js-testing' {
   /**

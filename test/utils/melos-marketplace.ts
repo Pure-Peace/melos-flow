@@ -17,9 +17,22 @@ export enum ListingType {
   EnglishAuction,
 }
 
-export enum Events {
-  ListingCreated,
-}
+export type MarketplaceEvents =
+  | 'MelosSettlementInitialized'
+  | 'ListingManagerCreated'
+  | 'ListingManagerDestroyed'
+  | 'FungibleTokenFeeUpdated'
+  | 'TxFeeCutted'
+  | 'FungibleTokenFeeRemoved'
+  | 'MinimumListingDurationChanged'
+  | 'MaxAuctionDurationChanged'
+  | 'AllowedPaymentTokensChanged'
+  | 'BidCreated'
+  | 'BidRemoved'
+  | 'BidListingCompleted'
+  | 'ListingCreated'
+  | 'ListingRemoved'
+  | 'FixedPricesListingCompleted';
 
 export type UFix64 = string;
 
@@ -74,6 +87,7 @@ export type FixedPricesListingCompletedEvent = {
 export interface ListingConfig {
   listingStartTime: number;
   listingEndTime?: number;
+  royaltyPercent?: number;
 }
 
 export interface Common extends ListingConfig {
@@ -119,7 +133,12 @@ export const createListing = async (
   listingType: ListingType,
   cfg: Common | OpenBid | DutchAuction | EnglishAuction
 ) => {
-  let args: unknown[] = [nftId, toUFix64(cfg.listingStartTime), toUFix64(cfg.listingEndTime)];
+  let args: unknown[] = [
+    nftId,
+    toUFix64(cfg.listingStartTime),
+    toUFix64(cfg.listingEndTime),
+    toUFix64(cfg.royaltyPercent),
+  ];
   switch (listingType) {
     case ListingType.Common:
       cfg = cfg as Common;
@@ -169,7 +188,7 @@ export const purchaseListing = async (account: AuthAccount, listingId: number) =
 };
 
 export const getAccountListingCount = async (address: string) => {
-  return executeScript({
+  return executeScript<number>({
     code: scriptCode('melos-marketplace/getAccountListingCount'),
     args: [address],
     addressMap,
@@ -188,7 +207,7 @@ export const setAllowedPaymentTokens = async (admin: AuthAccount) => {
 };
 
 export const getAllowedPaymentTokens = async () => {
-  return executeScript({
+  return executeScript<string[]>({
     code: scriptCode('melos-marketplace/getAllowedPaymentTokens'),
     args: [],
     addressMap,
@@ -197,7 +216,7 @@ export const getAllowedPaymentTokens = async () => {
 };
 
 export const getContractIdentifier = async () => {
-  return executeScript({
+  return executeScript<string>({
     code: scriptCode('melos-marketplace/getContractIdentifier'),
     args: [],
     addressMap,
@@ -215,9 +234,27 @@ export const getListingDetails = async (listingId: number) => {
 };
 
 export const getFlowBalance = async (address: string) => {
-  return executeScript({
+  return executeScript<UFix64>({
     code: scriptCode('getFlowBalance'),
     args: [address],
+    addressMap,
+    limit,
+  });
+};
+
+export const getListingExists = async (listingId: number) => {
+  return executeScript<boolean>({
+    code: scriptCode('melos-marketplace/getListingExists'),
+    args: [listingId],
+    addressMap,
+    limit,
+  });
+};
+
+export const getListingPurachased = async (listingId: number) => {
+  return executeScript<boolean>({
+    code: scriptCode('melos-marketplace/getListingPurachased'),
+    args: [listingId],
     addressMap,
     limit,
   });
