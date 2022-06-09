@@ -15,13 +15,15 @@ import {
   getAccountListingCount,
   getAllowedPaymentTokens,
   getContractIdentifier,
+  getListingDetails,
+  ListingCreated,
   ListingType,
   purchaseListing,
   removeListing,
   setAllowedPaymentTokens,
   setupListingManager,
 } from './utils/melos-marketplace';
-import {assert} from 'console';
+import {assert, Console} from 'console';
 
 // Increase timeout if your tests failing due to timeout
 jest.setTimeout(100000);
@@ -69,20 +71,26 @@ describe('Melos marketplace tests', () => {
     assertTx(await mint(address));
     const nfts = assertTx(await getAccountNFTs(address));
     expect(nfts.length).toBeGreaterThan(0);
-    const nftId = nfts[0];
 
     // Setup listing manager for user
     assertTx(await setupListingManager(address));
-    const res = eventFilter(
+
+    // Create listing with NFT
+    const nftId = nfts[0];
+    const res = eventFilter<ListingCreated>(
       assertTx(await createListing(address, nftId, ListingType.Common, {price: 1, listingStartTime: 1})),
       melosMarketplaceIdentifier,
       Events[Events.ListingCreated]
     );
-    console.log(res);
+    console.log('ListingCreated events: ', res.filtedEvents);
     expect(res.filtedEvents.length).toBeGreaterThan(0);
 
     const aliceListingCount = assertTx(await getAccountListingCount(address));
     expect(aliceListingCount).toBeGreaterThan(0);
+
+    const listingId = res.filtedEvents[0].listingId;
+    const listing = assertTx(await getListingDetails(listingId));
+    console.log('listingDetails: ', listing);
   });
 
   /* it('should be able to create a listing', async () => {

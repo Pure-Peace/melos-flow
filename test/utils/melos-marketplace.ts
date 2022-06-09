@@ -20,6 +20,18 @@ export enum Events {
   ListingCreated,
 }
 
+export type ListingCreated = {
+  listingType: number;
+  seller: string;
+  listingId: number;
+  nftId: number;
+  nftType: string;
+  nftResourceUUID: number;
+  paymentToken: string;
+  listingStartTime: string;
+  listingEndTime?: string;
+};
+
 export interface ListingConfig {
   listingStartTime: number;
   listingEndTime?: number;
@@ -165,6 +177,15 @@ export const getContractIdentifier = async () => {
   return executeScript({
     code: scriptCode('melos-marketplace/getContractIdentifier'),
     args: [],
+    addressMap,
+    limit,
+  });
+};
+
+export const getListingDetails = async (listingId: number) => {
+  return executeScript({
+    code: scriptCode('melos-marketplace/getListingDetails'),
+    args: [listingId],
     addressMap,
     limit,
   });

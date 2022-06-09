@@ -194,7 +194,7 @@ export async function deployContractsIfNotDeployed() {
   }
 }
 
-export function eventFilter<T>(txResult: any, contract: string, event: string) {
+export function eventFilter<T>(txResult: TxResult, contract: string, event: string) {
   const filtedEvents = [];
   for (const ev of txResult.events) {
     if (ev.type.endsWith(`${contract}.${event}`)) {
