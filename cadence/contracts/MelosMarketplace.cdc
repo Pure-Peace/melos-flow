@@ -154,7 +154,11 @@ pub contract MelosMarketplace {
 
   // Get the public interface of the specified listing
   pub fun getListing(_ listingId: UInt64): &{ListingPublic}? {
-    return &self.listings[listingId] as? &Listing
+    if self.listings[listingId] == nil {
+      return nil
+    } else {
+      return &self.listings[listingId] as? &Listing
+    }
   }
 
   // Get the details struct of the specified listing

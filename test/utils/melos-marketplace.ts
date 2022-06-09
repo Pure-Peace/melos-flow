@@ -84,6 +84,11 @@ export type FixedPricesListingCompletedEvent = {
   buyer: FlowAddress;
 };
 
+export type ListingRemovedEvent = {
+  listingId: number;
+  purchased: boolean;
+};
+
 export interface ListingConfig {
   listingStartTime: number;
   listingEndTime?: number;
@@ -172,6 +177,16 @@ export async function removeListing(listingOwner: AuthAccount, listingId: number
     code: txCode('melos-marketplace/removeListing'),
     args: [listingId],
     payer: listingOwner.auth,
+    addressMap,
+    limit,
+  });
+}
+
+export async function publicRemoveListing(executor: AuthAccount, listingId: number) {
+  return sendTransaction({
+    code: txCode('melos-marketplace/publicRemoveListing'),
+    args: [listingId],
+    payer: executor.auth,
     addressMap,
     limit,
   });

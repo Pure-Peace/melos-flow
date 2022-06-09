@@ -5,6 +5,7 @@ import {
   prepareEmulator,
   eventFilter,
   getAuthAccountByName,
+  getTxEvents,
 } from './utils/helpers';
 import {balanceOf, mint, setupCollection, getAccountNFTs} from './utils/melos-nft';
 import {
@@ -23,6 +24,9 @@ import {
   setAllowedPaymentTokens,
   setupListingManager,
   getListingPurachased,
+  publicRemoveListing,
+  ListingRemovedEvent,
+  getListingExists,
 } from './utils/melos-marketplace';
 import {mintFlow} from 'flow-js-testing';
 
@@ -115,6 +119,20 @@ describe('Melos marketplace tests', () => {
     // Listing should be purachased
     const listingIsPurchased = assertTx(await getListingPurachased(listingId));
     expect(listingIsPurchased).toBe(true);
+
+    // Should be able to remove the listing after purachased
+    const removeListingResult = assertTx(await publicRemoveListing(bob, listingId));
+    const removeListingEvent = eventFilter<ListingRemovedEvent, MarketplaceEvents>(
+      removeListingResult,
+      melosMarketplaceIdentifier,
+      'ListingRemoved'
+    );
+    console.log(removeListingEvent);
+    expect(removeListingEvent.length).toBeGreaterThan(0);
+
+    // After removed, listing should be not exists
+    const isListingExists = assertTx(await getListingExists(listingId));
+    expect(isListingExists).toBe(false);
   });
 
   /* it('should be able to create a listing', async () => {
