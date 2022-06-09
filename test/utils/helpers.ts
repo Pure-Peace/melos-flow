@@ -1,4 +1,4 @@
-import {emulator as _emulator, getAccountAddress, init} from 'flow-js-testing';
+import {emulator as _emulator, getAccountAddress, getFlowBalance, init, mintFlow} from 'flow-js-testing';
 import {readFileSync} from 'fs';
 import path from 'path';
 import type {Fcl} from '@rarible/fcl-types';
@@ -6,7 +6,7 @@ import * as fclLib from '@onflow/fcl';
 import {exec} from 'child_process';
 
 import {EMULATOR_ADDRESS} from '../../sdk/config';
-import {FlowService} from '../../sdk/flow-service';
+import {FlowAuthorizeMinter, FlowService} from '../../sdk/flow-service';
 import flow from '../../flow.json';
 import {EMULATOR_PORT} from '../../sdk/config';
 import {toFlowAddress} from '../../sdk/common';
@@ -15,6 +15,7 @@ import {TxResult} from 'flow-cadut';
 export const UFIX64_PRECISION = 8;
 
 const _fcl: Fcl = fclLib;
+const ALREADY_CHECKED_ACCOUNTS = new Set();
 
 export const emulator = _emulator;
 
@@ -35,10 +36,15 @@ export type DeploymentsConfig = Record<
     }[]
 >;
 
-export type Account = {
+export interface Account {
+  name?: string;
   address: string;
   key: string;
-};
+}
+
+export interface AuthAccount extends Account {
+  auth: FlowAuthorizeMinter;
+}
 
 export type AccountsConfig = Record<string, Account>;
 
@@ -105,23 +111,58 @@ export function createTestAuth(fcl: Fcl, accountAddress: string, privateKey: str
   return flowService.authorizeMinter();
 }
 
-export function getAccountsFromFlowConfig() {
+export function getAccountsFromFlowConfig(): Account[] {
   return Object.entries(flow.accounts).map(([k, v]) => {
     return {name: k, address: v.address, key: v.key};
   });
 }
 
-export async function getAccount(name: string): Promise<Account> {
-  const acc = (flow.accounts as AccountsConfig)[name];
-  if (!acc) {
-    return {address: await getAccountAddress(name), key: flow.accounts['emulator-account'].key};
+export async function getAccountByAddress(address: string): Promise<Account> {
+  for (const [k, v] of Object.entries(flow.accounts)) {
+    if (v.address === address) {
+      const account = {name: k, address: v.address, key: v.key};
+      await createAccountIfNotExists(account);
+      return account;
+    }
   }
-  return acc;
+  throw new Error('account not found');
 }
 
-export async function getAuthAccount(name: string) {
-  const {address, key} = await getAccount(name);
-  return {address, key, auth: createTestAuth(_fcl, address, key)};
+export async function createAccountIfNotExists(account: Account) {
+  if (ALREADY_CHECKED_ACCOUNTS.has(account.address)) {
+    return;
+  }
+  if (account.name) {
+    await getAccountAddress(account.name);
+  } else {
+    const balance = await getFlowBalance(account.address);
+    if (Number(balance) < 0.0001) {
+      await mintFlow(account.address, '0.0001');
+    }
+  }
+  ALREADY_CHECKED_ACCOUNTS.add(account.address);
+}
+
+export async function getAccount(name: string): Promise<Account> {
+  const acc = (flow.accounts as AccountsConfig)[name];
+  let account;
+  if (!acc) {
+    account = {name, address: await getAccountAddress(name), key: flow.accounts['emulator-account'].key};
+  } else {
+    account = {name, ...acc};
+  }
+  await createAccountIfNotExists(account);
+  return account;
+}
+
+export async function getAuthAccountByName(name: string): Promise<AuthAccount> {
+  const account = await getAccount(name);
+  return {...account, auth: createTestAuth(_fcl, account.address, account.key)};
+}
+
+export async function getAuthAccountByAddress(address: string): Promise<AuthAccount> {
+  const account = await getAccountByAddress(address);
+  return {...account, auth: createTestAuth(_fcl, address, account.key)};
 }
 
 export const CHECK_PROJECT_CODE_TEMPLATE = `
