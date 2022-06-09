@@ -6,21 +6,19 @@ import FungibleToken from "../../contracts/core/FungibleToken.cdc"
 import FlowToken from "../../contracts/core/FlowToken.cdc"
 
 
-pub fun getOrCreateNFTCollection(account: AuthAccount): &MelosNFT.Collection{NonFungibleToken.Receiver} {
-    let PUBLIC_PATH = MelosNFT.CollectionPublicPath
-    let STORAGE_PATH = MelosNFT.CollectionStoragePath
+pub fun getOrCreateNFTCollection(account: AuthAccount): Capability<&NonFungibleToken.Collection{NonFungibleToken.Receiver}> {
+  let PUBLIC_PATH = MelosNFT.CollectionPublicPath
+  let STORAGE_PATH = MelosNFT.CollectionStoragePath
 
-    if let collectionRef = account.borrow<&MelosNFT.Collection>(from: STORAGE_PATH) {
-        return collectionRef
-    }
-
+  if account.borrow<&MelosNFT.Collection>(from: STORAGE_PATH) == nil {
     let collection <- MelosNFT.createEmptyCollection() as! @MelosNFT.Collection
     let collectionRef = &collection as &MelosNFT.Collection
     account.save(<- collection, to: STORAGE_PATH)
     account.link<&MelosNFT.Collection{NonFungibleToken.CollectionPublic, MelosNFT.MelosNFTCollectionPublic}>(
-      PUBLIC_PATH, target: STORAGE_PATH)
+    PUBLIC_PATH, target: STORAGE_PATH)
+  }
 
-    return collectionRef
+  return account.getCapability<&NonFungibleToken.Collection{NonFungibleToken.Receiver}>(PUBLIC_PATH)
 }
 
 transaction(
@@ -28,7 +26,7 @@ transaction(
 ) {
   let listing: &{MelosMarketplace.ListingPublic}
   let payment: @FungibleToken.Vault
-  let collection: &MelosNFT.Collection{NonFungibleToken.Receiver}
+  let collection: Capability<&{NonFungibleToken.Receiver}>
   prepare(account: AuthAccount) {
     let PAYMENT_TOKEN_STORAGE_PATH = /storage/flowTokenVault
     self.listing = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
@@ -42,7 +40,6 @@ transaction(
   }
 
   execute {
-    let nft <- self.listing.purchase(payment: <- self.payment)
-    self.collection.deposit(token: <- nft)
+    self.listing.purchase(payment: <- self.payment, rewardCollection: self.collection)
   }
 }
