@@ -6,20 +6,20 @@ import FungibleToken from "../../contracts/core/FungibleToken.cdc"
 import FlowToken from "../../contracts/core/FlowToken.cdc"
 
 
-pub fun getOrCreateNFTCollection(account: AuthAccount): Capability<&NonFungibleToken.Collection{NonFungibleToken.Receiver}> {
+pub fun getOrCreateNFTCollection(account: AuthAccount): Capability<&{NonFungibleToken.Receiver}> {
   let PUBLIC_PATH = MelosNFT.CollectionPublicPath
   let STORAGE_PATH = MelosNFT.CollectionStoragePath
 
   if account.borrow<&MelosNFT.Collection>(from: STORAGE_PATH) == nil {
     let collection <- MelosNFT.createEmptyCollection() as! @MelosNFT.Collection
-    let collectionRef = &collection as &MelosNFT.Collection
     account.save(<- collection, to: STORAGE_PATH)
-    account.link<&MelosNFT.Collection{NonFungibleToken.CollectionPublic, MelosNFT.MelosNFTCollectionPublic}>(
-    PUBLIC_PATH, target: STORAGE_PATH)
+    account.link<&{NonFungibleToken.CollectionPublic, NonFungibleToken.Receiver}>(
+      PUBLIC_PATH, target: STORAGE_PATH)
   }
 
-  return account.getCapability<&NonFungibleToken.Collection{NonFungibleToken.Receiver}>(PUBLIC_PATH)
+  return account.getCapability<&{NonFungibleToken.Receiver}>(PUBLIC_PATH)
 }
+
 
 pub fun getOrCreateBidManager(account: AuthAccount): Capability<&{MelosMarketplace.BidManagerPublic}> {
   let PUBLIC_PATH = MelosMarketplace.BidManagerPublicPath
