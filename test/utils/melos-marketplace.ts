@@ -21,16 +21,54 @@ export enum Events {
   ListingCreated,
 }
 
-export type ListingCreated = {
-  listingType: number;
-  seller: string;
+export type UFix64 = string;
+
+export type FlowType = string;
+
+export type FlowAddress = string;
+
+export type ListingCreatedEvent = {
   listingId: number;
+  listingType: number;
+  seller: FlowAddress;
   nftId: number;
-  nftType: string;
+  nftType: FlowType;
   nftResourceUUID: number;
-  paymentToken: string;
-  listingStartTime: string;
-  listingEndTime?: string;
+  paymentToken: FlowType;
+  listingStartTime: UFix64;
+  listingEndTime?: UFix64;
+};
+
+export type FungibleTokensWithdrawnEvent = {
+  amount: UFix64;
+  from: FlowAddress;
+};
+
+export type FungibleTokensDepositedEvent = {
+  amount: UFix64;
+  to: FlowAddress;
+};
+
+export type TxFeeCuttedEvent = {
+  listingId: number;
+  txFee?: UFix64;
+  royalty?: UFix64;
+};
+
+export type MelosNFTWithdrawEvent = {
+  id: number;
+  from: FlowAddress;
+};
+
+export type MelosNFTDepositEvent = {
+  id: number;
+  to: FlowAddress;
+};
+
+export type FixedPricesListingCompletedEvent = {
+  listingId: number;
+  payment: UFix64;
+  buyer: FlowAddress;
 };
 
 export interface ListingConfig {
