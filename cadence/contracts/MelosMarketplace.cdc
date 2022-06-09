@@ -845,7 +845,7 @@ pub contract MelosMarketplace {
     }
 
     pub fun isPurchased(): Bool {
-      return self.details.isPurchased == false
+      return self.details.isPurchased
     }
 
     pub fun ensurePaymentTokenType(_ payment: @FungibleToken.Vault): @FungibleToken.Vault {

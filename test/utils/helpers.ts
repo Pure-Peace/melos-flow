@@ -12,6 +12,7 @@ import {EMULATOR_PORT} from '../../sdk/config';
 import {toFlowAddress} from '../../sdk/common';
 import {TxResult} from 'flow-cadut';
 
+export const SEALED = 4;
 export const UFIX64_PRECISION = 8;
 export const MINIMUM_BALANCE = 0.001;
 
@@ -85,7 +86,6 @@ export const assertTx = (response: [TxResult | any, any]) => {
 
 export async function prepareEmulator(params: CreateFlowEmulatorParams) {
   await startEmulator(params);
-  // await deployAll(withPrefix(await config().get('SERVICE_ADDRESS')));
   return emulator;
 }
 
@@ -199,7 +199,7 @@ export async function checkProjectDeployments() {
       _fcl.limit(999),
     ]);
     const result = await _fcl.tx(tx).onceSealed();
-    if (result.status !== 4) {
+    if (result.status !== SEALED) {
       return false;
     }
     return true;

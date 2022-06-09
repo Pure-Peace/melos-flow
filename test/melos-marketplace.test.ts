@@ -49,7 +49,7 @@ describe('Melos marketplace tests', () => {
     assertTx(await setupListingManager(alice));
   });
 
-  it('common listing tests', async () => {
+  it('Common listing tests: Create listing and purachase', async () => {
     // Deploy contracts
     await deployContractsIfNotDeployed();
 
