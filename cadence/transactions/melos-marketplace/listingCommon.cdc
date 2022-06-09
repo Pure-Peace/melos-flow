@@ -38,6 +38,7 @@ transaction(
   nftId: UInt64,
   listingStartTime: UFix64, 
   listingEndTime: UFix64?, 
+  royaltyPercent: UFix64?,
   price: UFix64
 ) {
   let listingConfig: MelosMarketplace.Common
@@ -49,10 +50,11 @@ transaction(
     self.listingConfig = MelosMarketplace.Common(
       listingStartTime: listingStartTime, 
       listingEndTime: listingEndTime, 
+      royaltyPercent: royaltyPercent,
       price: price
     )
 
-    self.receiver = account.getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+    self.receiver = account.getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
     self.nftProvider = getOrCreateNFTProvider(account: account)
     self.refund = account.getCapability<&{NonFungibleToken.CollectionPublic}>(MelosNFT.CollectionPublicPath)
     self.listingManager = getOrCreateListingManager(account: account)

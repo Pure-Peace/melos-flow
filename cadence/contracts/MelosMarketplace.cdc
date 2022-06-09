@@ -19,13 +19,11 @@ pub contract MelosMarketplace {
     pub var txFeeReceiver: Capability<&{FungibleToken.Receiver}>
     pub var txFeePercent: UFix64
     pub var royaltyReceiver: Capability<&{FungibleToken.Receiver}>
-    pub var royaltyPercent: UFix64
 
     init (
       txFeeReceiver: Capability<&{FungibleToken.Receiver}>,
       txFeePercent: UFix64,
       royaltyReceiver: Capability<&{FungibleToken.Receiver}>,
-      royaltyPercent: UFix64
     ) {
       assert(txFeeReceiver.borrow() != nil, message: "Cannot borrow txFeeReceiver")
       assert(royaltyReceiver.borrow() != nil, message: "Cannot borrow royaltyReceiver")
@@ -33,7 +31,6 @@ pub contract MelosMarketplace {
       self.txFeeReceiver = txFeeReceiver
       self.txFeePercent = txFeePercent
       self.royaltyReceiver = royaltyReceiver
-      self.royaltyPercent = royaltyPercent
     }
   }
 
@@ -77,8 +74,7 @@ pub contract MelosMarketplace {
     token: String, 
     txFeeReceiver: Address, 
     txFeePercent: UFix64,
-    royaltyReceiver: Address, 
-    royaltyPercent: UFix64
+    royaltyReceiver: Address 
   )
   pub event TxFeeCutted(listingId: UInt64, txFee: UFix64?, royalty: UFix64?)
   pub event FungibleTokenFeeRemoved(token: String)
@@ -272,8 +268,7 @@ pub contract MelosMarketplace {
         token: tokenType.identifier, 
         txFeeReceiver: config.txFeeReceiver.address, 
         txFeePercent: config.txFeePercent,
-        royaltyReceiver: config.royaltyReceiver.address, 
-        royaltyPercent: config.royaltyPercent
+        royaltyReceiver: config.royaltyReceiver.address
       )
     }
 
@@ -323,22 +318,30 @@ pub contract MelosMarketplace {
   pub struct interface ListingConfig {
     pub let listingStartTime: UFix64
     pub let listingEndTime: UFix64?
+    pub let royaltyPercent: UFix64?
     pub fun getPrice(): UFix64
   }
 
   pub struct Common: ListingConfig {
     pub let listingStartTime: UFix64
     pub let listingEndTime: UFix64?
+    pub let royaltyPercent: UFix64?
 
     pub let price: UFix64
 
-    init (listingStartTime: UFix64, listingEndTime: UFix64?, price: UFix64) {
+    init (
+      listingStartTime: UFix64, 
+      listingEndTime: UFix64?, 
+      royaltyPercent: UFix64?, 
+      price: UFix64
+      ) {
       if listingEndTime != nil {
         assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
         assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
       }
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingEndTime
+      self.royaltyPercent = royaltyPercent
 
       self.price = price
     }
@@ -351,16 +354,23 @@ pub contract MelosMarketplace {
   pub struct OpenBid: ListingConfig {
     pub let listingStartTime: UFix64
     pub let listingEndTime: UFix64?
-    
+    pub let royaltyPercent: UFix64?
+
     pub let minimumPrice: UFix64
 
-    init (listingStartTime: UFix64, listingEndTime: UFix64?, minimumPrice: UFix64) {
+    init (
+      listingStartTime: UFix64, 
+      listingEndTime: UFix64?, 
+      royaltyPercent: UFix64?, 
+      minimumPrice: UFix64
+    ) {
       if listingEndTime != nil {
         assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
         assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
       }
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingEndTime
+      self.royaltyPercent = royaltyPercent
 
       self.minimumPrice = minimumPrice
     }
@@ -373,7 +383,8 @@ pub contract MelosMarketplace {
   pub struct DutchAuction: ListingConfig {
     pub let listingStartTime: UFix64
     pub let listingEndTime: UFix64?
-    
+    pub let royaltyPercent: UFix64?
+
     pub let startingPrice: UFix64
     pub let reservePrice: UFix64
     pub let priceCutInterval: UFix64
@@ -381,6 +392,7 @@ pub contract MelosMarketplace {
     init (
       listingStartTime: UFix64, 
       listingEndTime: UFix64?, 
+      royaltyPercent: UFix64?,
       startingPrice: UFix64, 
       reservePrice: UFix64, 
       priceCutInterval: UFix64
@@ -393,6 +405,7 @@ pub contract MelosMarketplace {
 
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingEndTime
+      self.royaltyPercent = royaltyPercent
 
       self.startingPrice = startingPrice
       self.reservePrice = reservePrice
@@ -413,7 +426,8 @@ pub contract MelosMarketplace {
   pub struct EnglishAuction: ListingConfig {
     pub let listingStartTime: UFix64
     pub let listingEndTime: UFix64?
-    
+    pub let royaltyPercent: UFix64?
+
     pub let reservePrice: UFix64
     pub let minimumBidPercentage: UFix64
 
@@ -424,6 +438,7 @@ pub contract MelosMarketplace {
     init (
       listingStartTime: UFix64, 
       listingEndTime: UFix64?, 
+      royaltyPercent: UFix64?,
       reservePrice: UFix64,
       minimumBidPercentage: UFix64,
       basePrice: UFix64
@@ -438,6 +453,7 @@ pub contract MelosMarketplace {
 
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingEndTime
+      self.royaltyPercent = royaltyPercent
 
       self.reservePrice = reservePrice
       self.minimumBidPercentage = minimumBidPercentage
@@ -724,6 +740,10 @@ pub contract MelosMarketplace {
       assert(MelosMarketplace.isTokenAllowed(paymentToken), message: "Payment tokens not allowed")
       assert(receiver.borrow() != nil, message: "Cannot borrow receiver")
       assert(refund.borrow() != nil, message: "Cannot borrow refund")
+      
+      let txFeePercent = MelosMarketplace.getFeeConfigByTokenType(tokenType: paymentToken)?.txFeePercent ?? 0.0
+      let royaltyPercent = listingConfig.royaltyPercent ?? 0.0
+      assert((txFeePercent + royaltyPercent) < 1.0, message: "txFeePercent + royaltyPercent should be smaller than 100%")
 
       let collection = nftProvider.borrow() ?? panic("Cannot borrow NFT collection")
       let nftRef = collection.borrowNFT(id: nftId)
@@ -882,15 +902,19 @@ pub contract MelosMarketplace {
           )
         }
         if let royaltyReceiver = feeConfig.royaltyReceiver.borrow() {
-          royalty = payment.balance * feeConfig.royaltyPercent
-          royaltyReceiver.deposit(
-            from: <- payment.withdraw(
-              amount: royalty!
+          if let royaltyPercent = self.details.listingConfig.royaltyPercent {
+            royalty = payment.balance * royaltyPercent
+            royaltyReceiver.deposit(
+              from: <- payment.withdraw(
+                amount: royalty!
+              )
             )
-          )
+          }
         }
       }
-      emit TxFeeCutted(listingId: self.uuid, txFee: txFee, royalty: royalty)
+      if txFee != nil || royalty != nil {
+        emit TxFeeCutted(listingId: self.uuid, txFee: txFee, royalty: royalty)
+      }
       return <- payment
     }
 
