@@ -617,7 +617,7 @@ pub contract MelosMarketplace {
   // -----------------------------------------------------------------------
 
   pub struct ListingDetails {
-    pub let listingType: ListingType
+    pub let listingType: UInt8
     pub let listingManagerId: UInt64
 
     pub let nftType: Type
@@ -639,7 +639,7 @@ pub contract MelosMarketplace {
       listingConfig: {MelosMarketplace.ListingConfig},
       receiver: Capability<&{FungibleToken.Receiver}>
     ) {
-      self.listingType = listingType
+      self.listingType = listingType.rawValue
       self.listingManagerId = listingManagerId
       self.isPurchased = false
       self.nftType = nftType
@@ -661,7 +661,6 @@ pub contract MelosMarketplace {
   }
 
   pub resource interface ListingPublic {
-    pub fun getListingType(): ListingType
     pub fun isListingType(_ typ: ListingType): Bool
     pub fun config(): {MelosMarketplace.ListingConfig}
     pub fun getEnglishAuctionParticipants(): {Address: UInt64}
@@ -775,12 +774,8 @@ pub contract MelosMarketplace {
       )
     }
 
-    pub fun getListingType(): ListingType {
-      return self.details.listingType
-    }
-
     pub fun isListingType(_ typ: ListingType): Bool {
-      return self.details.listingType == typ
+      return self.details.listingType == typ.rawValue
     }
 
     pub fun config(): {MelosMarketplace.ListingConfig} {
@@ -914,7 +909,8 @@ pub contract MelosMarketplace {
 
     pub fun purchase(payment: @FungibleToken.Vault): @NonFungibleToken.NFT {
       // Check listing and params
-      assert([ListingType.Common, ListingType.DutchAuction].contains(self.getListingType()), message: "Listing type is not supported")
+      assert([ListingType.Common, ListingType.DutchAuction].contains(
+        ListingType(rawValue: self.details.listingType)!), message: "Listing type is not supported")
       assert(!self.isPurchased(), message: "Listing has already been purchased")
       assert(self.isListingStarted(), message: "Listing not started")
       assert(!self.isListingEnded(), message: "Listing has ended")
@@ -1016,7 +1012,7 @@ pub contract MelosMarketplace {
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
     ): UInt64 {
-      switch self.getListingType() {
+      switch ListingType(rawValue: self.details.listingType)! {
         case ListingType.OpenBid:
           return self.createOpenBid(
             bidManager: bidManager, 
