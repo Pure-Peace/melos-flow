@@ -34,6 +34,8 @@ export type MarketplaceEvents =
   | 'ListingRemoved'
   | 'FixedPricesListingCompleted';
 
+export type MelosNFTEvents = 'Minted' | 'Withdraw' | 'Deposit' | 'MetadataBaseURIChanged';
+
 export type UFix64 = string;
 
 export type FlowType = string;
@@ -50,6 +52,11 @@ export type ListingCreatedEvent = {
   paymentToken: FlowType;
   listingStartTime: UFix64;
   listingEndTime?: UFix64;
+};
+
+export type MelosNFTMintedEvent = {
+  id: number;
+  recipient: string;
 };
 
 export type FungibleTokensWithdrawnEvent = {
@@ -89,9 +96,39 @@ export type ListingRemovedEvent = {
   purchased: boolean;
 };
 
+export type ListingDetailsQuery = {
+  details: {
+    listingType: number;
+    listingManagerId: number;
+    nftType: string;
+    nftId: number;
+    nftResourceUUID: number;
+    paymentToken: string;
+    listingConfig: {
+      listingStartTime: UFix64;
+      listingEndTime: UFix64;
+      royaltyPercent: UFix64;
+      startingPrice: UFix64;
+      reservePrice: UFix64;
+      priceCutInterval: UFix64;
+    };
+    receiver: {
+      path: any;
+      address: FlowAddress;
+      borrowType: string;
+    };
+    isPurchased: boolean;
+  };
+  price: UFix64;
+  isNFTAvaliable: boolean;
+  isListingStarted: boolean;
+  isListingEnded: boolean;
+  isPurchased: boolean;
+};
+
 export interface ListingConfig {
-  listingStartTime: number;
-  listingEndTime?: number;
+  listingStartTime?: number;
+  listingDuration?: number;
   royaltyPercent?: number;
 }
 
@@ -107,6 +144,7 @@ export interface DutchAuction extends ListingConfig {
   startingPrice: number;
   reservePrice: number;
   priceCutInterval: number;
+  listingDuration: number;
 }
 
 export interface EnglishAuction extends ListingConfig {
@@ -116,6 +154,7 @@ export interface EnglishAuction extends ListingConfig {
   basePrice: number;
   currentPrice: number;
   topBidId?: number;
+  listingDuration: number;
 }
 
 /**
@@ -141,7 +180,7 @@ export async function createListing(
   let args: unknown[] = [
     nftId,
     toUFix64(cfg.listingStartTime),
-    toUFix64(cfg.listingEndTime),
+    toUFix64(cfg.listingDuration),
     toUFix64(cfg.royaltyPercent),
   ];
   switch (listingType) {
@@ -240,7 +279,7 @@ export async function getContractIdentifier() {
 }
 
 export async function getListingDetails(listingId: number) {
-  return executeScript({
+  return executeScript<ListingDetailsQuery>({
     code: scriptCode('melos-marketplace/getListingDetails'),
     args: [listingId],
     addressMap,
@@ -252,6 +291,15 @@ export async function getFlowBalance(address: string) {
   return executeScript<UFix64>({
     code: scriptCode('getFlowBalance'),
     args: [address],
+    addressMap,
+    limit,
+  });
+}
+
+export async function getBlockTime() {
+  return executeScript<UFix64>({
+    code: scriptCode('getBlockTime'),
+    args: [],
     addressMap,
     limit,
   });
@@ -269,6 +317,15 @@ export async function getListingExists(listingId: number) {
 export async function getListingPurachased(listingId: number) {
   return executeScript<boolean>({
     code: scriptCode('melos-marketplace/getListingPurachased'),
+    args: [listingId],
+    addressMap,
+    limit,
+  });
+}
+
+export async function getListingPrice(listingId: number) {
+  return executeScript<string>({
+    code: scriptCode('melos-marketplace/getListingPrice'),
     args: [listingId],
     addressMap,
     limit,

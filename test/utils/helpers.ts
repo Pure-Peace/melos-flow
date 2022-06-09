@@ -12,6 +12,10 @@ import {EMULATOR_PORT} from '../../sdk/config';
 import {toFlowAddress} from '../../sdk/common';
 import {TxResult} from 'flow-cadut';
 
+export const SECOND = 1000;
+export const HOUR = 3600 * SECOND;
+export const DAY = 24 * HOUR;
+
 export const SEALED = 4;
 export const UFIX64_PRECISION = 8;
 export const MINIMUM_BALANCE = 0.001;
@@ -237,10 +241,10 @@ export async function deployContractsIfNotDeployed() {
   }
 }
 
-export function eventFilter<T, E>(txResult: TxResult, contract: string, event: E) {
+export function eventFilter<T, E>(txResult: TxResult, contract: string, contractEvent: E) {
   const filtedEvents = [];
   for (const ev of txResult.events) {
-    if (ev.type.endsWith(`${contract}.${event}`)) {
+    if (ev.type.endsWith(`${contract}.${contractEvent}`)) {
       filtedEvents.push(ev.data as T);
     }
   }
@@ -251,4 +255,8 @@ export function getTxEvents(txResult: TxResult) {
   return txResult.events.map((ev: any) => {
     return {type: ev.type, data: ev.data};
   });
+}
+
+export async function sleep(duration: number) {
+  return new Promise((r) => setTimeout(r, duration));
 }
