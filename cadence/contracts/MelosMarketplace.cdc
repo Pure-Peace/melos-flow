@@ -812,7 +812,11 @@ pub contract MelosMarketplace {
     }
 
     pub fun getTopBidFromBids(): &{BidPublic}? {
-      return self.getSortedBids()[0]
+      let temp = self.getSortedBids()
+      if temp.length == 0 {
+        return nil
+      }
+      return temp[0]
     }
 
     pub fun getBid(_ bidId: UInt64): &{BidPublic}? {
