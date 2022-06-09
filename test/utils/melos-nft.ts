@@ -8,24 +8,24 @@ const addressMap = {
   MelosNFT: '0xf8d6e0586b0a20c7',
 };
 
-export const setupCollection = async (account: AuthAccount) => {
+export async function setupCollection(account: AuthAccount) {
   return sendTransaction({code: txCode('melos-nft/setupCollection'), payer: account.auth, addressMap, limit});
-};
+}
 
 /**
  * Returns Melos supply.
  * @throws Will throw an error if execution will be halted
  * */
-export const totalSupply = async () => {
+export async function totalSupply() {
   return executeScript<number>({code: scriptCode('melos-nft/totalSupply'), addressMap, limit});
-};
+}
 
 /**
  * Mints Melos to **recipient**.
  * */
-export const mint = async (minter: AuthAccount, recipient: string) => {
+export async function mint(minter: AuthAccount, recipient: string) {
   return sendTransaction({code: txCode('melos-nft/mint'), args: [recipient], payer: minter.auth, addressMap, limit});
-};
+}
 
 /**
  * Transfers Melos NFT with id equal **itemId** from **sender** account to **recipient**.
@@ -33,7 +33,7 @@ export const mint = async (minter: AuthAccount, recipient: string) => {
  * @param {string} recipient - recipient address
  * @param {UInt64} itemId - id of the item to transfer
  * */
-export const transfer = async (sender: AuthAccount, recipient: string, itemId: number) => {
+export async function transfer(sender: AuthAccount, recipient: string, itemId: number) {
   return sendTransaction({
     code: txCode('melos-nft/transfer'),
     args: [itemId, recipient],
@@ -41,16 +41,16 @@ export const transfer = async (sender: AuthAccount, recipient: string, itemId: n
     addressMap,
     limit,
   });
-};
+}
 
-export const getAccountNFTs = async (address: string) => {
+export async function getAccountNFTs(address: string) {
   return executeScript<number[]>({code: scriptCode('melos-nft/getAccountNFTs'), args: [address], addressMap, limit});
-};
+}
 
 /**
  * Returns the number of Melos in an account's collection.
  * @param {string} account - account address
  * */
-export const balanceOf = async (address: string) => {
+export async function balanceOf(address: string) {
   return executeScript<number>({code: scriptCode('melos-nft/getAccountBalance'), args: [address], addressMap, limit});
-};
+}
