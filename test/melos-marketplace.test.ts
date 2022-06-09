@@ -1,4 +1,3 @@
-import {mintFlow} from 'flow-js-testing';
 import {
   emulator,
   assertTx,
@@ -15,6 +14,7 @@ import {
   getAccountListingCount,
   getAllowedPaymentTokens,
   getContractIdentifier,
+  getFlowBalance,
   getListingDetails,
   ListingCreated,
   ListingType,
@@ -24,6 +24,7 @@ import {
   setupListingManager,
 } from './utils/melos-marketplace';
 import {assert, Console} from 'console';
+import {getAccountAddress} from 'flow-js-testing';
 
 // Increase timeout if your tests failing due to timeout
 jest.setTimeout(100000);
@@ -52,7 +53,7 @@ describe('Melos marketplace tests', () => {
     assertTx(await setupListingManager(address));
   });
 
-  it('should be able to create a listing', async () => {
+  it('common listing tests', async () => {
     // Deploy contracts
     await deployContractsIfNotDeployed();
 
@@ -64,33 +65,37 @@ describe('Melos marketplace tests', () => {
     console.log('allowedPaymentTokens: ', allowedPaymentTokens);
     expect(allowedPaymentTokens.length).toBeGreaterThan(0);
 
-    const {address} = await getAccount('alice');
+    const {address: alice} = await getAccount('alice');
 
-    // Setup NFT collection and mint NFT for user
-    assertTx(await setupCollection(address));
-    assertTx(await mint(address));
-    const nfts = assertTx(await getAccountNFTs(address));
+    // Setup NFT collection and mint NFT for alice
+    assertTx(await setupCollection(alice));
+    assertTx(await mint(alice));
+    const nfts = assertTx(await getAccountNFTs(alice));
     expect(nfts.length).toBeGreaterThan(0);
 
-    // Setup listing manager for user
-    assertTx(await setupListingManager(address));
+    // Setup listing manager for alice
+    assertTx(await setupListingManager(alice));
 
     // Create listing with NFT
     const nftId = nfts[0];
     const res = eventFilter<ListingCreated>(
-      assertTx(await createListing(address, nftId, ListingType.Common, {price: 1, listingStartTime: 1})),
+      assertTx(await createListing(alice, nftId, ListingType.Common, {price: 1, listingStartTime: 1})),
       melosMarketplaceIdentifier,
       Events[Events.ListingCreated]
     );
     console.log('ListingCreated events: ', res.filtedEvents);
     expect(res.filtedEvents.length).toBeGreaterThan(0);
 
-    const aliceListingCount = assertTx(await getAccountListingCount(address));
+    const aliceListingCount = assertTx(await getAccountListingCount(alice));
     expect(aliceListingCount).toBeGreaterThan(0);
 
     const listingId = res.filtedEvents[0].listingId;
     const listing = assertTx(await getListingDetails(listingId));
     console.log('listingDetails: ', listing);
+
+    const {address: bob} = await getAccount('bob');
+    const bobBalance = await getFlowBalance(bob);
+    console.log('bobBalance: ', bobBalance);
   });
 
   /* it('should be able to create a listing', async () => {

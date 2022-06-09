@@ -190,3 +190,12 @@ export const getListingDetails = async (listingId: number) => {
     limit,
   });
 };
+
+export const getFlowBalance = async (account: string) => {
+  return executeScript({
+    code: scriptCode('getFlowBalance'),
+    args: [account],
+    addressMap,
+    limit,
+  });
+};
