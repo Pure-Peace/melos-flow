@@ -6,6 +6,7 @@ import {
   prepareEmulator,
   toUFix64,
   eventFilter,
+  getAuthAccountByName,
 } from './utils/helpers';
 import {balanceOf, mint, setupCollection, getAccountNFTs} from './utils/melos-nft';
 import {
@@ -24,15 +25,10 @@ import {
   setupListingManager,
 } from './utils/melos-marketplace';
 import {assert, Console} from 'console';
-import {getAccountAddress} from 'flow-js-testing';
+import {getAccountAddress, mintFlow} from 'flow-js-testing';
 
 // Increase timeout if your tests failing due to timeout
 jest.setTimeout(100000);
-
-const Common = 0;
-const OpenBid = 1;
-const DutchAuction = 2;
-const EnglishAuction = 3;
 
 describe('Melos marketplace tests', () => {
   beforeEach(async () => {
@@ -48,9 +44,9 @@ describe('Melos marketplace tests', () => {
   it('should be able to create an empty ListingManager on alice', async () => {
     // Setup
     await deployContractsIfNotDeployed();
-    const {address} = await getAccount('alice');
+    const alice = await getAuthAccountByName('alice');
 
-    assertTx(await setupListingManager(address));
+    assertTx(await setupListingManager(alice));
   });
 
   it('common listing tests', async () => {
@@ -60,17 +56,18 @@ describe('Melos marketplace tests', () => {
     const melosMarketplaceIdentifier = assertTx(await getContractIdentifier());
 
     // Set allowed payment tokens
-    assertTx(await setAllowedPaymentTokens('emulator-account'));
+    const admin = await getAuthAccountByName('emulator-account');
+    assertTx(await setAllowedPaymentTokens(admin));
     const allowedPaymentTokens = assertTx(await getAllowedPaymentTokens());
     console.log('allowedPaymentTokens: ', allowedPaymentTokens);
     expect(allowedPaymentTokens.length).toBeGreaterThan(0);
 
-    const {address: alice} = await getAccount('alice');
+    const alice = await getAuthAccountByName('alice');
 
     // Setup NFT collection and mint NFT for alice
     assertTx(await setupCollection(alice));
-    assertTx(await mint(alice));
-    const nfts = assertTx(await getAccountNFTs(alice));
+    assertTx(await mint(admin, alice.address));
+    const nfts = assertTx(await getAccountNFTs(alice.address));
     expect(nfts.length).toBeGreaterThan(0);
 
     // Setup listing manager for alice
@@ -79,23 +76,34 @@ describe('Melos marketplace tests', () => {
     // Create listing with NFT
     const nftId = nfts[0];
     const res = eventFilter<ListingCreated>(
-      assertTx(await createListing(alice, nftId, ListingType.Common, {price: 1, listingStartTime: 1})),
+      assertTx(await createListing(alice, nftId, ListingType.Common, {price: 5, listingStartTime: 1})),
       melosMarketplaceIdentifier,
       Events[Events.ListingCreated]
     );
     console.log('ListingCreated events: ', res.filtedEvents);
     expect(res.filtedEvents.length).toBeGreaterThan(0);
 
-    const aliceListingCount = assertTx(await getAccountListingCount(alice));
+    const aliceListingCount = assertTx(await getAccountListingCount(alice.address));
     expect(aliceListingCount).toBeGreaterThan(0);
 
     const listingId = res.filtedEvents[0].listingId;
     const listing = assertTx(await getListingDetails(listingId));
     console.log('listingDetails: ', listing);
 
-    const {address: bob} = await getAccount('bob');
-    const bobBalance = await getFlowBalance(bob);
-    console.log('bobBalance: ', bobBalance);
+    // Mint flow to bob
+    const bob = await getAuthAccountByName('bob');
+    await getAccountAddress('bob'); // Fix flow-jest-test bug
+
+    const expectBalance = 666;
+    await mintFlow(bob.address, expectBalance.toFixed(8));
+    const balanceBob = Number(assertTx(await getFlowBalance(bob.address)));
+
+    console.log('bob flow balance: ', balanceBob);
+    expect(balanceBob).toBeGreaterThanOrEqual(expectBalance);
+
+    // Bob purachase listing
+    const result = assertTx(await purchaseListing(bob, listingId));
+    console.log(result);
   });
 
   /* it('should be able to create a listing', async () => {

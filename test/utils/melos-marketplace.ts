@@ -1,5 +1,6 @@
 import {sendTransaction, executeScript} from 'flow-cadut';
-import {getAuthAccount, scriptCode, toUFix64, txCode} from './helpers';
+import {toFlowAddress} from 'sdk/common';
+import {AuthAccount, getAuthAccountByAddress, scriptCode, toUFix64, txCode} from './helpers';
 
 const limit = 999;
 
@@ -65,20 +66,21 @@ export interface EnglishAuction extends ListingConfig {
  * @param {string} account - account address
  * @throws Will throw an error if transaction is reverted.
  * */
-export const setupListingManager = async (account: string) => {
-  const {auth} = await getAuthAccount(account);
-
-  return sendTransaction({code: txCode('melos-marketplace/setupListingManager'), payer: auth, addressMap, limit});
+export const setupListingManager = async (account: AuthAccount) => {
+  return sendTransaction({
+    code: txCode('melos-marketplace/setupListingManager'),
+    payer: account.auth,
+    addressMap,
+    limit,
+  });
 };
 
 export const createListing = async (
-  seller: string,
+  owner: AuthAccount,
   nftId: number,
   listingType: ListingType,
   cfg: Common | OpenBid | DutchAuction | EnglishAuction
 ) => {
-  const {auth} = await getAuthAccount(seller);
-
   let args: unknown[] = [nftId, toUFix64(cfg.listingStartTime), toUFix64(cfg.listingEndTime)];
   switch (listingType) {
     case ListingType.Common:
@@ -102,63 +104,46 @@ export const createListing = async (
   return sendTransaction({
     code: txCode(`melos-marketplace/listing${ListingType[listingType]}`),
     args,
-    payer: auth,
+    payer: owner.auth,
     addressMap,
     limit,
   });
 };
 
-/**
- * Buys item with id equal to **item** id for **price** from **seller**.
- * @param {string} buyer - buyer account address
- * @param {UInt64} resourceId - resource uuid of item to sell
- * @param {string} seller - seller account address
- * */
-export const purchaseListing = async (buyer: string, resourceId: number, seller: string) => {
-  const {auth} = await getAuthAccount(buyer);
-
-  return sendTransaction({
-    code: txCode('melos-marketplace/purchaseListing'),
-    args: [resourceId, seller],
-    payer: auth,
-    addressMap,
-    limit,
-  });
-};
-
-/**
- * Removes item with id equal to **item** from sale.
- * @param {string} owner - owner address
- * @param {UInt64} itemId - id of item to remove
- * */
-export const removeListing = async (owner: string, itemId: number) => {
-  const {auth} = await getAuthAccount(owner);
-
+export const removeListing = async (listingOwner: AuthAccount, listingId: number) => {
   return sendTransaction({
     code: txCode('melos-marketplace/removeListing'),
-    args: [itemId],
-    payer: auth,
+    args: [listingId],
+    payer: listingOwner.auth,
     addressMap,
     limit,
   });
 };
 
-export const getAccountListingCount = async (account: string) => {
+export const purchaseListing = async (account: AuthAccount, listingId: number) => {
+  return sendTransaction({
+    code: txCode('melos-marketplace/purchaseListing'),
+    args: [listingId],
+    payer: account.auth,
+    addressMap,
+    limit,
+  });
+};
+
+export const getAccountListingCount = async (address: string) => {
   return executeScript({
     code: scriptCode('melos-marketplace/getAccountListingCount'),
-    args: [account],
+    args: [address],
     addressMap,
     limit,
   });
 };
 
-export const setAllowedPaymentTokens = async (account: string) => {
-  const {auth} = await getAuthAccount(account);
-
+export const setAllowedPaymentTokens = async (admin: AuthAccount) => {
   return sendTransaction({
     code: txCode('melos-marketplace/adminSetAllowedPaymentTokens'),
     args: [],
-    payer: auth,
+    payer: admin.auth,
     addressMap,
     limit,
   });
@@ -191,10 +176,10 @@ export const getListingDetails = async (listingId: number) => {
   });
 };
 
-export const getFlowBalance = async (account: string) => {
+export const getFlowBalance = async (address: string) => {
   return executeScript({
     code: scriptCode('getFlowBalance'),
-    args: [account],
+    args: [address],
     addressMap,
     limit,
   });
