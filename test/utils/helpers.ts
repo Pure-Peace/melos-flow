@@ -13,9 +13,11 @@ import {toFlowAddress} from '../../sdk/common';
 import {TxResult} from 'flow-cadut';
 
 export const UFIX64_PRECISION = 8;
+export const MINIMUM_BALANCE = 0.001;
 
 const _fcl: Fcl = fclLib;
-const ALREADY_CHECKED_ACCOUNTS = new Set();
+
+export const EXISTS_ACCOUNTS = new Set();
 
 export const emulator = _emulator;
 
@@ -129,18 +131,18 @@ export async function getAccountByAddress(address: string): Promise<Account> {
 }
 
 export async function createAccountIfNotExists(account: Account) {
-  if (ALREADY_CHECKED_ACCOUNTS.has(account.address)) {
+  if (EXISTS_ACCOUNTS.has(account.address)) {
     return;
   }
   if (account.name) {
     await getAccountAddress(account.name);
   } else {
     const balance = await getFlowBalance(account.address);
-    if (Number(balance) < 0.0001) {
-      await mintFlow(account.address, '0.0001');
+    if (Number(balance) < MINIMUM_BALANCE) {
+      await mintFlow(account.address, MINIMUM_BALANCE.toFixed(8));
     }
   }
-  ALREADY_CHECKED_ACCOUNTS.add(account.address);
+  EXISTS_ACCOUNTS.add(account.address);
 }
 
 export async function getAccount(name: string): Promise<Account> {
