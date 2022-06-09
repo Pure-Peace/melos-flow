@@ -36,8 +36,8 @@ pub fun getOrCreateNFTProvider(account: AuthAccount): Capability<&MelosNFT.Colle
 
 transaction(
   nftId: UInt64,
-  listingStartTime: UFix64,
-  listingEndTime: UFix64?,
+  listingStartTime: UFix64?,
+  listingDuration: UFix64?,
   royaltyPercent: UFix64?,
   minimumPrice: UFix64
 ) {
@@ -48,8 +48,8 @@ transaction(
   let listingManager: &MelosMarketplace.ListingManager
   prepare(account: AuthAccount) {
     self.listingConfig = MelosMarketplace.OpenBid(
-      listingStartTime: listingStartTime,
-      listingEndTime: listingEndTime,
+      listingStartTime: listingStartTime ?? getCurrentBlock().timestamp,
+      listingDuration: listingDuration,
       royaltyPercent: royaltyPercent,
       minimumPrice: minimumPrice
     )

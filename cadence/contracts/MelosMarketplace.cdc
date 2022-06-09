@@ -335,12 +335,15 @@ pub contract MelosMarketplace {
 
     init (
       listingStartTime: UFix64, 
-      listingEndTime: UFix64?, 
+      listingDuration: UFix64?, 
       royaltyPercent: UFix64?, 
       price: UFix64
       ) {
-      if listingEndTime != nil {
+      var listingEndTime: UFix64? = nil
+      if let dur = listingDuration {
+        listingEndTime = listingStartTime + dur
         assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
+        assert(listingEndTime! > getCurrentBlock().timestamp, message: "Listing end time should be greater than current block time")
         assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
       }
       self.listingStartTime = listingStartTime
@@ -364,12 +367,15 @@ pub contract MelosMarketplace {
 
     init (
       listingStartTime: UFix64, 
-      listingEndTime: UFix64?, 
+      listingDuration: UFix64?, 
       royaltyPercent: UFix64?, 
       minimumPrice: UFix64
     ) {
-      if listingEndTime != nil {
+      var listingEndTime: UFix64? = nil
+      if let dur = listingDuration {
+        listingEndTime = listingStartTime + dur
         assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
+        assert(listingEndTime! > getCurrentBlock().timestamp, message: "Listing end time should be greater than current block time")
         assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
       }
       self.listingStartTime = listingStartTime
@@ -395,17 +401,23 @@ pub contract MelosMarketplace {
 
     init (
       listingStartTime: UFix64, 
-      listingEndTime: UFix64?, 
+      listingDuration: UFix64?, 
       royaltyPercent: UFix64?,
       startingPrice: UFix64, 
       reservePrice: UFix64, 
       priceCutInterval: UFix64
     ) {
+      var listingEndTime: UFix64? = nil
+      if let dur = listingDuration {
+        listingEndTime = listingStartTime + dur
+      }
+
       assert(startingPrice >= reservePrice, message: "Starting price must be greater than or equal with reserve price")
       assert(listingEndTime != nil, message: "Dutch auction listingEndTime must not null")
       assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
+      assert(listingEndTime! > getCurrentBlock().timestamp, message: "Listing end time should be greater than current block time")
       assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
-      assert(priceCutInterval < (listingStartTime - listingEndTime!), message: "Dutch auction priceCutInterval must be less than listing duration")
+      assert(priceCutInterval < (listingEndTime! - listingStartTime), message: "Dutch auction priceCutInterval must be less than listing duration")
 
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingEndTime
@@ -418,12 +430,15 @@ pub contract MelosMarketplace {
 
     pub fun getPrice(): UFix64 {
       let duration = getCurrentBlock().timestamp - self.listingStartTime
+      if duration < self.priceCutInterval {
+        return self.startingPrice
+      }
 
       let diff = self.startingPrice - self.reservePrice
       let deduct = (duration - duration % self.priceCutInterval)
          * diff / (self.listingEndTime! - self.listingStartTime - self.priceCutInterval)
       
-      return deduct > diff ? self.reservePrice : self.reservePrice - deduct
+      return deduct > diff ? self.reservePrice : self.startingPrice - deduct
     }
   }
 
@@ -441,16 +456,23 @@ pub contract MelosMarketplace {
 
     init (
       listingStartTime: UFix64, 
-      listingEndTime: UFix64?, 
+      listingDuration: UFix64?, 
       royaltyPercent: UFix64?,
       reservePrice: UFix64,
       minimumBidPercentage: UFix64,
       basePrice: UFix64
     ) {
+      var listingEndTime: UFix64? = nil
+      if let dur = listingDuration {
+        listingEndTime = listingStartTime + dur
+      }
+
       assert(reservePrice >= basePrice, message: "Reserve price must be greater than or equal with base price")
       assert(listingEndTime != nil, message: "English auction listingEndTime must not null")
       assert(listingEndTime! > listingStartTime, message: "Listing end time must be greater than listing start")
+      assert(listingEndTime! > getCurrentBlock().timestamp, message: "Listing end time should be greater than current block time")
       assert((listingEndTime! - listingStartTime) > MelosMarketplace.minimumListingDuration ?? 0.0, message: "Listing duration must be greater than minimum listing duration")
+
       if let maxAuctionDuration = MelosMarketplace.maxAuctionDuration {
         assert((listingEndTime! - listingStartTime) <= maxAuctionDuration, message: "Auction duration must be less than max auction duration")
       }
@@ -853,7 +875,7 @@ pub contract MelosMarketplace {
 
     pub fun isListingEnded(): Bool {
       if let endTime = self.config().listingEndTime {
-        return getCurrentBlock().timestamp < endTime
+        return getCurrentBlock().timestamp >= endTime
       }
       return false
     }
