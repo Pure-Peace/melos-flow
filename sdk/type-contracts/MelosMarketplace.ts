@@ -19,6 +19,24 @@ export type ListingTxFeeCuttedEvent = {
   royalty?: UFix64;
 };
 
+export type OfferCreatedEvent = {
+  offerId: number;
+  nftId: number;
+  offerer: FlowAddress;
+  price: UFix64;
+  royaltyPercent: UFix64;
+};
+
+export type OfferAcceptedEvent = {
+  offerId: number;
+  acceptor: FlowAddress;
+};
+
+export type OfferRemovedEvent = {
+  offerId: number;
+  completed: boolean;
+};
+
 export type FixedPricesListingCompletedEvent = {
   listingId: number;
   payment: UFix64;
@@ -130,4 +148,9 @@ export type MarketplaceEvents =
   | 'BidListingCompleted'
   | 'ListingCreated'
   | 'ListingRemoved'
-  | 'FixedPricesListingCompleted';
+  | 'FixedPricesListingCompleted'
+  | 'OfferCreated'
+  | 'OfferAccepted'
+  | 'OfferRemoved'
+  | 'UnRefundPaymentCreated'
+  | 'UnRefundPaymentClaimed';

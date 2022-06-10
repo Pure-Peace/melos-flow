@@ -27,6 +27,10 @@ import {
   getListingTopBid,
   getListingEnded,
   publicCompleteEnglishAuction,
+  createOffer,
+  acceptOffer,
+  getUnRefundPaymentsCount,
+  getOffer,
 } from '../sdk/contracts-sdk/melos-marketplace';
 import {
   ListingCreatedEvent,
@@ -36,6 +40,8 @@ import {
   BidCreatedEvent,
   FixedPricesListingCompletedEvent,
   BidListingCompletedEvent,
+  OfferCreatedEvent,
+  OfferAcceptedEvent,
 } from '../sdk/type-contracts/MelosMarketplace';
 import {MelosNFTMintedEvent, MelosNFTEvents} from '../sdk/type-contracts/MelosNFT';
 import {getFlowBalance} from '../sdk/contracts-sdk/core';
@@ -182,6 +188,28 @@ const handleCreateBid = async (
   const bidId = bidCreatedEvents[0].bidId;
 
   return {bidId, bidResult, bidCreatedEvents};
+};
+
+const handleCreateOffer = async (
+  offerer: AuthAccount,
+  nftId: number,
+  melosMarketplaceIdentifier: string,
+  offerDuration: number,
+  offerPrice: number
+) => {
+  const offerCreateResult = assertTx(await createOffer(offerer, nftId, offerDuration, offerPrice));
+  const offerCreateEvents = eventFilter<OfferCreatedEvent, MarketplaceEvents>(
+    offerCreateResult,
+    melosMarketplaceIdentifier,
+    'OfferCreated'
+  );
+  console.log('offerCreateEvents: ', offerCreateEvents);
+  expect(offerCreateEvents.length).toBeGreaterThan(0);
+
+  const {offerId} = offerCreateEvents[0];
+  const offer = assertTx(await getOffer(offerId));
+
+  return {offerCreateEvents, offerCreateResult, offerId, offer};
 };
 
 describe('Melos marketplace tests', () => {
@@ -470,6 +498,7 @@ describe('Melos marketplace tests', () => {
 
     // Alex bid listing (should be top)
     const {user: alex} = await setupUser('alex');
+    const alexBeforeBalance = assertTx(await getFlowBalance(alex.address));
     const bidPriceAlex = bidPriceBob * 2;
     const alexBid = await handleCreateBid(alex, listingId, bidPriceAlex, melosMarketplaceIdentifier);
     expect(Number(alexBid.bidCreatedEvents[0].offerPrice)).toEqual(bidPriceAlex);
@@ -509,10 +538,58 @@ describe('Melos marketplace tests', () => {
     expect(assertTx(await getAccountHasNFT(alex.address, nft))).toEqual(true);
 
     // Check balances
-    await purachasedBalanceCheck(aliceBeforeBalance, bobBalanceBeforeBid, alice, alex);
+    await purachasedBalanceCheck(aliceBeforeBalance, alexBeforeBalance, alice, alex);
 
     // Bob not win, so he will get refund
     const bobBalance = assertTx(await getFlowBalance(bob.address));
     expect(bobBalance).toEqual(bobBalanceBeforeBid);
+  });
+
+  it('OfferAccept tests: Create offer and accept', async () => {
+    // Deploy contracts
+    await deployContractsIfNotDeployed();
+
+    const {melosMarketplaceIdentifier} = await initializeMarketplace();
+
+    // Setup NFT owner and mint NFT
+    const {user: alice, nft} = await setupSeller('alice');
+    const aliceBeforeBalance = assertTx(await getFlowBalance(alice.address));
+
+    // Bob create offer
+    const {user: bob} = await setupUser('bob');
+    const offerPriceBob = 5;
+    const bobOffer = await handleCreateOffer(bob, nft, melosMarketplaceIdentifier, 300, offerPriceBob);
+
+    console.log('bobOffer: ', bobOffer.offer);
+
+    // Alex create offer
+    const {user: alex} = await setupUser('alex');
+    const alexBalanceBefore = assertTx(await getFlowBalance(alex.address));
+    const offerPriceAlex = 5;
+    const alexOffer = await handleCreateOffer(alex, nft, melosMarketplaceIdentifier, 300, offerPriceAlex);
+
+    // Alice accept alex's offer
+    const offerAcceptedResult = assertTx(await acceptOffer(alice, alexOffer.offerId));
+    const offerAcceptedEvents = eventFilter<OfferAcceptedEvent, MarketplaceEvents>(
+      offerAcceptedResult,
+      melosMarketplaceIdentifier,
+      'OfferAccepted'
+    );
+    console.log('offerAcceptedResult: ', offerAcceptedResult);
+
+    // Alex will win
+    expect(offerAcceptedEvents[0].offerId).toEqual(alexOffer.offerId);
+
+    // Check NFT ownership
+    expect(assertTx(await getAccountHasNFT(alice.address, nft))).toEqual(false);
+    expect(assertTx(await getAccountHasNFT(bob.address, nft))).toEqual(false);
+    expect(assertTx(await getAccountHasNFT(alex.address, nft))).toEqual(true);
+
+    // Check balances
+    await purachasedBalanceCheck(aliceBeforeBalance, alexBalanceBefore, alice, alex);
+
+    // Check balance
+    const unRefundPaymentsCount = assertTx(await getUnRefundPaymentsCount());
+    expect(unRefundPaymentsCount).toEqual(0);
   });
 });

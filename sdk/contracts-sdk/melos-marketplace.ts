@@ -261,3 +261,68 @@ export async function getListingIsType(listingId: number, listingType: ListingTy
     limit,
   });
 }
+
+export async function getUnRefundPaymentsCount() {
+  return executeScript<number>({
+    code: scriptCode('melos-marketplace/getUnRefundPaymentsCount'),
+    args: [],
+    addressMap,
+    limit,
+  });
+}
+
+export async function getOffer(offerId: number) {
+  return executeScript<any>({
+    code: scriptCode('melos-marketplace/getOffer'),
+    args: [offerId],
+    addressMap,
+    limit,
+  });
+}
+
+export async function createOffer(
+  account: AuthAccount,
+  nftId: number,
+  offerDuration: number,
+  offerPrice: number,
+  offerStartTime?: number,
+  royaltyPercent?: number
+) {
+  return sendTransaction({
+    code: txCode('melos-marketplace/createOffer'),
+    args: [nftId, toUFix64(offerDuration), toUFix64(offerPrice), toUFix64(royaltyPercent), toUFix64(offerStartTime)],
+    payer: account.auth,
+    addressMap,
+    limit,
+  });
+}
+
+export async function acceptOffer(account: AuthAccount, offerId: number) {
+  return sendTransaction({
+    code: txCode('melos-marketplace/acceptOffer'),
+    args: [offerId],
+    payer: account.auth,
+    addressMap,
+    limit,
+  });
+}
+
+export async function removeOffer(account: AuthAccount, offerId: number) {
+  return sendTransaction({
+    code: txCode('melos-marketplace/removeOffer'),
+    args: [offerId],
+    payer: account.auth,
+    addressMap,
+    limit,
+  });
+}
+
+export async function publicRemoveEndedOffer(account: AuthAccount, offerId: number) {
+  return sendTransaction({
+    code: txCode('melos-marketplace/publicRemoveEndedOffer'),
+    args: [offerId],
+    payer: account.auth,
+    addressMap,
+    limit,
+  });
+}
