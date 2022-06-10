@@ -139,6 +139,7 @@ export type ListingDetailsQuery = {
     isPurchased: boolean;
   };
   price: UFix64;
+  nextBidMiniumPrice?: UFix64;
   isNFTAvaliable: boolean;
   isListingStarted: boolean;
   isListingEnded: boolean;

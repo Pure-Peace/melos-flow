@@ -3,6 +3,7 @@ import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 pub struct Listing {
   pub let details: MelosMarketplace.ListingDetails
   pub let price: UFix64
+  pub let nextBidMiniumPrice: UFix64?
   pub let isNFTAvaliable: Bool
   pub let isListingStarted: Bool
   pub let isListingEnded: Bool
@@ -13,6 +14,11 @@ pub struct Listing {
   ) {
     self.details = listing.getDetails()
     self.price = listing.getPrice()
+    if listing.isListingType(MelosMarketplace.ListingType.EnglishAuction) {
+      self.nextBidMiniumPrice = (self.details.listingConfig as! MelosMarketplace.EnglishAuction).getNextBidMinimumPrice()
+    } else {
+      self.nextBidMiniumPrice = nil
+    }
 
     self.isNFTAvaliable = listing.isNFTAvaliable()
     self.isListingStarted = listing.isListingStarted()
