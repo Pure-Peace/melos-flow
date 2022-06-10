@@ -56,6 +56,7 @@ pub contract MelosMarketplace {
   access(self) let listings: @{UInt64: Listing}
   access(self) var allowedPaymentTokens: [Type]
   access(self) let feeConfigs: {String: FungibleTokenFeeConfig}
+  access(self) let unRefundPayments: @{UInt64: UnRefundPayment}
   access(self) let unReturnedBids: @{UInt64: UnReturnedBid}
 
   // -----------------------------------------------------------------------
@@ -107,8 +108,10 @@ pub contract MelosMarketplace {
   pub event ListingRemoved(listingId: UInt64, purchased: Bool)
   pub event FixedPricesListingCompleted(listingId: UInt64, payment: UFix64, buyer: Address)
 
-  pub event UnReturnedBidCreated(bidManagerId: UInt64, balance: UFix64)
-  pub event UnReturnedBidClaimed(bidManagerId: UInt64)
+  // UnrefundPayment events
+  pub event UnRefundPaymentCreated(type: Type, managerId: UInt64, balance: UFix64)
+  pub event UnRefundPaymentClaimed(type: Type, managerId: UInt64)
+
 
   // -----------------------------------------------------------------------
   // Contract Initilization
@@ -121,7 +124,8 @@ pub contract MelosMarketplace {
     self.listings <- {}
     self.allowedPaymentTokens = []
     self.feeConfigs = {}
-    self.unReturnedBids <- {}
+    self.unRefundPayments <- {}
+    self.offers <- {}
 
     self.AdminStoragePath = /storage/MelosSettlementAdmin
     self.ListingManagerPublicPath = /public/MelosMarketplace
@@ -215,7 +219,7 @@ pub contract MelosMarketplace {
     }
     return MelosMarketplace.fastSort(left, fn: fn).concat([p]).concat(MelosMarketplace.fastSort(right, fn: fn))
   }
-
+  
   // Check if the type of the listing matches
   pub fun checkListingConfig(_ listingType: ListingType, _ listingConfig: {MelosMarketplace.ListingConfig}) {
     var cfg: {MelosMarketplace.ListingConfig}? = nil
@@ -236,14 +240,14 @@ pub contract MelosMarketplace {
     assert(cfg != nil, message: "Invalid listing config")
   }
 
-  pub fun claimUnReturnedBid(
+  pub fun claimUnRefundBid(
     bidId: UInt64, 
     bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>, 
     refund: Capability<&{FungibleToken.Receiver}>
   ) {
-    if let unReturnedBid <- MelosMarketplace.unReturnedBids.remove(key: bidId) {
-      unReturnedBid.claim(bidManager: bidManager, refund: refund)
-      destroy unReturnedBid
+    if let unRefundBid <- MelosMarketplace.unRefundPayments.remove(key: bidId) {
+      unRefundBid.claim(managerId: bidManager.borrow()!.uuid, refund: refund)
+      destroy unRefundBid
     } else {
       panic("Not exists")
     }
@@ -583,8 +587,8 @@ pub contract MelosMarketplace {
         if let refund = self.refund.borrow() {
           refund.deposit(from: <- self.payment)
         } else {
-          let _ <- MelosMarketplace.unReturnedBids[self.uuid] <- create UnReturnedBid(
-            payment: <- self.payment, bidManagerId: self.bidManagerId
+          let _ <- MelosMarketplace.unRefundPayments[self.uuid] <- create UnRefundPayment(
+            payment: <- self.payment, managerId: self.bidManagerId, type: self.getType()
           )
           destroy _
         } 
@@ -592,6 +596,7 @@ pub contract MelosMarketplace {
         destroy self.payment
       }
       self.bidManager.borrow()?.removeBid(listingId: self.listingId, bidId: self.uuid)
+      emit BidRemoved(listingId: self.listingId, bidId: self.uuid)
     }
   }
 
@@ -1140,7 +1145,6 @@ pub contract MelosMarketplace {
         self.englishAuctionParticipant.remove(key: removeBid.bidder)
       }
 
-      emit BidRemoved(listingId: self.uuid, bidId: removeBidId)
       destroy removeBid
 
       return true
@@ -1293,25 +1297,27 @@ pub contract MelosMarketplace {
     }
   }
 
-  pub resource UnReturnedBid  {
+  pub resource UnRefundPayment  {
     access(self) var payment: @FungibleToken.Vault?
-    pub let bidManagerId: UInt64
+    pub let managerId: UInt64
+    pub let type: Type
 
-    init(payment: @FungibleToken.Vault, bidManagerId: UInt64) {
+    init(payment: @FungibleToken.Vault, managerId: UInt64, type: Type) {
       let balance = payment.balance
       self.payment <- payment
-      self.bidManagerId = bidManagerId
+      self.managerId = managerId
+      self.type = type
 
-      emit UnReturnedBidCreated(bidManagerId: bidManagerId, balance: balance)
+      emit UnRefundPaymentCreated(type: type, managerId: managerId, balance: balance)
     }
 
-    access(contract) fun claim(bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>, refund: Capability<&{FungibleToken.Receiver}>) {
-      assert(bidManager.borrow()!.uuid == self.bidManagerId, message: "Invalid ownership")
+    access(contract) fun claim(managerId: UInt64, refund: Capability<&{FungibleToken.Receiver}>) {
+      assert(managerId == self.managerId, message: "Invalid ownership")
       let payment <- self.payment <- nil
       assert(payment != nil, message: "Already claimed")
       refund.borrow()!.deposit(from: <- payment!)
 
-      emit UnReturnedBidClaimed(bidManagerId: self.bidManagerId)
+      emit UnRefundPaymentClaimed(type: self.type, managerId: self.managerId)
     }
 
     destroy() {
