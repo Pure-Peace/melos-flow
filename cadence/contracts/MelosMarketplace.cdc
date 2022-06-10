@@ -225,6 +225,10 @@ pub contract MelosMarketplace {
     return self.allowedPaymentTokens
   }
 
+  pub fun getUnRefundPaymentsCount(): Int {
+    return MelosMarketplace.unRefundPayments.length
+  }
+
   // Check if the token is allowed
   pub fun isTokenAllowed(_ token: Type): Bool {
     return self.allowedPaymentTokens.contains(token)
