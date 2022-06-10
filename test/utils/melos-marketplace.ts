@@ -96,6 +96,25 @@ export type ListingRemovedEvent = {
   purchased: boolean;
 };
 
+export type BidCreatedEvent = {
+  listingId: number;
+  bidId: number;
+  bidder: FlowAddress;
+  offerPrice: UFix64;
+};
+
+export type BidRemovedEvent = {
+  listingId: number;
+  bidId: number;
+};
+
+export type BidListingCompletedEvent = {
+  listingId: number;
+  winnerBid: number;
+  bidder: FlowAddress;
+  price: UFix64;
+};
+
 export type ListingDetailsQuery = {
   details: {
     listingType: number;
@@ -324,7 +343,7 @@ export async function getListingPurachased(listingId: number) {
 }
 
 export async function getListingPrice(listingId: number) {
-  return executeScript<string>({
+  return executeScript<UFix64>({
     code: scriptCode('melos-marketplace/getListingPrice'),
     args: [listingId],
     addressMap,
@@ -332,11 +351,40 @@ export async function getListingPrice(listingId: number) {
   });
 }
 
-export async function createBid(admin: AuthAccount) {
+export async function createBid(buyer: AuthAccount, listingId: number, price: number) {
   return sendTransaction({
-    code: txCode('melos-marketplace/adminSetAllowedPaymentTokens'),
-    args: [],
-    payer: admin.auth,
+    code: txCode('melos-marketplace/createBid'),
+    args: [listingId, toUFix64(price)],
+    payer: buyer.auth,
+    addressMap,
+    limit,
+  });
+}
+
+export async function removeBid(bidder: AuthAccount, listingId: number, bidId: number) {
+  return sendTransaction({
+    code: txCode('melos-marketplace/removeBid'),
+    args: [listingId, bidId],
+    payer: bidder.auth,
+    addressMap,
+    limit,
+  });
+}
+
+export async function getListingSortedBids(listingId: number) {
+  return executeScript<any[]>({
+    code: scriptCode('melos-marketplace/getListingSortedBids'),
+    args: [listingId],
+    addressMap,
+    limit,
+  });
+}
+
+export async function acceptOpenBid(seller: AuthAccount, listingId: number, bidId: number) {
+  return sendTransaction({
+    code: txCode('melos-marketplace/acceptOpenBid'),
+    args: [listingId, bidId],
+    payer: seller.auth,
     addressMap,
     limit,
   });
