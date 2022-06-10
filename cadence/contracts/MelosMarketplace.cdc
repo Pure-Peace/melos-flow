@@ -348,6 +348,26 @@ pub contract MelosMarketplace {
     return <- payment
   }
 
+  access(contract) fun tryRefunds(
+    refund: Capability<&{FungibleToken.Receiver}>,
+    resourceId: UInt64,
+    managerId: UInt64,
+    payment: @FungibleToken.Vault
+  ) {
+    if payment.balance > 0.0 {
+      if let refund = refund.borrow() {
+        refund.deposit(from: <- payment)
+      } else {
+        let _ <- MelosMarketplace.unRefundPayments[resourceId] <- create UnRefundPayment(
+          payment: <- payment, managerId: managerId, type: self.getType()
+        )
+        destroy _
+      } 
+    } else {
+      destroy payment
+    }
+  }
+
   pub fun createListingManager(): @ListingManager {
     return <-create ListingManager()
   }
@@ -663,18 +683,12 @@ pub contract MelosMarketplace {
     }
 
     destroy() {
-      if self.payment.balance > 0.0 {
-        if let refund = self.refund.borrow() {
-          refund.deposit(from: <- self.payment)
-        } else {
-          let _ <- MelosMarketplace.unRefundPayments[self.uuid] <- create UnRefundPayment(
-            payment: <- self.payment, managerId: self.bidManagerId, type: self.getType()
-          )
-          destroy _
-        } 
-      } else {
-        destroy self.payment
-      }
+      MelosMarketplace.tryRefunds(
+        refund: self.refund, 
+        resourceId: self.uuid, 
+        managerId: self.bidManagerId, 
+        payment: <- self.payment
+      )
       self.bidManager.borrow()?.removeBid(listingId: self.listingId, bidId: self.uuid)
       emit BidRemoved(listingId: self.listingId, bidId: self.uuid)
     }
@@ -1354,6 +1368,11 @@ pub contract MelosMarketplace {
     }
   }
 
+  // -----------------------------------------------------------------------
+  // UnRefundPayment resource
+  // -----------------------------------------------------------------------
+
+
   pub resource UnRefundPayment  {
     access(self) var payment: @FungibleToken.Vault?
     pub let managerId: UInt64
@@ -1481,6 +1500,10 @@ pub contract MelosMarketplace {
     }
   }
 
+  // -----------------------------------------------------------------------
+  // Offer resource
+  // -----------------------------------------------------------------------
+
   pub resource Offer {
     pub let nftId: UInt64
     pub let nftType: Type
@@ -1587,18 +1610,12 @@ pub contract MelosMarketplace {
     }
 
     destroy () {
-      if self.payment.balance > 0.0 {
-        if let refund = self.refund.borrow() {
-          refund.deposit(from: <- self.payment)
-        } else {
-          let _ <- MelosMarketplace.unRefundPayments[self.uuid] <- create UnRefundPayment(
-            payment: <- self.payment, managerId: self.offerManagerId, type: self.getType()
-          )
-          destroy _
-        } 
-      } else {
-        destroy self.payment
-      }
+      MelosMarketplace.tryRefunds(
+        refund: self.refund, 
+        resourceId: self.uuid, 
+        managerId: self.offerManagerId, 
+        payment: <- self.payment
+      )
       self.offerManager.borrow()?.removeOfferInner(self.uuid)
       emit OfferRemoved(offerId: self.uuid, completed: self.isCompleted())
     }
