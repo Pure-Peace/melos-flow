@@ -57,7 +57,7 @@ pub contract MelosMarketplace {
   access(self) var allowedPaymentTokens: [Type]
   access(self) let feeConfigs: {String: FungibleTokenFeeConfig}
   access(self) let unRefundPayments: @{UInt64: UnRefundPayment}
-  access(self) let unReturnedBids: @{UInt64: UnReturnedBid}
+  access(self) let offers: @{UInt64: Offer}
 
   // -----------------------------------------------------------------------
   // Events
@@ -112,6 +112,10 @@ pub contract MelosMarketplace {
   pub event UnRefundPaymentCreated(type: Type, managerId: UInt64, balance: UFix64)
   pub event UnRefundPaymentClaimed(type: Type, managerId: UInt64)
 
+  // Offer events
+  pub event OfferCreated(offerId: UInt64, nftId: UInt64, offerer: Address, price: UFix64)
+  pub event OfferAccepted(offerId: UInt64, acceptor: Address)
+  pub event OfferRemoved(offerId: UInt64, completed: Bool)
 
   // -----------------------------------------------------------------------
   // Contract Initilization
@@ -167,6 +171,15 @@ pub contract MelosMarketplace {
       return nil
     } else {
       return &self.listings[listingId] as &Listing?
+    }
+  }
+
+  // Get the offer reference
+  pub fun getOffer(_ offerId: UInt64): &Offer? {
+    if self.offers[offerId] == nil {
+      return nil
+    } else {
+      return &self.offers[offerId] as &Offer?
     }
   }
 
@@ -266,6 +279,17 @@ pub contract MelosMarketplace {
         || !listingRef.isNFTAvaliable()
         || listingRef.isListingEnded()) {
       destroy MelosMarketplace.listings.remove(key: listingId)
+      return true
+    }
+
+    return false
+  }
+
+  // Allow anyone to remove offers that has completed
+  pub fun removeOffer(offerId: UInt64): Bool {
+    let offerRef = MelosMarketplace.getOffer(offerId) ?? panic("Offer not exists")
+    if offerRef.isCompleted() {
+      destroy MelosMarketplace.offers.remove(key: offerId)
       return true
     }
 
@@ -1325,6 +1349,183 @@ pub contract MelosMarketplace {
         panic("Unclaimed, could not destroy")
       }
       destroy self.payment
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // OfferManager resources
+  // -----------------------------------------------------------------------
+
+  pub resource interface OfferManagerPublic {
+    pub fun getOffers(): [UInt64]
+    pub fun isOfferExists(_ offerId: UInt64): Bool
+    pub fun findOfferIndex(_ offerId: UInt64): Int?
+
+    access(contract) fun recordOffer(_ offerId: UInt64): Bool
+    access(contract) fun removeOfferInner(_ offerId: UInt64): Bool
+  }
+
+  pub resource OfferManager: OfferManagerPublic {
+    access(self) let offers: [UInt64]
+
+    init () {
+      self.offers = []
+    }
+
+    pub fun getOffers(): [UInt64] {
+      return self.offers
+    }
+
+    pub fun isOfferExists(_ offerId: UInt64): Bool {
+      return self.offers.contains(offerId)
+    }
+
+    pub fun findOfferIndex(_ offerId: UInt64): Int? {
+      for index, id in self.offers {
+        if id == offerId {
+          return index
+        }
+      }
+      return nil
+    }
+
+    pub fun removeOffer(offerId: UInt64) {
+      assert(self.isOfferExists(offerId), message: "Offer not created by this manager")
+      let offer <- MelosMarketplace.offers.remove(key: offerId)!
+      assert(offer.offerManagerId == self.uuid, message: "")
+      destroy offer
+      self.removeOfferInner(offerId)
+    }
+
+    access(contract) fun recordOffer(_ offerId: UInt64): Bool {
+      if self.offers.contains(offerId) {
+        return false
+      } 
+      self.offers.append(offerId)
+      return true
+    }
+
+    access(contract) fun removeOfferInner(_ offerId: UInt64): Bool {
+      if let index = self.findOfferIndex(offerId) {
+        self.offers.remove(at: index)
+        return true
+      }
+
+      return false
+    }
+
+    destroy() {
+      assert(self.offers.length == 0, message: "Still offers exists")
+    }
+  }
+
+  pub resource Offer {
+    pub let nftId: UInt64
+    pub let nftType: Type
+    pub let nftResourceUUID: UInt64
+    pub let listingStartTime: UFix64
+    pub let listingEndTime: UFix64
+
+    access(contract) let payment: @FungibleToken.Vault
+    access(contract) let rewardCollection: Capability<&{NonFungibleToken.Receiver}>
+    access(contract) let refund: Capability<&{FungibleToken.Receiver}>
+    access(contract) let offerManager: Capability<&{MelosMarketplace.OfferManagerPublic}>
+
+    pub let offerer: Address
+    pub let offerManagerId: UInt64
+    access(self) var completed: Bool
+
+    init (
+      nftId: UInt64,
+      nftType: Type,
+      nftResourceUUID: UInt64,
+      listingStartTime: UFix64,
+      listingDuration: UFix64,
+      payment: @FungibleToken.Vault,
+      rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
+      refund: Capability<&{FungibleToken.Receiver}>,
+      offerManager: Capability<&{MelosMarketplace.OfferManagerPublic}>
+    ) {
+      assert(offerManager.check(), message: "Invalid offerManager")
+      assert(rewardCollection.check(), message: "Invalid NFT reward collection")
+      assert(refund.check(), message: "Invalid refund capability")
+
+      self.offerManager = offerManager
+      let offerManagerRef = self.offerManager.borrow()!
+      offerManagerRef.recordOffer(self.uuid)
+
+      self.nftId = nftId
+      self.nftType = nftType
+      self.nftResourceUUID = nftResourceUUID
+      self.listingStartTime = listingStartTime
+      self.listingEndTime = listingStartTime + listingDuration
+
+      self.payment <- payment
+      self.rewardCollection = rewardCollection
+      self.refund = refund
+
+      self.offerer = refund.address
+      self.offerManagerId = offerManagerRef.uuid
+      self.completed = false
+
+      emit OfferCreated(offerId: self.uuid, nftId: nftId, offerer: self.offerer, price: self.payment.balance)
+    }
+
+    pub fun isCompleted(): Bool {
+      return self.completed
+    }
+
+    pub fun isEnded(): Bool {
+      return getCurrentBlock().timestamp >= self.listingEndTime
+    }
+
+    pub fun isValid(): Bool {
+      if self.rewardCollection.borrow() != nil {
+        return true
+      }
+      return false
+    }
+
+    pub fun acceptOffer(
+      nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>,
+      reward: Capability<&{FungibleToken.Receiver}>
+    ) {
+      assert(!self.isEnded(), message: "Offer is already ended")
+      assert(!self.completed, message: "Offer is already completed")
+
+      let collection = nftProvider.borrow() ?? panic("Cannot borrow NFT collection")
+      let nftRef = collection.borrowNFT(id: self.nftId)
+      assert(nftRef.id == self.nftId, message: "Invalid NFT id")
+      assert(nftRef.uuid == self.nftResourceUUID, message: "Invalid NFT resource UUID")
+      assert(nftRef.getType() == self.nftType, message: "Invalid NFT type")
+      assert(reward.check(), message: "Invalid reward receiver")
+
+      self.completed = true
+
+      let price = self.payment.balance
+      reward.borrow()!.deposit(from: <- self.payment.withdraw(amount: self.payment.balance))
+
+      let rewardCollection = self.rewardCollection.borrow() ?? panic("Could not get NFT receiver")
+      rewardCollection.deposit(token: <- collection.withdraw(withdrawID: self.nftId))
+
+      emit OfferAccepted(offerId: self.uuid, acceptor: nftProvider.address)
+    }
+
+    destroy () {
+      if self.payment.balance > 0.0 {
+        if let refund = self.refund.borrow() {
+          refund.deposit(from: <- self.payment)
+        } else {
+          let _ <- MelosMarketplace.unRefundPayments[self.uuid] <- create UnRefundPayment(
+            payment: <- self.payment, managerId: self.offerManagerId, type: self.getType()
+          )
+          destroy _
+        } 
+      } else {
+        destroy self.payment
+      }
+      self.offerManager.borrow()?.removeOfferInner(self.uuid)
+      emit OfferRemoved(offerId: self.uuid, completed: self.isCompleted())
     }
   }
 }
