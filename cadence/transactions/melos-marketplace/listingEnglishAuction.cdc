@@ -56,7 +56,7 @@ transaction(
       royaltyPercent: royaltyPercent,
       reservePrice: reservePrice,
       minimumBidPercentage: minimumBidPercentage,
-      basePrice: minimumBidPercentage
+      basePrice: basePrice
     )
 
     self.receiver = account.getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
