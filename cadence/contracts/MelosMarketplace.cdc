@@ -81,7 +81,8 @@ pub contract MelosMarketplace {
     txFeePercent: UFix64,
     royaltyReceiver: Address 
   )
-  pub event TxFeeCutted(listingId: UInt64, txFee: UFix64?, royalty: UFix64?)
+  pub event ListingTxFeeCutted(listingId: UInt64, txFee: UFix64?, royalty: UFix64?)
+  pub event OfferAcceptFeeCutted(offerId: UInt64, txFee: UFix64?, royalty: UFix64?)
   pub event FungibleTokenFeeRemoved(token: String)
 
   // Contract config events
@@ -116,7 +117,7 @@ pub contract MelosMarketplace {
   pub event UnRefundPaymentClaimed(type: Type, managerId: UInt64)
 
   // Offer events
-  pub event OfferCreated(offerId: UInt64, nftId: UInt64, offerer: Address, price: UFix64)
+  pub event OfferCreated(offerId: UInt64, nftId: UInt64, offerer: Address, price: UFix64, royaltyPercent: UFix64?)
   pub event OfferAccepted(offerId: UInt64, acceptor: Address)
   pub event OfferRemoved(offerId: UInt64, completed: Bool)
 
@@ -307,6 +308,40 @@ pub contract MelosMarketplace {
     }
 
     return false
+  }
+
+  access(contract) fun deductFees(
+    payment: @FungibleToken.Vault, 
+    royaltyPercent: UFix64?, 
+    eventEmitFunction: ((UFix64?, UFix64?): Void)
+  ): @FungibleToken.Vault {
+    var txFee: UFix64? = nil
+    var royalty: UFix64? = nil
+    // Deducting platform fees
+    if let feeConfig = MelosMarketplace.getFeeConfigByTokenType(tokenType: payment.getType()) {
+      if let txFeeReceiver = feeConfig.txFeeReceiver.borrow() {
+        txFee = payment.balance * feeConfig.txFeePercent
+        txFeeReceiver.deposit(
+          from: <- payment.withdraw(
+            amount: txFee!
+          )
+        )
+      }
+      if let royaltyReceiver = feeConfig.royaltyReceiver.borrow() {
+        if let perc = royaltyPercent {
+          royalty = payment.balance * perc
+          royaltyReceiver.deposit(
+            from: <- payment.withdraw(
+              amount: royalty!
+            )
+          )
+        }
+      }
+    }
+    if txFee != nil || royalty != nil {
+      eventEmitFunction(txFee, royalty)
+    }
+    return <- payment
   }
 
   pub fun createListingManager(): @ListingManager {
@@ -995,43 +1030,20 @@ pub contract MelosMarketplace {
       return <- self.nftProvider.borrow()!.withdraw(withdrawID: self.details.nftId)
     }
 
-    access(self) fun deductFees(_ payment: @FungibleToken.Vault): @FungibleToken.Vault {
-      var txFee: UFix64? = nil
-      var royalty: UFix64? = nil
-      // Deducting platform fees
-      if let feeConfig = MelosMarketplace.getFeeConfigByTokenType(tokenType: payment.getType()) {
-        if let txFeeReceiver = feeConfig.txFeeReceiver.borrow() {
-          txFee = payment.balance * feeConfig.txFeePercent
-          txFeeReceiver.deposit(
-            from: <- payment.withdraw(
-              amount: txFee!
-            )
-          )
-        }
-        if let royaltyReceiver = feeConfig.royaltyReceiver.borrow() {
-          if let royaltyPercent = self.details.listingConfig.royaltyPercent {
-            royalty = payment.balance * royaltyPercent
-            royaltyReceiver.deposit(
-              from: <- payment.withdraw(
-                amount: royalty!
-              )
-            )
-          }
-        }
-      }
-      if txFee != nil || royalty != nil {
-        emit TxFeeCutted(listingId: self.uuid, txFee: txFee, royalty: royalty)
-      }
-      return <- payment
-    }
-
     access(self) fun completeListing(_ payment: @FungibleToken.Vault?): @NonFungibleToken.NFT {
       if payment == nil {
         destroy payment
         return <- self.withdrawNFT()
       }
 
-      let payment <- self.deductFees(<- payment!)
+      let listingId = self.uuid
+      let payment <- MelosMarketplace.deductFees(
+        payment: <- payment!, 
+        royaltyPercent: self.details.listingConfig.royaltyPercent, 
+        eventEmitFunction: fun (txFee: UFix64?, royalty: UFix64?) {
+          emit ListingTxFeeCutted(listingId: listingId, txFee: txFee, royalty: royalty)
+        }
+      )
 
       // Deposit the remaining amount after deducting fees and royalties to the beneficiary.
       self.details.receiver.borrow()!.deposit(from: <- payment)
@@ -1414,7 +1426,8 @@ pub contract MelosMarketplace {
       payment: @FungibleToken.Vault,
       rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
-      offerManager: Capability<&{MelosMarketplace.OfferManagerPublic}>
+      offerManager: Capability<&{MelosMarketplace.OfferManagerPublic}>,
+      royaltyPercent: UFix64?
     ): UInt64 {
       let offer <- create Offer(
         nftId: nftId,
@@ -1424,7 +1437,8 @@ pub contract MelosMarketplace {
         payment: <- payment,
         rewardCollection: rewardCollection,
         refund: refund,
-        offerManager: offerManager
+        offerManager: offerManager,
+        royaltyPercent: royaltyPercent
       )
       let offerId = offer.uuid
       let _ <- MelosMarketplace.offers[offerId] <- offer
@@ -1476,6 +1490,7 @@ pub contract MelosMarketplace {
 
     pub let offerer: Address
     pub let offerManagerId: UInt64
+    pub let royaltyPercent: UFix64?
     access(self) var completed: Bool
 
     init (
@@ -1486,7 +1501,8 @@ pub contract MelosMarketplace {
       payment: @FungibleToken.Vault,
       rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
-      offerManager: Capability<&{MelosMarketplace.OfferManagerPublic}>
+      offerManager: Capability<&{MelosMarketplace.OfferManagerPublic}>,
+      royaltyPercent: UFix64?
     ) {
       assert(offerManager.check(), message: "Invalid offerManager")
       assert(rewardCollection.check(), message: "Invalid NFT reward collection")
@@ -1507,9 +1523,17 @@ pub contract MelosMarketplace {
 
       self.offerer = refund.address
       self.offerManagerId = offerManagerRef.uuid
+      self.royaltyPercent = royaltyPercent
+
       self.completed = false
 
-      emit OfferCreated(offerId: self.uuid, nftId: nftId, offerer: self.offerer, price: self.payment.balance)
+      emit OfferCreated(
+        offerId: self.uuid, 
+        nftId: nftId, 
+        offerer: self.offerer, 
+        price: self.payment.balance, 
+        royaltyPercent: royaltyPercent
+      )
     }
 
     pub fun isCompleted(): Bool {
@@ -1542,8 +1566,15 @@ pub contract MelosMarketplace {
 
       self.completed = true
 
-      let price = self.payment.balance
-      receiver.borrow()!.deposit(from: <- self.payment.withdraw(amount: self.payment.balance))
+      let offerId = self.uuid
+      let payment <- MelosMarketplace.deductFees(
+        payment: <- self.payment.withdraw(amount: self.payment.balance), 
+        royaltyPercent: self.royaltyPercent, 
+        eventEmitFunction: fun (txFee: UFix64?, royalty: UFix64?) {
+          emit OfferAcceptFeeCutted(offerId: offerId, txFee: txFee, royalty: royalty)
+        }
+      )
+      receiver.borrow()!.deposit(from: <- payment)
 
       let rewardCollection = self.rewardCollection.borrow() ?? panic("Could not get NFT receiver")
       rewardCollection.deposit(token: <- collection.withdraw(withdrawID: self.nftId))

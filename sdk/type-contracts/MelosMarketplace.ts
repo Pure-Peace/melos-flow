@@ -13,7 +13,7 @@ export type ListingCreatedEvent = {
   listingEndTime?: UFix64;
 };
 
-export type TxFeeCuttedEvent = {
+export type ListingTxFeeCuttedEvent = {
   listingId: number;
   txFee?: UFix64;
   royalty?: UFix64;
@@ -120,7 +120,7 @@ export type MarketplaceEvents =
   | 'ListingManagerCreated'
   | 'ListingManagerDestroyed'
   | 'FungibleTokenFeeUpdated'
-  | 'TxFeeCutted'
+  | 'ListingTxFeeCutted'
   | 'FungibleTokenFeeRemoved'
   | 'MinimumListingDurationChanged'
   | 'MaxAuctionDurationChanged'

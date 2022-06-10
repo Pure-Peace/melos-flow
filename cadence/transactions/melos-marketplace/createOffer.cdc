@@ -58,8 +58,8 @@ transaction(
   nftId: UInt64,
   listingStartTime: UFix64, 
   listingDuration: UFix64, 
-  royaltyPercent: UFix64?,
-  offerPrice: UFix64
+  offerPrice: UFix64,
+  royaltyPercent: UFix64?
 ) {
   let payment: @FungibleToken.Vault
   let collection: Capability<&{NonFungibleToken.Receiver}>
@@ -89,7 +89,8 @@ transaction(
       payment: <- self.payment,
       rewardCollection: self.collection,
       refund: self.refund,
-      offerManager: self.offerManager.offerManagerCapability
+      offerManager: self.offerManager.offerManagerCapability,
+      royaltyPercent: royaltyPercent
     )
   }
 }
