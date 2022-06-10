@@ -82,10 +82,10 @@ const setupUser = async (name: string, airdropFlow = 1000) => {
   const user = await getAuthAccountByName(name);
 
   await mintFlow(user.address, airdropFlow.toFixed(8));
-  const balance = Number(assertTx(await getFlowBalance(user.address)));
+  const balance = assertTx(await getFlowBalance(user.address));
 
   console.log(`${name} flow balance: `, balance);
-  expect(balance).toBeGreaterThanOrEqual(airdropFlow);
+  expect(Number(balance)).toBeGreaterThanOrEqual(airdropFlow);
 
   return {user, balance};
 };
@@ -138,6 +138,26 @@ const removePurachasedListing = async (
   expect(isListingExists).toBe(false);
 };
 
+const purachasedBalanceCheck = async (
+  sellerBeforeBalance: string,
+  buyerBeforeBalance: string,
+  seller: Account,
+  buyer: Account
+) => {
+  const sellerBalanceAfter = assertTx(await getFlowBalance(seller.address));
+  const buyerBalanceAfter = assertTx(await getFlowBalance(buyer.address));
+
+  const sellerEarned = Number(sellerBalanceAfter) - Number(sellerBeforeBalance);
+  const buyerSpend = Number(buyerBeforeBalance) - Number(buyerBalanceAfter);
+
+  console.log(
+    `seller BalanceBefore: ${sellerBeforeBalance}, seller BalanceAfter: ${sellerBalanceAfter} earnd: ${sellerEarned}`,
+    '\n',
+    `buyer BalanceBefore: ${buyerBeforeBalance}, buyer BalanceAfter: ${buyerBalanceAfter} spend: ${buyerSpend}`
+  );
+  expect(sellerEarned).toEqual(buyerSpend);
+};
+
 describe('Melos marketplace tests', () => {
   beforeEach(async () => {
     await prepareEmulator({logs: false});
@@ -170,8 +190,11 @@ describe('Melos marketplace tests', () => {
       return assertTx(await createListing(alice, nft, ListingType.Common, {price: 5, royaltyPercent: 0}));
     });
 
+    const {user: bob, balance: bobBalanceBefore} = await setupUser('bob');
+
+    const aliceBalanceBefore = assertTx(await getFlowBalance(alice.address));
+
     // Bob purachase listing
-    const {user: bob} = await setupUser('bob');
     const result = assertTx(await purchaseListing(bob, listingId));
     const fixedPricesListingCompleted = eventFilter<FixedPricesListingCompletedEvent, MarketplaceEvents>(
       result,
@@ -181,6 +204,8 @@ describe('Melos marketplace tests', () => {
     console.log('purchase events: ', getTxEvents(result));
     console.log('fixedPricesListingCompleted: ', fixedPricesListingCompleted);
     expect(fixedPricesListingCompleted.length).toBeGreaterThan(0);
+
+    await purachasedBalanceCheck(aliceBalanceBefore, bobBalanceBefore, alice, bob);
 
     await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
   });
@@ -197,12 +222,13 @@ describe('Melos marketplace tests', () => {
     const startingPrice = 10;
     const reservePrice = 1;
     const priceCutInterval = 1;
+    const listingDuration = 60;
     const {listingId, listingDetails} = await handleCreateListing(alice, melosMarketplaceIdentifier, async () => {
       return assertTx(
         await createListing(alice, nft, ListingType.DutchAuction, {
           royaltyPercent: 0,
           startingPrice,
-          listingDuration: 60,
+          listingDuration,
           reservePrice,
           priceCutInterval,
         })
@@ -222,13 +248,18 @@ describe('Melos marketplace tests', () => {
     const priceDiff = Number(startingPrice) - Number(afterPrice);
     const timeDuration = Number(currentBlockTime) - Number(listingStartTime);
     console.log(
-      `[DUTCH AUCTION] startingPrice: ${startingPrice}, afterPrice: ${afterPrice}, price diff: ${priceDiff}, listingStartTime: ${listingStartTime}, currentBlockTime: ${currentBlockTime}, duration: ${timeDuration}s`
+      `[DUTCH AUCTION] startingPrice: ${startingPrice}, afterPrice: ${afterPrice}, price diff: ${priceDiff}`,
+      '\n',
+      `listingStartTime: ${listingStartTime}, currentBlockTime: ${currentBlockTime}, duration: ${timeDuration}s (total listing duration ${listingDuration}s)`
     );
 
     // If duration exists, price should dropped
     if (timeDuration > priceCutInterval) {
       expect(Number(afterPrice)).toBeLessThan(Number(startingPrice));
     }
+
+    const aliceBalanceBefore = assertTx(await getFlowBalance(alice.address));
+    const bobBalanceBefore = assertTx(await getFlowBalance(bob.address));
 
     const result = assertTx(await purchaseListing(bob, listingId));
     const fixedPricesListingCompleted = eventFilter<FixedPricesListingCompletedEvent, MarketplaceEvents>(
@@ -240,6 +271,36 @@ describe('Melos marketplace tests', () => {
     console.log('[DUTCH AUCTION] fixedPricesListingCompleted: ', fixedPricesListingCompleted);
     expect(fixedPricesListingCompleted.length).toBeGreaterThan(0);
 
+    await purachasedBalanceCheck(aliceBalanceBefore, bobBalanceBefore, alice, bob);
+
     await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
   });
+
+  /* it('OpenBid listing tests: Create listing, bid and accept', async () => {
+    // Deploy contracts
+    await deployContractsIfNotDeployed();
+    const {melosMarketplaceIdentifier} = await initializeMarketplace();
+
+    // Setup seller and mint NFT
+    const {user: alice, nft} = await setupSeller('alice');
+
+    // Create listing with NFT
+    const {listingId} = await handleCreateListing(alice, melosMarketplaceIdentifier, async () => {
+      return assertTx(await createListing(alice, nft, ListingType.OpenBid, {minimumPrice: 10, royaltyPercent: 0}));
+    });
+
+    // Bob purachase listing
+    const {user: bob} = await setupUser('bob');
+    const result = assertTx(await purchaseListing(bob, listingId));
+    const fixedPricesListingCompleted = eventFilter<FixedPricesListingCompletedEvent, MarketplaceEvents>(
+      result,
+      melosMarketplaceIdentifier,
+      'FixedPricesListingCompleted'
+    );
+    console.log('purchase events: ', getTxEvents(result));
+    console.log('fixedPricesListingCompleted: ', fixedPricesListingCompleted);
+    expect(fixedPricesListingCompleted.length).toBeGreaterThan(0);
+
+    await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
+  }); */
 });
