@@ -30,5 +30,6 @@ transaction(
 
   execute {
     self.offer.acceptOffer(nftProvider: self.nftProvider, receiver: self.receiver)
+    MelosMarketplace.removeOffer(offerId: offerId)
   }
 }
