@@ -89,7 +89,7 @@ pub contract MelosMarketplace {
   // Includes English auctions and open-bid
   pub event BidCreated(listingId: UInt64, bidId: UInt64, bidder: Address, offerPrice: UFix64)
   pub event BidRemoved(listingId: UInt64, bidId: UInt64)
-  pub event BidListingCompleted(listingId: UInt64, topBid: UInt64?, winner: Address?, price: UFix64)
+  pub event BidListingCompleted(listingId: UInt64, winBid: UInt64?, bidder: Address?, price: UFix64)
 
   // Listing events
   pub event ListingCreated(
@@ -1130,7 +1130,7 @@ pub contract MelosMarketplace {
 
       let targetBid <- self.bids.remove(key: bidId)!
       let price = targetBid.payment.balance
-      let winner = targetBid.refund.address
+      let bidder = targetBid.refund.address
       let bidId = targetBid.uuid
 
       let nft <- self.completeListing(<- targetBid.payment.withdraw(amount: price))
@@ -1139,7 +1139,7 @@ pub contract MelosMarketplace {
 
       self.clearBids()
 
-      emit BidListingCompleted(listingId: self.uuid, topBid: bidId, winner: winner, price: price)
+      emit BidListingCompleted(listingId: self.uuid, winBid: bidId, bidder: bidder, price: price)
       return true
     }
 
@@ -1157,14 +1157,14 @@ pub contract MelosMarketplace {
         let nft <- self.completeListing(nil)
         self.refund.borrow()!.deposit(token: <- nft)
 
-        emit BidListingCompleted(listingId: self.uuid, topBid: nil, winner: nil, price: cfg.currentPrice)
+        emit BidListingCompleted(listingId: self.uuid, winBid: nil, bidder: nil, price: cfg.currentPrice)
         return false
       }
       
       let topBid <- self.bids.remove(key: cfg.topBidId!)!
 
       let price = topBid.payment.balance
-      let winner = topBid.refund.address
+      let bidder = topBid.refund.address
       let bidId = topBid.uuid
 
       let nft <- self.completeListing(<- topBid.payment.withdraw(amount: price))
@@ -1173,7 +1173,7 @@ pub contract MelosMarketplace {
       destroy topBid
       self.clearBids()
 
-      emit BidListingCompleted(listingId: self.uuid, topBid: bidId, winner: winner, price: price)
+      emit BidListingCompleted(listingId: self.uuid, winBid: bidId, bidder: bidder, price: price)
       return true
     }
   }
