@@ -41,6 +41,11 @@ import {
   removeBid,
   acceptOpenBid,
   BidListingCompletedEvent,
+  getListingNextBidMinimumPrice,
+  getListingTopBid,
+  publicCompleteListing,
+  getListingEnded,
+  getListingIsType,
 } from './utils/melos-marketplace';
 import {mintFlow} from 'flow-js-testing';
 import {TxResult} from 'flow-cadut';
@@ -125,9 +130,12 @@ const removePurachasedListing = async (
   melosMarketplaceIdentifier: string,
   listingRemover: AuthAccount
 ) => {
-  // Listing should be purachased
   const listingIsPurchased = assertTx(await getListingPurachased(listingId));
-  expect(listingIsPurchased).toBe(true);
+
+  // Listing should be purachased if listing type is not english auction
+  if (!assertTx(await getListingIsType(listingId, ListingType.EnglishAuction))) {
+    expect(listingIsPurchased).toBe(true);
+  }
 
   // Should be able to remove the listing after purachased
   const removeListingResult = assertTx(await publicRemoveListing(listingRemover, listingId));
@@ -136,12 +144,14 @@ const removePurachasedListing = async (
     melosMarketplaceIdentifier,
     'ListingRemoved'
   );
-  console.log(removeListingEvent);
+  console.log('removeListingEvent: ', removeListingEvent);
   expect(removeListingEvent.length).toBeGreaterThan(0);
 
   // After removed, listing should be not exists
   const isListingExists = assertTx(await getListingExists(listingId));
   expect(isListingExists).toBe(false);
+
+  return {removeListingResult, removeListingEvent, listingIsPurchased};
 };
 
 const purachasedBalanceCheck = async (
@@ -362,7 +372,7 @@ describe('Melos marketplace tests', () => {
 
     const sortedBids = assertTx(await getListingSortedBids(listingId));
     expect(sortedBids.length).toBeGreaterThanOrEqual(3);
-    console.log(`listing (${listingId}) current bids (${sortedBids.length}): `, sortedBids);
+    console.log(`open bid listing (${listingId}) current bids (${sortedBids.length}): `, sortedBids);
 
     // Bob remove his second bid
     const removeBidResult = assertTx(await removeBid(bob, listingId, bobBid2.bidId));
@@ -386,7 +396,7 @@ describe('Melos marketplace tests', () => {
       melosMarketplaceIdentifier,
       'BidListingCompleted'
     );
-    console.log(bidListingCompletedEvents);
+    console.log('openbid bidListingCompletedEvents:', bidListingCompletedEvents);
     expect(bidListingCompletedEvents.length).toBeGreaterThan(0);
 
     // Check NFT ownership
@@ -401,5 +411,118 @@ describe('Melos marketplace tests', () => {
 
     // listing ended, so bob can remove alice's listing
     await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
+  });
+
+  it('EnglishAuction listing tests: Create listing, bid and complete', async () => {
+    // Deploy contracts
+    await deployContractsIfNotDeployed();
+    const {melosMarketplaceIdentifier} = await initializeMarketplace();
+
+    // Setup seller and mint NFT
+    const {user: alice, nft} = await setupSeller('alice');
+
+    // Create listing with NFT
+    const reservePrice = 20;
+    const basePrice = 10;
+    const minimumBidPercentage = 0.2; // 20% minimum markup
+    const listingDuration = 20; // 20s
+    const {listingId} = await handleCreateListing(alice, melosMarketplaceIdentifier, async () => {
+      return assertTx(
+        await createListing(alice, nft, ListingType.EnglishAuction, {
+          reservePrice,
+          minimumBidPercentage,
+          basePrice,
+          listingDuration,
+        })
+      );
+    });
+
+    const {user: bob} = await setupUser('bob');
+
+    // If bid amount is less than basePrice * (1 + minimumBidPercentage) , will panic
+    const bidPriceLow = 5;
+    const [, err] = await createBid(bob, listingId, bidPriceLow);
+    if (bidPriceLow < basePrice * (1 + minimumBidPercentage)) {
+      expect(err).toBeTruthy();
+    }
+
+    // Bob bid listing
+    const bidPriceBob = 15;
+    const bobBalanceBeforeBid = assertTx(await getFlowBalance(bob.address));
+    const bobBid = await handleCreateBid(bob, listingId, bidPriceBob, melosMarketplaceIdentifier);
+    expect(Number(bobBid.bidCreatedEvents[0].offerPrice)).toEqual(bidPriceBob);
+
+    const bobBalanceAfterBid = assertTx(await getFlowBalance(bob.address));
+
+    // Wallet balance should change (reduce)
+    expect(Number(bobBalanceAfterBid) + bidPriceBob).toEqual(Number(bobBalanceBeforeBid));
+
+    const sortedBids = assertTx(await getListingSortedBids(listingId));
+    expect(sortedBids.length).toBeGreaterThanOrEqual(1);
+    console.log(`english auction listing (${listingId}) current bids (${sortedBids.length}): `, sortedBids);
+
+    // Top shoule be bob's bid now
+    const listingCurrentTopBid = assertTx(await getListingTopBid(listingId));
+    expect(listingCurrentTopBid.uuid).toEqual(bobBid.bidId);
+    console.log('listingCurrentTopBid: ', listingCurrentTopBid);
+
+    // Log new details
+    const details = assertTx(await getListingDetails(listingId));
+    console.log('new listing details', details);
+
+    // Bob try completeEnglishAuction
+    const isListingEnded = assertTx(await getListingEnded(listingId));
+    const [, err1] = await publicCompleteListing(bob, listingId);
+    // If auction is not ended, will panic
+    if (!isListingEnded) {
+      expect(err1).toBeTruthy();
+    }
+
+    // Alex bid listing (should be top)
+    const {user: alex} = await setupUser('alex');
+    const bidPriceAlex = bidPriceBob * 2;
+    const alexBid = await handleCreateBid(alex, listingId, bidPriceAlex, melosMarketplaceIdentifier);
+    expect(Number(alexBid.bidCreatedEvents[0].offerPrice)).toEqual(bidPriceAlex);
+
+    console.log('waiting for english ended...');
+    // Sleep random time for english auction ended
+    // Because the emulator is inconvenient to modify the time,
+    // the loop is used to perform many transactions, so that the block time changes.
+    while (!assertTx(await getListingEnded(listingId))) {
+      for (let i = 0; i < 100; i++) {
+        await mintFlow(alice.address, '0.1');
+      }
+    }
+
+    const aliceBeforeBalance = assertTx(await getFlowBalance(alice.address));
+
+    // listing ended, so bob can remove alice's listing
+    // If the listing is english auction, `publicCompleteListing` will be executed automatically
+    const {removeListingResult} = await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
+    console.log('english auction removeListingResult: ', removeListingResult);
+
+    // Get listing complete events
+    const bidListingCompletedEvents = eventFilter<BidListingCompletedEvent, MarketplaceEvents>(
+      removeListingResult,
+      melosMarketplaceIdentifier,
+      'BidListingCompleted'
+    );
+    console.log('english auction bidListingCompletedEvents: ', bidListingCompletedEvents);
+    expect(bidListingCompletedEvents.length).toBeGreaterThan(0);
+
+    // Alex will win
+    expect(bidListingCompletedEvents[0].winBid).toEqual(alexBid.bidId);
+
+    // Check NFT ownership
+    expect(assertTx(await getAccountHasNFT(alice.address, nft))).toEqual(false);
+    expect(assertTx(await getAccountHasNFT(bob.address, nft))).toEqual(false);
+    expect(assertTx(await getAccountHasNFT(alex.address, nft))).toEqual(true);
+
+    // Check balances
+    await purachasedBalanceCheck(aliceBeforeBalance, bobBalanceBeforeBid, alice, alex);
+
+    // Bob not win, so he will get refund
+    const bobBalance = assertTx(await getFlowBalance(bob.address));
+    expect(bobBalance).toEqual(bobBalanceBeforeBid);
   });
 });
