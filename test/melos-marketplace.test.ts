@@ -227,7 +227,7 @@ describe('Melos marketplace tests', () => {
 
     // If duration exists, price should dropped
     if (timeDuration > priceCutInterval) {
-      expect(afterPrice).toBeLessThan(startingPrice);
+      expect(Number(afterPrice)).toBeLessThan(Number(startingPrice));
     }
 
     const result = assertTx(await purchaseListing(bob, listingId));
