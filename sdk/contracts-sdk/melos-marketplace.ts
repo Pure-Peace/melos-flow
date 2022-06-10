@@ -75,9 +75,9 @@ export async function removeListing(listingOwner: AuthAccount, listingId: number
   });
 }
 
-export async function publicRemoveListing(executor: AuthAccount, listingId: number) {
+export async function publicRemoveEndedListing(executor: AuthAccount, listingId: number) {
   return sendTransaction({
-    code: txCode('melos-marketplace/publicRemoveListing'),
+    code: txCode('melos-marketplace/publicRemoveEndedListing'),
     args: [listingId],
     payer: executor.auth,
     addressMap,
@@ -234,9 +234,9 @@ export async function getListingTopBid(listingId: number) {
   });
 }
 
-export async function publicCompleteListing(account: AuthAccount, listingId: number) {
+export async function publicCompleteEnglishAuction(account: AuthAccount, listingId: number) {
   return sendTransaction({
-    code: txCode('melos-marketplace/publicCompleteListing'),
+    code: txCode('melos-marketplace/publicCompleteEnglishAuction'),
     args: [listingId],
     payer: account.auth,
     addressMap,

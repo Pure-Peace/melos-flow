@@ -14,7 +14,7 @@ import {
   getListingDetails,
   getListingPurachased,
   getListingIsType,
-  publicRemoveListing,
+  publicRemoveEndedListing,
   getListingExists,
   createBid,
   createListing,
@@ -26,7 +26,7 @@ import {
   acceptOpenBid,
   getListingTopBid,
   getListingEnded,
-  publicCompleteListing,
+  publicCompleteEnglishAuction,
 } from '../sdk/contracts-sdk/melos-marketplace';
 import {
   ListingCreatedEvent,
@@ -128,7 +128,7 @@ const removePurachasedListing = async (
   }
 
   // Should be able to remove the listing after purachased
-  const removeListingResult = assertTx(await publicRemoveListing(listingRemover, listingId));
+  const removeListingResult = assertTx(await publicRemoveEndedListing(listingRemover, listingId));
   const removeListingEvent = eventFilter<ListingRemovedEvent, MarketplaceEvents>(
     removeListingResult,
     melosMarketplaceIdentifier,
@@ -462,7 +462,7 @@ describe('Melos marketplace tests', () => {
 
     // Bob try completeEnglishAuction
     const isListingEnded = assertTx(await getListingEnded(listingId));
-    const [, err1] = await publicCompleteListing(bob, listingId);
+    const [, err1] = await publicCompleteEnglishAuction(bob, listingId);
     // If auction is not ended, will panic
     if (!isListingEnded) {
       expect(err1).toBeTruthy();
@@ -487,7 +487,7 @@ describe('Melos marketplace tests', () => {
     const aliceBeforeBalance = assertTx(await getFlowBalance(alice.address));
 
     // listing ended, so bob can remove alice's listing
-    // If the listing is english auction, `publicCompleteListing` will be executed automatically
+    // If the listing is english auction, `publicCompleteEnglishAuction` will be executed automatically
     const {removeListingResult} = await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
     console.log('english auction removeListingResult: ', removeListingResult);
 
