@@ -31,6 +31,7 @@ import {
   acceptOffer,
   getUnRefundPaymentsCount,
   getOffer,
+  removeOffer,
 } from '../sdk/contracts-sdk/melos-marketplace';
 import {
   ListingCreatedEvent,
@@ -591,5 +592,9 @@ describe('Melos marketplace tests', () => {
     // Check balance
     const unRefundPaymentsCount = assertTx(await getUnRefundPaymentsCount());
     expect(unRefundPaymentsCount).toEqual(0);
+
+    // Bob remove his offer
+    const removeOfferResult = assertTx(await removeOffer(bob, bobOffer.offerId));
+    console.log('removeOfferResult: ', removeOfferResult);
   });
 });
