@@ -157,7 +157,7 @@ pub contract MelosMarketplace {
     if self.listings[listingId] == nil {
       return nil
     } else {
-      return &self.listings[listingId] as? &Listing
+      return &self.listings[listingId] as &Listing?
     }
   }
 
@@ -836,7 +836,7 @@ pub contract MelosMarketplace {
     pub fun getBids(): [&{BidPublic}] {
       let temp: [&Bid] = []
       for bidId in self.bids.keys {
-        temp.append(&self.bids[bidId] as &Bid)
+        temp.append((&self.bids[bidId] as &Bid?)!)
       }
       return temp
     }
@@ -862,7 +862,7 @@ pub contract MelosMarketplace {
     }
 
     pub fun getBid(_ bidId: UInt64): &{BidPublic}? {
-      return &self.bids[bidId] as? &Bid
+      return &self.bids[bidId] as &Bid?
     }
 
     pub fun getDetails(): ListingDetails {
@@ -1254,7 +1254,7 @@ pub contract MelosMarketplace {
       assert(MelosMarketplace.isListingExists(listingId), message: "Listing not exists")
       assert(self.getListingOwnership(listingId), message: "Invalid listing ownership")
 
-      let listingRef = &MelosMarketplace.listings[listingId] as &Listing
+      let listingRef = (&MelosMarketplace.listings[listingId] as &Listing?)!
       return listingRef.processAcceptOpenBid(listingManager: &self as &ListingManager, bidId: bidId)
     }
   }
