@@ -1054,7 +1054,7 @@ pub contract MelosMarketplace {
       let _ <- self.bids[bidId] <- bid
       destroy _;
 
-      cfg.setTopBid(newTopBid: bidRef)
+      (self.details.listingConfig as! EnglishAuction).setTopBid(newTopBid: bidRef)
 
       emit BidCreated(
         listingId: self.uuid, 
@@ -1098,9 +1098,8 @@ pub contract MelosMarketplace {
 
       let removeBid <- self.bids.remove(key: removeBidId)!
       if self.isListingType(ListingType.EnglishAuction) {
-        let cfg = self.config() as! EnglishAuction
-        if removeBidId == cfg.topBidId {
-          cfg.setTopBid(newTopBid: self.getTopBidFromBids())
+        if removeBidId == (self.details.listingConfig as! EnglishAuction).topBidId {
+          (self.details.listingConfig as! EnglishAuction).setTopBid(newTopBid: self.getTopBidFromBids())
         }
         
         self.englishAuctionParticipant.remove(key: removeBid.bidder)
