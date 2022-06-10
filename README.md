@@ -19,9 +19,3 @@ yarn build
 ```
 yarn test
 ```
-
-**Run script**
-
-```
-yarn do <script name>
-```
