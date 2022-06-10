@@ -5,39 +5,21 @@ import NonFungibleToken from "../../contracts/core/NonFungibleToken.cdc"
 import FungibleToken from "../../contracts/core/FungibleToken.cdc"
 import FlowToken from "../../contracts/core/FlowToken.cdc"
 
-pub struct OfferManager {
-  pub let offerManagerRef: &MelosMarketplace.OfferManager
-  pub let offerManagerCapability: Capability<&{MelosMarketplace.OfferManagerPublic}>
 
-  init(
-    offerManagerRef: &MelosMarketplace.OfferManager,
-    offerManagerCapability: Capability<&{MelosMarketplace.OfferManagerPublic}>
-  ) {
-    self.offerManagerRef = offerManagerRef
-    self.offerManagerCapability = offerManagerCapability
-  }
-}
-
-pub fun getOrCreateOfferManager(account: AuthAccount): OfferManager {
+pub fun getOrCreateOfferManager(account: AuthAccount): &MelosMarketplace.OfferManager {
     let PUBLIC_PATH = MelosMarketplace.OfferManagerPublicPath
     let STORAGE_PATH = MelosMarketplace.OfferManagerStoragePath
 
     if let offerManagerRef = account.borrow<&MelosMarketplace.OfferManager>(from: STORAGE_PATH) {
-      return OfferManager(
-        offerManagerRef: offerManagerRef, 
-        offerManagerCapability: account.getCapability<&{MelosMarketplace.OfferManagerPublic}>(PUBLIC_PATH)
-      )
+      return offerManagerRef
     }
 
     let offerManager <- MelosMarketplace.createOfferManager()
     let offerManagerRef = &offerManager as &MelosMarketplace.OfferManager
     account.save(<- offerManager, to: STORAGE_PATH)
-    account.link<&{MelosMarketplace.ListingManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+    account.link<&{MelosMarketplace.OfferManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
 
-    return OfferManager(
-      offerManagerRef: offerManagerRef, 
-      offerManagerCapability: account.getCapability<&{MelosMarketplace.OfferManagerPublic}>(PUBLIC_PATH)
-    )
+    return offerManagerRef
 }
 
 pub fun getOrCreateNFTCollection(account: AuthAccount): Capability<&{NonFungibleToken.Receiver}> {
@@ -64,7 +46,8 @@ transaction(
   let payment: @FungibleToken.Vault
   let collection: Capability<&{NonFungibleToken.Receiver}>
   let refund: Capability<&{FungibleToken.Receiver}>
-  let offerManager: OfferManager
+  let offerManager: &MelosMarketplace.OfferManager
+  let offerManagerCapability: Capability<&{MelosMarketplace.OfferManagerPublic}>
   prepare(account: AuthAccount) {
     let PAYMENT_TOKEN_STORAGE_PATH = /storage/flowTokenVault
 
@@ -78,10 +61,11 @@ transaction(
     self.collection = getOrCreateNFTCollection(account: account)
     
     self.offerManager = getOrCreateOfferManager(account: account)
+    self.offerManagerCapability = account.getCapability<&{MelosMarketplace.OfferManagerPublic}>(MelosMarketplace.OfferManagerPublicPath)
   }
 
   execute {
-    let result = self.offerManager.offerManagerRef.createOffer(
+    let result = self.offerManager.createOffer(
       nftId: nftId,
       nftType: Type<@MelosNFT.NFT>(),
       offerStartTime: offerStartTime ?? getCurrentBlock().timestamp,
@@ -89,7 +73,7 @@ transaction(
       payment: <- self.payment,
       rewardCollection: self.collection,
       refund: self.refund,
-      offerManager: self.offerManager.offerManagerCapability,
+      offerManager: self.offerManagerCapability,
       royaltyPercent: royaltyPercent
     )
   }
