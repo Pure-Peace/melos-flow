@@ -49,6 +49,9 @@ pub contract MelosMarketplace {
   pub let BidManagerStoragePath: StoragePath
   pub let BidManagerPublicPath: PublicPath
 
+  // Offer manager resource
+  pub let OfferManagerStoragePath: StoragePath
+  pub let OfferManagerPublicPath: PublicPath
 
   pub var minimumListingDuration: UFix64?
   pub var maxAuctionDuration: UFix64?
@@ -132,10 +135,15 @@ pub contract MelosMarketplace {
     self.offers <- {}
 
     self.AdminStoragePath = /storage/MelosSettlementAdmin
-    self.ListingManagerPublicPath = /public/MelosMarketplace
+
     self.ListingManagerStoragePath = /storage/MelosMarketplace
-    self.BidManagerPublicPath = /public/MelosBidManager
+    self.ListingManagerPublicPath = /public/MelosMarketplace
+
     self.BidManagerStoragePath = /storage/MelosBidManager
+    self.BidManagerPublicPath = /public/MelosBidManager
+
+    self.OfferManagerStoragePath = /storage/MelosOfferManager
+    self.OfferManagerPublicPath = /public/MelosOfferManager
 
     // Create admint resource and do some settings
     let admin <- create Admin()
@@ -172,6 +180,11 @@ pub contract MelosMarketplace {
     } else {
       return &self.listings[listingId] as &Listing?
     }
+  }
+
+  // Checks whether the specified offer id exists
+  pub fun isOfferExists(_ offerId: UInt64): Bool {
+    return self.offers[offerId] != nil
   }
 
   // Get the offer reference
@@ -302,6 +315,10 @@ pub contract MelosMarketplace {
 
   pub fun createBidManager(): @BidManager {
     return <-create BidManager()
+  }
+
+  pub fun createOfferManager(): @OfferManager {
+    return <-create OfferManager()
   }
 
   // -----------------------------------------------------------------------
@@ -1389,6 +1406,33 @@ pub contract MelosMarketplace {
       return nil
     }
 
+    pub fun createOffer(
+      nftId: UInt64,
+      nftType: Type,
+      listingStartTime: UFix64,
+      listingDuration: UFix64,
+      payment: @FungibleToken.Vault,
+      rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
+      refund: Capability<&{FungibleToken.Receiver}>,
+      offerManager: Capability<&{MelosMarketplace.OfferManagerPublic}>
+    ): UInt64 {
+      let offer <- create Offer(
+        nftId: nftId,
+        nftType: nftType,
+        listingStartTime: listingStartTime,
+        listingDuration: listingDuration,
+        payment: <- payment,
+        rewardCollection: rewardCollection,
+        refund: refund,
+        offerManager: offerManager
+      )
+      let offerId = offer.uuid
+      let _ <- MelosMarketplace.offers[offerId] <- offer
+      destroy _
+
+      return offerId
+    }
+
     pub fun removeOffer(offerId: UInt64) {
       assert(self.isOfferExists(offerId), message: "Offer not created by this manager")
       let offer <- MelosMarketplace.offers.remove(key: offerId)!
@@ -1422,7 +1466,6 @@ pub contract MelosMarketplace {
   pub resource Offer {
     pub let nftId: UInt64
     pub let nftType: Type
-    pub let nftResourceUUID: UInt64
     pub let listingStartTime: UFix64
     pub let listingEndTime: UFix64
 
@@ -1438,7 +1481,6 @@ pub contract MelosMarketplace {
     init (
       nftId: UInt64,
       nftType: Type,
-      nftResourceUUID: UInt64,
       listingStartTime: UFix64,
       listingDuration: UFix64,
       payment: @FungibleToken.Vault,
@@ -1456,7 +1498,6 @@ pub contract MelosMarketplace {
 
       self.nftId = nftId
       self.nftType = nftType
-      self.nftResourceUUID = nftResourceUUID
       self.listingStartTime = listingStartTime
       self.listingEndTime = listingStartTime + listingDuration
 
@@ -1488,7 +1529,7 @@ pub contract MelosMarketplace {
 
     pub fun acceptOffer(
       nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>,
-      reward: Capability<&{FungibleToken.Receiver}>
+      receiver: Capability<&{FungibleToken.Receiver}>
     ) {
       assert(!self.isEnded(), message: "Offer is already ended")
       assert(!self.completed, message: "Offer is already completed")
@@ -1496,14 +1537,13 @@ pub contract MelosMarketplace {
       let collection = nftProvider.borrow() ?? panic("Cannot borrow NFT collection")
       let nftRef = collection.borrowNFT(id: self.nftId)
       assert(nftRef.id == self.nftId, message: "Invalid NFT id")
-      assert(nftRef.uuid == self.nftResourceUUID, message: "Invalid NFT resource UUID")
       assert(nftRef.getType() == self.nftType, message: "Invalid NFT type")
-      assert(reward.check(), message: "Invalid reward receiver")
+      assert(receiver.check(), message: "Invalid reward receiver")
 
       self.completed = true
 
       let price = self.payment.balance
-      reward.borrow()!.deposit(from: <- self.payment.withdraw(amount: self.payment.balance))
+      receiver.borrow()!.deposit(from: <- self.payment.withdraw(amount: self.payment.balance))
 
       let rewardCollection = self.rewardCollection.borrow() ?? panic("Could not get NFT receiver")
       rewardCollection.deposit(token: <- collection.withdraw(withdrawID: self.nftId))
