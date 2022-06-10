@@ -56,6 +56,7 @@ pub contract MelosMarketplace {
   access(self) let listings: @{UInt64: Listing}
   access(self) var allowedPaymentTokens: [Type]
   access(self) let feeConfigs: {String: FungibleTokenFeeConfig}
+  access(self) let unReturnedBids: @{UInt64: UnReturnedBid}
 
   // -----------------------------------------------------------------------
   // Events
@@ -106,6 +107,8 @@ pub contract MelosMarketplace {
   pub event ListingRemoved(listingId: UInt64, purchased: Bool)
   pub event FixedPricesListingCompleted(listingId: UInt64, payment: UFix64, buyer: Address)
 
+  pub event UnReturnedBidCreated(bidManagerId: UInt64, balance: UFix64)
+
   // -----------------------------------------------------------------------
   // Contract Initilization
   // -----------------------------------------------------------------------
@@ -117,6 +120,7 @@ pub contract MelosMarketplace {
     self.listings <- {}
     self.allowedPaymentTokens = []
     self.feeConfigs = {}
+    self.unReturnedBids <- {}
 
     self.AdminStoragePath = /storage/MelosSettlementAdmin
     self.ListingManagerPublicPath = /public/MelosMarketplace
@@ -229,6 +233,19 @@ pub contract MelosMarketplace {
         break
     }
     assert(cfg != nil, message: "Invalid listing config")
+  }
+
+  pub fun claimUnReturnedBid(
+    bidId: UInt64, 
+    bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>, 
+    refund: Capability<&{FungibleToken.Receiver}>
+  ) {
+    if let unReturnedBid <- MelosMarketplace.unReturnedBids.remove(key: bidId) {
+      unReturnedBid.claim(bidManager: bidManager, refund: refund)
+      destroy unReturnedBid
+    } else {
+      panic("Not exists")
+    }
   }
 
   // Allow anyone to remove listings that matches the condition
@@ -561,8 +578,15 @@ pub contract MelosMarketplace {
     }
 
     destroy() {
-      self.bidManager.borrow()!.removeBid(listingId: self.listingId, bidId: self.uuid)
-      self.refund.borrow()!.deposit(from: <- self.payment)
+      if let refund = self.refund.borrow() {
+        refund.deposit(from: <- self.payment)
+        self.bidManager.borrow()?.removeBid(listingId: self.listingId, bidId: self.uuid)
+      } else {
+        let _ <- MelosMarketplace.unReturnedBids[self.uuid] <- create UnReturnedBid(
+          payment: <- self.payment, bidManagerId: self.bidManagerId
+        )
+        destroy _
+      }
     }
   }
 
@@ -1261,6 +1285,33 @@ pub contract MelosMarketplace {
 
       let listingRef = (&MelosMarketplace.listings[listingId] as &Listing?)!
       return listingRef.processAcceptOpenBid(listingManager: &self as &ListingManager, bidId: bidId)
+    }
+  }
+
+  pub resource UnReturnedBid  {
+    access(self) var payment: @FungibleToken.Vault?
+    pub let bidManagerId: UInt64
+
+    init(payment: @FungibleToken.Vault, bidManagerId: UInt64) {
+      let balance = payment.balance
+      self.payment <- payment
+      self.bidManagerId = bidManagerId
+
+      emit UnReturnedBidCreated(bidManagerId: bidManagerId, balance: balance)
+    }
+
+    access(contract) fun claim(bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>, refund: Capability<&{FungibleToken.Receiver}>) {
+      assert(bidManager.borrow()!.uuid == self.bidManagerId, message: "Invalid ownership")
+      let payment <- self.payment <- nil
+      assert(payment != nil, message: "Already claimed")
+      refund.borrow()!.deposit(from: <- payment!)
+    }
+
+    destroy() {
+      if self.payment != nil {
+        panic("Unclaimed, could not destroy")
+      }
+      destroy self.payment
     }
   }
 }
