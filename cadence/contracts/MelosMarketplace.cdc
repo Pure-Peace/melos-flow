@@ -579,15 +579,19 @@ pub contract MelosMarketplace {
     }
 
     destroy() {
-      if let refund = self.refund.borrow() {
-        refund.deposit(from: <- self.payment)
-        self.bidManager.borrow()?.removeBid(listingId: self.listingId, bidId: self.uuid)
+      if self.payment.balance > 0.0 {
+        if let refund = self.refund.borrow() {
+          refund.deposit(from: <- self.payment)
+        } else {
+          let _ <- MelosMarketplace.unReturnedBids[self.uuid] <- create UnReturnedBid(
+            payment: <- self.payment, bidManagerId: self.bidManagerId
+          )
+          destroy _
+        } 
       } else {
-        let _ <- MelosMarketplace.unReturnedBids[self.uuid] <- create UnReturnedBid(
-          payment: <- self.payment, bidManagerId: self.bidManagerId
-        )
-        destroy _
+        destroy self.payment
       }
+      self.bidManager.borrow()?.removeBid(listingId: self.listingId, bidId: self.uuid)
     }
   }
 
