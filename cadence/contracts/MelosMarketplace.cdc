@@ -1421,8 +1421,8 @@ pub contract MelosMarketplace {
     pub fun createOffer(
       nftId: UInt64,
       nftType: Type,
-      listingStartTime: UFix64,
-      listingDuration: UFix64,
+      offerStartTime: UFix64,
+      offerDuration: UFix64,
       payment: @FungibleToken.Vault,
       rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
@@ -1432,8 +1432,8 @@ pub contract MelosMarketplace {
       let offer <- create Offer(
         nftId: nftId,
         nftType: nftType,
-        listingStartTime: listingStartTime,
-        listingDuration: listingDuration,
+        offerStartTime: offerStartTime,
+        offerDuration: offerDuration,
         payment: <- payment,
         rewardCollection: rewardCollection,
         refund: refund,
@@ -1480,8 +1480,8 @@ pub contract MelosMarketplace {
   pub resource Offer {
     pub let nftId: UInt64
     pub let nftType: Type
-    pub let listingStartTime: UFix64
-    pub let listingEndTime: UFix64
+    pub let offerStartTime: UFix64
+    pub let offerEndTime: UFix64
 
     access(contract) let payment: @FungibleToken.Vault
     access(contract) let rewardCollection: Capability<&{NonFungibleToken.Receiver}>
@@ -1496,8 +1496,8 @@ pub contract MelosMarketplace {
     init (
       nftId: UInt64,
       nftType: Type,
-      listingStartTime: UFix64,
-      listingDuration: UFix64,
+      offerStartTime: UFix64,
+      offerDuration: UFix64,
       payment: @FungibleToken.Vault,
       rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
@@ -1514,8 +1514,8 @@ pub contract MelosMarketplace {
 
       self.nftId = nftId
       self.nftType = nftType
-      self.listingStartTime = listingStartTime
-      self.listingEndTime = listingStartTime + listingDuration
+      self.offerStartTime = offerStartTime
+      self.offerEndTime = offerStartTime + offerDuration
 
       self.payment <- payment
       self.rewardCollection = rewardCollection
@@ -1541,7 +1541,7 @@ pub contract MelosMarketplace {
     }
 
     pub fun isEnded(): Bool {
-      return getCurrentBlock().timestamp >= self.listingEndTime
+      return getCurrentBlock().timestamp >= self.offerEndTime
     }
 
     pub fun isValid(): Bool {

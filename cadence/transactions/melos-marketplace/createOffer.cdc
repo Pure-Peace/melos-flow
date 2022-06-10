@@ -56,9 +56,9 @@ pub fun getOrCreateNFTCollection(account: AuthAccount): Capability<&{NonFungible
 
 transaction(
   nftId: UInt64,
-  listingStartTime: UFix64, 
-  listingDuration: UFix64, 
+  offerDuration: UFix64, 
   offerPrice: UFix64,
+  offerStartTime: UFix64?,
   royaltyPercent: UFix64?
 ) {
   let payment: @FungibleToken.Vault
@@ -84,8 +84,8 @@ transaction(
     let result = self.offerManager.offerManagerRef.createOffer(
       nftId: nftId,
       nftType: Type<@MelosNFT.NFT>(),
-      listingStartTime: listingStartTime,
-      listingDuration: listingDuration,
+      offerStartTime: offerStartTime ?? getCurrentBlock().timestamp,
+      offerDuration: offerDuration,
       payment: <- self.payment,
       rewardCollection: self.collection,
       refund: self.refund,
