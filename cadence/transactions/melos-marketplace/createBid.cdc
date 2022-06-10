@@ -50,7 +50,7 @@ transaction(
     let paymentToken = account.borrow<&FlowToken.Vault>(from: PAYMENT_TOKEN_STORAGE_PATH)
       ?? panic("Cannot borrow paymentToken from account")
 
-    self.refund = account.getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+    self.refund = account.getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 
     self.payment <- paymentToken.withdraw(amount: price)
     

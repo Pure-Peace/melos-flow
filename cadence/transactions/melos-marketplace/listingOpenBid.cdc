@@ -22,17 +22,17 @@ pub fun getOrCreateListingManager(account: AuthAccount): &MelosMarketplace.Listi
     return listingManagerRef
 }
 
-pub fun getOrCreateNFTProvider(account: AuthAccount): Capability<&MelosNFT.Collection{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}> {
+pub fun getOrCreateNFTProvider(account: AuthAccount): Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}> {
   let MelosNFTCollectionProviderPrivatePath = /private/MelosNFTCollectionProviderPrivatePath
-  if !account.getCapability<&MelosNFT.Collection{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(
+  let PUBLIC_PATH = MelosNFT.CollectionStoragePath
+  if !account.getCapability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(
     MelosNFTCollectionProviderPrivatePath).check() {
-      account.link<&MelosNFT.Collection{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(
-        MelosNFTCollectionProviderPrivatePath, target: MelosNFT.CollectionStoragePath)
+      account.link<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(
+        MelosNFTCollectionProviderPrivatePath, target: PUBLIC_PATH)
   }
 
-  return account.getCapability<&MelosNFT.Collection{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(MelosNFTCollectionProviderPrivatePath)
+  return account.getCapability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(MelosNFTCollectionProviderPrivatePath)
 }
-
 
 transaction(
   nftId: UInt64,
