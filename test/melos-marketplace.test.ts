@@ -11,7 +11,7 @@ import {
   SECOND,
   sleep,
 } from './utils/helpers';
-import {balanceOf, mint, setupCollection, getAccountNFTs} from './utils/melos-nft';
+import {balanceOf, mint, setupCollection, getAccountNFTs, getAccountHasNFT} from './utils/melos-nft';
 import {
   createListing,
   MarketplaceEvents,
@@ -205,6 +205,10 @@ describe('Melos marketplace tests', () => {
     console.log('fixedPricesListingCompleted: ', fixedPricesListingCompleted);
     expect(fixedPricesListingCompleted.length).toBeGreaterThan(0);
 
+    // Check NFT ownership
+    expect(assertTx(await getAccountHasNFT(alice.address, nft))).toEqual(false);
+    expect(assertTx(await getAccountHasNFT(bob.address, nft))).toEqual(true);
+
     await purachasedBalanceCheck(aliceBalanceBefore, bobBalanceBefore, alice, bob);
 
     await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
@@ -271,12 +275,16 @@ describe('Melos marketplace tests', () => {
     console.log('[DUTCH AUCTION] fixedPricesListingCompleted: ', fixedPricesListingCompleted);
     expect(fixedPricesListingCompleted.length).toBeGreaterThan(0);
 
+    // Check NFT ownership
+    expect(assertTx(await getAccountHasNFT(alice.address, nft))).toEqual(false);
+    expect(assertTx(await getAccountHasNFT(bob.address, nft))).toEqual(true);
+
     await purachasedBalanceCheck(aliceBalanceBefore, bobBalanceBefore, alice, bob);
 
     await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
   });
 
-  /* it('OpenBid listing tests: Create listing, bid and accept', async () => {
+  it('OpenBid listing tests: Create listing, bid and accept', async () => {
     // Deploy contracts
     await deployContractsIfNotDeployed();
     const {melosMarketplaceIdentifier} = await initializeMarketplace();
@@ -286,21 +294,10 @@ describe('Melos marketplace tests', () => {
 
     // Create listing with NFT
     const {listingId} = await handleCreateListing(alice, melosMarketplaceIdentifier, async () => {
-      return assertTx(await createListing(alice, nft, ListingType.OpenBid, {minimumPrice: 10, royaltyPercent: 0}));
+      return assertTx(await createListing(alice, nft, ListingType.OpenBid, {minimumPrice: 5, royaltyPercent: 0}));
     });
 
-    // Bob purachase listing
+    // Bob bid listing
     const {user: bob} = await setupUser('bob');
-    const result = assertTx(await purchaseListing(bob, listingId));
-    const fixedPricesListingCompleted = eventFilter<FixedPricesListingCompletedEvent, MarketplaceEvents>(
-      result,
-      melosMarketplaceIdentifier,
-      'FixedPricesListingCompleted'
-    );
-    console.log('purchase events: ', getTxEvents(result));
-    console.log('fixedPricesListingCompleted: ', fixedPricesListingCompleted);
-    expect(fixedPricesListingCompleted.length).toBeGreaterThan(0);
-
-    await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
-  }); */
+  });
 });

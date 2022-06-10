@@ -49,8 +49,17 @@ export async function getAccountNFTs(address: string) {
 
 /**
  * Returns the number of Melos in an account's collection.
- * @param {string} account - account address
+ * @param {string} address - account address
  * */
 export async function balanceOf(address: string) {
   return executeScript<number>({code: scriptCode('melos-nft/getAccountBalance'), args: [address], addressMap, limit});
+}
+
+export async function getAccountHasNFT(address: string, nftId: number) {
+  return executeScript<boolean>({
+    code: scriptCode('melos-nft/getAccountHasNFT'),
+    args: [address, nftId],
+    addressMap,
+    limit,
+  });
 }

@@ -331,3 +331,13 @@ export async function getListingPrice(listingId: number) {
     limit,
   });
 }
+
+export async function createBid(admin: AuthAccount) {
+  return sendTransaction({
+    code: txCode('melos-marketplace/adminSetAllowedPaymentTokens'),
+    args: [],
+    payer: admin.auth,
+    addressMap,
+    limit,
+  });
+}
