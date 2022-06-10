@@ -1,12 +1,7 @@
 import {sendTransaction, executeScript} from 'flow-cadut';
-import {AuthAccount, scriptCode, txCode} from './helpers';
-
-const limit = 999;
-
-const addressMap = {
-  NonFungibleToken: '0xf8d6e0586b0a20c7',
-  MelosNFT: '0xf8d6e0586b0a20c7',
-};
+import {txCode, scriptCode} from '../common';
+import {AuthAccount} from '../types';
+import {addressMap, limit} from './config';
 
 export async function setupCollection(account: AuthAccount) {
   return sendTransaction({code: txCode('melos-nft/setupCollection'), payer: account.auth, addressMap, limit});

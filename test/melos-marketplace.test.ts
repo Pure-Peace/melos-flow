@@ -1,54 +1,44 @@
+import {emulator, deployContractsIfNotDeployed, prepareEmulator, getAuthAccountByName, SECOND} from './utils/helpers';
+import {mint, setupCollection, getAccountNFTs, getAccountHasNFT} from '../sdk/contracts-sdk/melos-nft';
+
+import {mintFlow} from 'flow-js-testing';
+import {TxResult} from 'flow-cadut';
+import {assertTx, eventFilter, getTxEvents} from '../sdk/common';
+import {AuthAccount, Account, UFix64} from '../sdk/types';
 import {
-  emulator,
-  assertTx,
-  deployContractsIfNotDeployed,
-  prepareEmulator,
-  eventFilter,
-  getAuthAccountByName,
-  getTxEvents,
-  Account,
-  AuthAccount,
-  SECOND,
-  sleep,
-} from './utils/helpers';
-import {balanceOf, mint, setupCollection, getAccountNFTs, getAccountHasNFT} from './utils/melos-nft';
-import {
-  createListing,
-  MarketplaceEvents,
-  FixedPricesListingCompletedEvent,
-  getAccountListingCount,
-  getAllowedPaymentTokens,
-  getContractIdentifier,
-  getFlowBalance,
-  getListingDetails,
-  ListingCreatedEvent,
-  ListingType,
-  purchaseListing,
-  removeListing,
-  setAllowedPaymentTokens,
   setupListingManager,
+  getContractIdentifier,
+  setAllowedPaymentTokens,
+  getAllowedPaymentTokens,
+  getAccountListingCount,
+  getListingDetails,
   getListingPurachased,
+  getListingIsType,
   publicRemoveListing,
-  ListingRemovedEvent,
   getListingExists,
-  MelosNFTMintedEvent,
-  MelosNFTEvents,
-  getBlockTime,
-  getListingPrice,
   createBid,
-  BidCreatedEvent,
+  createListing,
+  purchaseListing,
+  getListingPrice,
+  getBlockTime,
   getListingSortedBids,
   removeBid,
   acceptOpenBid,
-  BidListingCompletedEvent,
-  getListingNextBidMinimumPrice,
   getListingTopBid,
-  publicCompleteListing,
   getListingEnded,
-  getListingIsType,
-} from './utils/melos-marketplace';
-import {mintFlow} from 'flow-js-testing';
-import {TxResult} from 'flow-cadut';
+  publicCompleteListing,
+} from '../sdk/contracts-sdk/melos-marketplace';
+import {
+  ListingCreatedEvent,
+  MarketplaceEvents,
+  ListingType,
+  ListingRemovedEvent,
+  BidCreatedEvent,
+  FixedPricesListingCompletedEvent,
+  BidListingCompletedEvent,
+} from '../sdk/type-contracts/MelosMarketplace';
+import {MelosNFTMintedEvent, MelosNFTEvents} from '../sdk/type-contracts/MelosNFT';
+import {getFlowBalance} from '../sdk/contracts-sdk/core';
 
 // Increase timeout if your tests failing due to timeout
 jest.setTimeout(300 * SECOND);

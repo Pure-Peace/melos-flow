@@ -18,7 +18,7 @@
   "license": "ISC",
   "dependencies": {
     "@onflow/fcl": "^0.0.78",
-    "@onflow/types": "^0.0.6",
+    "@onflow/types": "^1.0.1",
     "elliptic": "^6.5.4",
     "flow-cadut": "^0.1.16-alpha.4",
     "ts-node": "^10.7.0"

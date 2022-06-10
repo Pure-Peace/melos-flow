@@ -1,12 +1,6 @@
-import {
-  emulator,
-  assertTx,
-  getAccount,
-  prepareEmulator,
-  deployContractsIfNotDeployed,
-  getAuthAccountByName,
-} from './utils/helpers';
-import {balanceOf, totalSupply, mint, setupCollection, transfer} from './utils/melos-nft';
+import {emulator, prepareEmulator, deployContractsIfNotDeployed, getAuthAccountByName} from './utils/helpers';
+import {balanceOf, totalSupply, mint, setupCollection, transfer} from '../sdk/contracts-sdk/melos-nft';
+import {assertTx} from '../sdk/common';
 
 // Increase timeout if your tests failing due to timeout
 jest.setTimeout(100000);

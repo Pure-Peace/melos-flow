@@ -1,178 +1,15 @@
 import {sendTransaction, executeScript} from 'flow-cadut';
-import {toFlowAddress} from 'sdk/common';
-import {AuthAccount, getAuthAccountByAddress, scriptCode, toUFix64, txCode} from './helpers';
-
-const limit = 999;
-
-const addressMap = {
-  NonFungibleToken: '0xf8d6e0586b0a20c7',
-  MelosNFT: '0xf8d6e0586b0a20c7',
-  MelosMarketplace: '0xf8d6e0586b0a20c7',
-};
-
-export enum ListingType {
-  Common,
-  OpenBid,
-  DutchAuction,
-  EnglishAuction,
-}
-
-export type MarketplaceEvents =
-  | 'MelosSettlementInitialized'
-  | 'ListingManagerCreated'
-  | 'ListingManagerDestroyed'
-  | 'FungibleTokenFeeUpdated'
-  | 'TxFeeCutted'
-  | 'FungibleTokenFeeRemoved'
-  | 'MinimumListingDurationChanged'
-  | 'MaxAuctionDurationChanged'
-  | 'AllowedPaymentTokensChanged'
-  | 'BidCreated'
-  | 'BidRemoved'
-  | 'BidListingCompleted'
-  | 'ListingCreated'
-  | 'ListingRemoved'
-  | 'FixedPricesListingCompleted';
-
-export type MelosNFTEvents = 'Minted' | 'Withdraw' | 'Deposit' | 'MetadataBaseURIChanged';
-
-export type UFix64 = string;
-
-export type FlowType = string;
-
-export type FlowAddress = string;
-
-export type ListingCreatedEvent = {
-  listingId: number;
-  listingType: number;
-  seller: FlowAddress;
-  nftId: number;
-  nftType: FlowType;
-  nftResourceUUID: number;
-  paymentToken: FlowType;
-  listingStartTime: UFix64;
-  listingEndTime?: UFix64;
-};
-
-export type MelosNFTMintedEvent = {
-  id: number;
-  recipient: string;
-};
-
-export type FungibleTokensWithdrawnEvent = {
-  amount: UFix64;
-  from: FlowAddress;
-};
-
-export type FungibleTokensDepositedEvent = {
-  amount: UFix64;
-  to: FlowAddress;
-};
-
-export type TxFeeCuttedEvent = {
-  listingId: number;
-  txFee?: UFix64;
-  royalty?: UFix64;
-};
-
-export type MelosNFTWithdrawEvent = {
-  id: number;
-  from: FlowAddress;
-};
-
-export type MelosNFTDepositEvent = {
-  id: number;
-  to: FlowAddress;
-};
-
-export type FixedPricesListingCompletedEvent = {
-  listingId: number;
-  payment: UFix64;
-  buyer: FlowAddress;
-};
-
-export type ListingRemovedEvent = {
-  listingId: number;
-  purchased: boolean;
-};
-
-export type BidCreatedEvent = {
-  listingId: number;
-  bidId: number;
-  bidder: FlowAddress;
-  offerPrice: UFix64;
-};
-
-export type BidRemovedEvent = {
-  listingId: number;
-  bidId: number;
-};
-
-export type BidListingCompletedEvent = {
-  listingId: number;
-  winBid: number;
-  bidder: FlowAddress;
-  price: UFix64;
-};
-
-export type ListingDetailsQuery = {
-  details: {
-    listingType: number;
-    listingManagerId: number;
-    nftType: string;
-    nftId: number;
-    nftResourceUUID: number;
-    paymentToken: string;
-    listingConfig: {
-      listingStartTime: UFix64;
-      listingEndTime: UFix64;
-      royaltyPercent: UFix64;
-      startingPrice: UFix64;
-      reservePrice: UFix64;
-      priceCutInterval: UFix64;
-    };
-    receiver: {
-      path: any;
-      address: FlowAddress;
-      borrowType: string;
-    };
-    isPurchased: boolean;
-  };
-  price: UFix64;
-  nextBidMiniumPrice?: UFix64;
-  isNFTAvaliable: boolean;
-  isListingStarted: boolean;
-  isListingEnded: boolean;
-  isPurchased: boolean;
-};
-
-export interface ListingConfig {
-  listingStartTime?: number;
-  listingDuration?: number;
-  royaltyPercent?: number;
-}
-
-export interface CommonParams extends ListingConfig {
-  price: number;
-}
-
-export interface OpenBidParams extends ListingConfig {
-  minimumPrice: number;
-}
-
-export interface DutchAuctionParams extends ListingConfig {
-  startingPrice: number;
-  reservePrice: number;
-  priceCutInterval: number;
-  listingDuration: number;
-}
-
-export interface EnglishAuctionParams extends ListingConfig {
-  reservePrice: number;
-  minimumBidPercentage: number;
-  basePrice: number;
-  listingDuration: number;
-}
+import {
+  ListingType,
+  CommonParams,
+  OpenBidParams,
+  DutchAuctionParams,
+  EnglishAuctionParams,
+  ListingDetailsQuery,
+} from '../../sdk/type-contracts/MelosMarketplace';
+import {scriptCode, toUFix64, txCode} from '../common';
+import {AuthAccount, UFix64} from '../types';
+import {addressMap, limit} from './config';
 
 /**
  * Sets up MelosMarketplace.ListingManager on account and exposes public capability.
@@ -299,15 +136,6 @@ export async function getListingDetails(listingId: number) {
   return executeScript<ListingDetailsQuery>({
     code: scriptCode('melos-marketplace/getListingDetails'),
     args: [listingId],
-    addressMap,
-    limit,
-  });
-}
-
-export async function getFlowBalance(address: string) {
-  return executeScript<UFix64>({
-    code: scriptCode('getFlowBalance'),
-    args: [address],
     addressMap,
     limit,
   });

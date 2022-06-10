@@ -1,23 +1,19 @@
 import {emulator as _emulator, getAccountAddress, getFlowBalance, init, mintFlow} from 'flow-js-testing';
-import {readFileSync} from 'fs';
-import path from 'path';
 import type {Fcl} from '@rarible/fcl-types';
 import * as fclLib from '@onflow/fcl';
 import {exec} from 'child_process';
 
-import {EMULATOR_ADDRESS} from '../../sdk/config';
-import {FlowAuthorizeMinter, FlowService} from '../../sdk/flow-service';
+import {BASE_PATH, EMULATOR_ADDRESS} from '../../sdk/config';
+import {FlowService} from '../../sdk/flow-service';
 import flow from '../../flow.json';
 import {EMULATOR_PORT} from '../../sdk/config';
-import {toFlowAddress} from '../../sdk/common';
-import {TxResult} from 'flow-cadut';
+import {SEALED, toFlowAddress} from '../../sdk/common';
+import {Account, CreateFlowEmulatorParams, AuthAccount, DeploymentsConfig, AccountsConfig} from '../../sdk/types';
 
 export const SECOND = 1000;
 export const HOUR = 3600 * SECOND;
 export const DAY = 24 * HOUR;
 
-export const SEALED = 4;
-export const UFIX64_PRECISION = 8;
 export const MINIMUM_BALANCE = 0.001;
 
 const _fcl: Fcl = fclLib;
@@ -25,68 +21,6 @@ const _fcl: Fcl = fclLib;
 export const EXISTS_ACCOUNTS = new Set();
 
 export const emulator = _emulator;
-
-export type CreateFlowEmulatorParams = {
-  logs?: boolean;
-  logLevel?: ('debug' | 'info' | 'warning')[];
-};
-
-export type DeploymentsConfig = Record<
-  string,
-  | string
-  | {
-      name: string;
-      args: {
-        type: string;
-        value: string;
-      }[];
-    }[]
->;
-
-export interface Account {
-  name?: string;
-  address: string;
-  key: string;
-}
-
-export interface AuthAccount extends Account {
-  auth: FlowAuthorizeMinter;
-}
-
-export type AccountsConfig = Record<string, Account>;
-
-export const BASE_PATH = path.join(__dirname, '../../cadence');
-
-export const toUFix64 = (value?: number) =>
-  [null, undefined, NaN].includes(value) ? null : value!.toFixed(UFIX64_PRECISION);
-
-export const getCode = (filePath: string) => {
-  return readFileSync(path.join(BASE_PATH, filePath.endsWith('.cdc') ? filePath : `${filePath}.cdc`), {
-    encoding: 'utf-8',
-  });
-};
-
-export const getCodeWithType = (file: string, type: 'contracts' | 'scripts' | 'transactions') => {
-  return getCode(path.join(type, file));
-};
-
-export const contractCode = (file: string) => {
-  return getCodeWithType(file, 'contracts');
-};
-
-export const scriptCode = (file: string) => {
-  return getCodeWithType(file, 'scripts');
-};
-
-export const txCode = (file: string) => {
-  return getCodeWithType(file, 'transactions');
-};
-
-export function assertTx<T>(response: [T, any]) {
-  const [res, err] = response;
-  if (err) throw new Error(err);
-  return res!;
-}
 
 export async function prepareEmulator(params: CreateFlowEmulatorParams) {
   await startEmulator(params);
@@ -239,24 +173,4 @@ export async function deployContractsIfNotDeployed() {
   if (!(await checkProjectDeployments())) {
     await deployProject();
   }
-}
-
-export function eventFilter<T, E>(txResult: TxResult, contract: string, contractEvent: E) {
-  const filtedEvents = [];
-  for (const ev of txResult.events) {
-    if (ev.type.endsWith(`${contract}.${contractEvent}`)) {
-      filtedEvents.push(ev.data as T);
-    }
-  }
-  return filtedEvents;
-}
-
-export function getTxEvents(txResult: TxResult) {
-  return txResult.events.map((ev: any) => {
-    return {type: ev.type, data: ev.data};
-  });
-}
-
-export async function sleep(duration: number) {
-  return new Promise((r) => setTimeout(r, duration));
 }
