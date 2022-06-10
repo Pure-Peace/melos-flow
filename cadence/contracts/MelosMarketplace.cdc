@@ -713,6 +713,7 @@ pub contract MelosMarketplace {
     pub fun getBid(_ bidId: UInt64): &{BidPublic}?
     pub fun getDetails(): ListingDetails
     pub fun getPrice(): UFix64
+    pub fun getListingType(): ListingType
     pub fun isNFTAvaliable(): Bool
     pub fun isListingEnded(): Bool
     pub fun isListingStarted(): Bool
@@ -739,6 +740,7 @@ pub contract MelosMarketplace {
         payment: @FungibleToken.Vault
     ): UInt64
     pub fun removeBid(bidManager: Capability<&{MelosMarketplace.BidManagerPublic}>, removeBidId: UInt64): Bool
+    pub fun completeEnglishAuction(): Bool
   }
 
   pub resource Listing: ListingPublic {
@@ -871,6 +873,10 @@ pub contract MelosMarketplace {
 
     pub fun getPrice(): UFix64 {
       return self.details.getPrice()
+    }
+
+    pub fun getListingType(): ListingType {
+      return ListingType(rawValue: self.details.listingType)!
     }
 
     pub fun isListingEnded(): Bool {

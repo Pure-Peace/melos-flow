@@ -110,7 +110,7 @@ export type BidRemovedEvent = {
 
 export type BidListingCompletedEvent = {
   listingId: number;
-  winnerBid: number;
+  winBid: number;
   bidder: FlowAddress;
   price: UFix64;
 };
@@ -392,6 +392,43 @@ export async function getListingNextBidMinimumPrice(listingId: number) {
   return executeScript<UFix64>({
     code: scriptCode('melos-marketplace/getListingNextBidMinimumPrice'),
     args: [listingId],
+    addressMap,
+    limit,
+  });
+}
+
+export async function getListingTopBid(listingId: number) {
+  return executeScript<any>({
+    code: scriptCode('melos-marketplace/getListingTopBid'),
+    args: [listingId],
+    addressMap,
+    limit,
+  });
+}
+
+export async function publicCompleteListing(account: AuthAccount, listingId: number) {
+  return sendTransaction({
+    code: txCode('melos-marketplace/publicCompleteListing'),
+    args: [listingId],
+    payer: account.auth,
+    addressMap,
+    limit,
+  });
+}
+
+export async function getListingEnded(listingId: number) {
+  return executeScript<boolean>({
+    code: scriptCode('melos-marketplace/getListingEnded'),
+    args: [listingId],
+    addressMap,
+    limit,
+  });
+}
+
+export async function getListingIsType(listingId: number, listingType: ListingType) {
+  return executeScript<boolean>({
+    code: scriptCode('melos-marketplace/getListingIsType'),
+    args: [listingId, Number(listingType)],
     addressMap,
     limit,
   });
