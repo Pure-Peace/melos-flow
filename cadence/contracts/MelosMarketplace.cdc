@@ -108,6 +108,7 @@ pub contract MelosMarketplace {
   pub event FixedPricesListingCompleted(listingId: UInt64, payment: UFix64, buyer: Address)
 
   pub event UnReturnedBidCreated(bidManagerId: UInt64, balance: UFix64)
+  pub event UnReturnedBidClaimed(bidManagerId: UInt64)
 
   // -----------------------------------------------------------------------
   // Contract Initilization
@@ -1305,6 +1306,8 @@ pub contract MelosMarketplace {
       let payment <- self.payment <- nil
       assert(payment != nil, message: "Already claimed")
       refund.borrow()!.deposit(from: <- payment!)
+
+      emit UnReturnedBidClaimed(bidManagerId: self.bidManagerId)
     }
 
     destroy() {
