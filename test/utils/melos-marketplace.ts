@@ -151,28 +151,25 @@ export interface ListingConfig {
   royaltyPercent?: number;
 }
 
-export interface Common extends ListingConfig {
+export interface CommonParams extends ListingConfig {
   price: number;
 }
 
-export interface OpenBid extends ListingConfig {
+export interface OpenBidParams extends ListingConfig {
   minimumPrice: number;
 }
 
-export interface DutchAuction extends ListingConfig {
+export interface DutchAuctionParams extends ListingConfig {
   startingPrice: number;
   reservePrice: number;
   priceCutInterval: number;
   listingDuration: number;
 }
 
-export interface EnglishAuction extends ListingConfig {
+export interface EnglishAuctionParams extends ListingConfig {
   reservePrice: number;
   minimumBidPercentage: number;
-
   basePrice: number;
-  currentPrice: number;
-  topBidId?: number;
   listingDuration: number;
 }
 
@@ -194,7 +191,7 @@ export async function createListing(
   owner: AuthAccount,
   nftId: number,
   listingType: ListingType,
-  cfg: Common | OpenBid | DutchAuction | EnglishAuction
+  cfg: CommonParams | OpenBidParams | DutchAuctionParams | EnglishAuctionParams
 ) {
   let args: unknown[] = [
     nftId,
@@ -204,19 +201,19 @@ export async function createListing(
   ];
   switch (listingType) {
     case ListingType.Common:
-      cfg = cfg as Common;
+      cfg = cfg as CommonParams;
       args = args.concat([toUFix64(cfg.price)]);
       break;
     case ListingType.OpenBid:
-      cfg = cfg as OpenBid;
+      cfg = cfg as OpenBidParams;
       args = args.concat([toUFix64(cfg.minimumPrice)]);
       break;
     case ListingType.DutchAuction:
-      cfg = cfg as DutchAuction;
+      cfg = cfg as DutchAuctionParams;
       args = args.concat([toUFix64(cfg.startingPrice), toUFix64(cfg.reservePrice), toUFix64(cfg.priceCutInterval)]);
       break;
     case ListingType.EnglishAuction:
-      cfg = cfg as EnglishAuction;
+      cfg = cfg as EnglishAuctionParams;
       args = args.concat([toUFix64(cfg.reservePrice), toUFix64(cfg.minimumBidPercentage), toUFix64(cfg.basePrice)]);
       break;
   }
@@ -385,6 +382,15 @@ export async function acceptOpenBid(seller: AuthAccount, listingId: number, bidI
     code: txCode('melos-marketplace/acceptOpenBid'),
     args: [listingId, bidId],
     payer: seller.auth,
+    addressMap,
+    limit,
+  });
+}
+
+export async function getListingNextBidMinimumPrice(listingId: number) {
+  return executeScript<UFix64>({
+    code: scriptCode('melos-marketplace/getListingNextBidMinimumPrice'),
+    args: [listingId],
     addressMap,
     limit,
   });
