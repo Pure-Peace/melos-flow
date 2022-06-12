@@ -234,7 +234,7 @@ pub contract MelosMarketplace {
     return self.allowedPaymentTokens.contains(token)
   }
 
-  pub fun fastSort(_ arr: [AnyStruct], fn: ((AnyStruct, AnyStruct): Bool)): [AnyStruct] {
+  access(self) fun fastSort(_ arr: [AnyStruct], fn: ((AnyStruct, AnyStruct): Bool)): [AnyStruct] {
     if (arr.length < 2) {
       return arr
     }
