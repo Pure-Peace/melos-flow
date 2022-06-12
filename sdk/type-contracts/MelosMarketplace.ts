@@ -46,6 +46,7 @@ export type FixedPricesListingCompletedEvent = {
 export type ListingRemovedEvent = {
   listingId: number;
   purchased: boolean;
+  completed: boolean;
 };
 
 export type BidCreatedEvent = {
