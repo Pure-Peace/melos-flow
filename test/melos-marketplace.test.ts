@@ -397,7 +397,7 @@ describe('Melos marketplace tests', () => {
     const removeBidResult = assertTx(await removeBid(bob, listingId, bobBid2.bidId));
     const removeBidEvents = getTxEvents(removeBidResult);
     console.log('bob removeBidEvents: ', removeBidEvents);
-    expect(removeBidEvents.length).toEqual(2); // Should exists BidRemoved event + TokensDeposit event
+    expect(removeBidEvents.length).toBeGreaterThanOrEqual(2); // Should exists BidRemoved event + TokensDeposit event
 
     // After remove bid, check current bid counts
     const sortedBids2 = assertTx(await getListingSortedBids(listingId));

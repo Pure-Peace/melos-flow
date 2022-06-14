@@ -2,8 +2,8 @@ import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 import NonFungibleToken from "../../contracts/core/NonFungibleToken.cdc"
 import FungibleToken from "../../contracts/core/FungibleToken.cdc"
 
-import MelosNFT from "../../contracts/MelosNFT.cdc"
-import FlowToken from "../../contracts/core/FlowToken.cdc"
+import %NFT_NAME% from %NFT_ADDRESS%
+import %FT_NAME% from %FT_ADDRESS%
 
 
 pub fun getOrCreateOfferManager(account: AuthAccount): &MelosMarketplace.OfferManager {
@@ -23,11 +23,11 @@ pub fun getOrCreateOfferManager(account: AuthAccount): &MelosMarketplace.OfferMa
 }
 
 pub fun getOrCreateNFTCollection(account: AuthAccount): Capability<&{NonFungibleToken.Receiver}> {
-  let PUBLIC_PATH = MelosNFT.CollectionPublicPath
-  let STORAGE_PATH = MelosNFT.CollectionStoragePath
+  let PUBLIC_PATH = %NFT_PUBLIC_PATH%
+  let STORAGE_PATH = %NFT_STORAGE_PATH%
 
-  if account.borrow<&MelosNFT.Collection>(from: STORAGE_PATH) == nil {
-    let collection <- MelosNFT.createEmptyCollection() as! @MelosNFT.Collection
+  if account.borrow<&%NFT_NAME%.Collection>(from: STORAGE_PATH) == nil {
+    let collection <- %NFT_NAME%.createEmptyCollection() as! @%NFT_NAME%.Collection
     account.save(<- collection, to: STORAGE_PATH)
     account.link<&{NonFungibleToken.CollectionPublic, NonFungibleToken.Receiver}>(
       PUBLIC_PATH, target: STORAGE_PATH)
@@ -49,12 +49,12 @@ transaction(
   let offerManager: &MelosMarketplace.OfferManager
   let offerManagerCapability: Capability<&{MelosMarketplace.OfferManagerPublic}>
   prepare(account: AuthAccount) {
-    let PAYMENT_TOKEN_STORAGE_PATH = /storage/flowTokenVault
+    let PAYMENT_TOKEN_STORAGE_PATH = %FT_STORAGE_PATH%
 
-    let paymentToken = account.borrow<&FlowToken.Vault>(from: PAYMENT_TOKEN_STORAGE_PATH)
+    let paymentToken = account.borrow<&%FT_NAME%.Vault>(from: PAYMENT_TOKEN_STORAGE_PATH)
       ?? panic("Cannot borrow paymentToken from account")
 
-    self.refund = account.getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+    self.refund = account.getCapability<&{FungibleToken.Receiver}>(%FT_RECEIVER%)
 
     self.payment <- paymentToken.withdraw(amount: offerPrice)
 
@@ -67,7 +67,7 @@ transaction(
   execute {
     let result = self.offerManager.createOffer(
       nftId: nftId,
-      nftType: Type<@MelosNFT.NFT>(),
+      nftType: Type<@%NFT_NAME%.NFT>(),
       offerStartTime: offerStartTime ?? getCurrentBlock().timestamp,
       offerDuration: offerDuration,
       payment: <- self.payment,

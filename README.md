@@ -19,3 +19,9 @@ yarn build
 ```
 yarn test
 ```
+
+**Code generator**
+
+```
+yarn generate-code
+```

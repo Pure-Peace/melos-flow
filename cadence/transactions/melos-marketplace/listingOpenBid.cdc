@@ -1,8 +1,8 @@
 import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
-import MelosNFT from "../../contracts/MelosNFT.cdc"
 import NonFungibleToken from "../../contracts/core/NonFungibleToken.cdc"
-
 import FungibleToken from "../../contracts/core/FungibleToken.cdc"
+
+import MelosNFT from "../../contracts/MelosNFT.cdc"
 import FlowToken from "../../contracts/core/FlowToken.cdc"
 
 

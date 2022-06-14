@@ -12,7 +12,9 @@
     "build": "tsc --project tsconfig-build.json",
     "clean": "rimraf ./build",
     "test": "jest --runInBand",
-    "verify": "tsc --noEmit"
+    "gen-test": "yarn generate-code && yarn test",
+    "verify": "tsc --noEmit",
+    "generate-code": "node ./generateCadence.js"
   },
   "author": "",
   "license": "ISC",

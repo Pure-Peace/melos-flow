@@ -1,8 +1,8 @@
 import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
-import MelosNFT from "../../contracts/MelosNFT.cdc"
 import NonFungibleToken from "../../contracts/core/NonFungibleToken.cdc"
-
 import FungibleToken from "../../contracts/core/FungibleToken.cdc"
+
+import MelosNFT from "../../contracts/MelosNFT.cdc"
 import FlowToken from "../../contracts/core/FlowToken.cdc"
 
 
@@ -33,7 +33,6 @@ pub fun getOrCreateNFTProvider(account: AuthAccount): Capability<&{NonFungibleTo
 
   return account.getCapability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(MelosNFTCollectionProviderPrivatePath)
 }
-
 
 transaction(
   nftId: UInt64,

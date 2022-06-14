@@ -2,8 +2,8 @@ import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 import NonFungibleToken from "../../contracts/core/NonFungibleToken.cdc"
 import FungibleToken from "../../contracts/core/FungibleToken.cdc"
 
-import MelosNFT from "../../contracts/MelosNFT.cdc"
-import FlowToken from "../../contracts/core/FlowToken.cdc"
+import %NFT_NAME% from %NFT_ADDRESS%
+import %FT_NAME% from %FT_ADDRESS%
 
 
 pub fun getOrCreateListingManager(account: AuthAccount): &MelosMarketplace.ListingManager {
@@ -23,15 +23,15 @@ pub fun getOrCreateListingManager(account: AuthAccount): &MelosMarketplace.Listi
 }
 
 pub fun getOrCreateNFTProvider(account: AuthAccount): Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}> {
-  let MelosNFTCollectionProviderPrivatePath = /private/MelosNFTCollectionProviderPrivatePath
-  let PUBLIC_PATH = MelosNFT.CollectionStoragePath
+  let %NFT_NAME%CollectionProviderPrivatePath = %NFT_PROVIDER_PRIVATE_PATH%
+  let PUBLIC_PATH = %NFT_STORAGE_PATH%
   if !account.getCapability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(
-    MelosNFTCollectionProviderPrivatePath).check() {
+    %NFT_NAME%CollectionProviderPrivatePath).check() {
       account.link<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(
-        MelosNFTCollectionProviderPrivatePath, target: PUBLIC_PATH)
+        %NFT_NAME%CollectionProviderPrivatePath, target: PUBLIC_PATH)
   }
 
-  return account.getCapability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(MelosNFTCollectionProviderPrivatePath)
+  return account.getCapability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>(%NFT_NAME%CollectionProviderPrivatePath)
 }
 
 
@@ -54,7 +54,7 @@ transaction(
       price: price
     )
 
-    self.receiver = account.getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+    self.receiver = account.getCapability<&{FungibleToken.Receiver}>(%FT_RECEIVER%)
     self.nftProvider = getOrCreateNFTProvider(account: account)
     self.listingManager = getOrCreateListingManager(account: account)
   }
@@ -64,7 +64,7 @@ transaction(
       listingType: MelosMarketplace.ListingType.Common,
       nftProvider: self.nftProvider,
       nftId: nftId,
-      paymentToken: Type<@FlowToken.Vault>(),
+      paymentToken: Type<@%FT_NAME%.Vault>(),
       listingConfig: self.listingConfig,
       receiver: self.receiver
     )
