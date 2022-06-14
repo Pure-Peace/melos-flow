@@ -9,12 +9,13 @@
     "sdk/typings.d.ts"
   ],
   "scripts": {
+    "prepare": "yarn generate-code",
     "build": "tsc --project tsconfig-build.json",
     "clean": "rimraf ./build",
     "test": "jest --runInBand",
-    "gen-test": "yarn generate-code && yarn test",
+    "gen-test": "yarn prepare && yarn test",
     "verify": "tsc --noEmit",
-    "generate-code": "node ./generateCadence.js"
+    "generate-code": "node ./generateCadence.js && node ./generateSdkCode.js"
   },
   "author": "",
   "license": "ISC",

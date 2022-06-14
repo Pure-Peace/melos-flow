@@ -21,6 +21,8 @@ const REPLACE_MAP = {
   FT_STORAGE_PATH: '/storage/flowTokenVault',
 };
 
+let totalGenerated = 0;
+
 if (!fs.existsSync(BASE_PATH)) {
   throw new Error(`${BASE_PATH} not exists`);
 }
@@ -49,6 +51,8 @@ for (const dir of dirs) {
       const cdcContent = fs.readFileSync(path.join(templateDir, cdcFile), {encoding: 'utf-8'});
       const output = cdcReplace(cdcContent);
       fs.writeFileSync(path.join(generateDir, cdcFile), output, {encoding: 'utf-8'});
+      totalGenerated++;
     }
   }
 }
+console.log('generateCadence: ', totalGenerated, 'files are generated');

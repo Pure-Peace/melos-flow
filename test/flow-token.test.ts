@@ -13,7 +13,7 @@ describe('FlowToken', () => {
     const amount = 100;
     await shallPass(
       await sendTransaction({
-        name: 'flow_token_transfer',
+        name: 'flowTokenTransfer',
         args: [to, amount],
       })
     );
