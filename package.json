@@ -10,8 +10,8 @@
   ],
   "scripts": {
     "prepare": "yarn generate-code",
-    "build": "tsc --project tsconfig-build.json",
-    "clean": "rimraf ./build",
+    "build": "yarn prepare && tsc --project tsconfig-build.json",
+    "clean": "rimraf ./build ./sdk-code",
     "test": "jest --runInBand",
     "gen-test": "yarn prepare && yarn test",
     "verify": "tsc --noEmit",
