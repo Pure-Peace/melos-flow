@@ -17,16 +17,28 @@ import {
   OfferAcceptedEvent,
 } from '../sdk/type-contracts/MelosMarketplace';
 
-import {TESTING_ADDRESS_MAP} from '../sdk/contracts-sdk/base';
+import {DEFAULT_LIMIT, TESTING_ADDRESS_MAP} from '../sdk/contracts-sdk/base';
 import {MelosNFTMintedEvent, MelosNFTEvents} from '../sdk/type-contracts/MelosNFT';
 
 import {CommonSDK} from '../sdk/contracts-sdk/common';
 import {MelosNFTSDK} from '../sdk/contracts-sdk/melos-nft';
 import {MelosMarketplaceSDK} from '../sdk/contracts-sdk/melos-marketplace';
 
+const TESTING_REPLACE_MAP = {
+  NFT_NAME: 'MelosNFT',
+  NFT_ADDRESS: '"../../contracts/MelosNFT.cdc"',
+  NFT_PROVIDER_PRIVATE_PATH: '/private/MelosNFTCollectionProviderPrivatePath',
+  NFT_PUBLIC_PATH: 'MelosNFT.CollectionPublicPath',
+  NFT_STORAGE_PATH: 'MelosNFT.CollectionStoragePath',
+  FT_NAME: 'FlowToken',
+  FT_RECEIVER: '/public/flowTokenReceiver',
+  FT_ADDRESS: '"../../contracts/core/FlowToken.cdc"',
+  FT_STORAGE_PATH: '/storage/flowTokenVault',
+};
+
 const commonSDK = new CommonSDK(TESTING_ADDRESS_MAP);
 const nftSDK = new MelosNFTSDK(TESTING_ADDRESS_MAP);
-const marketplaceSDK = new MelosMarketplaceSDK(TESTING_ADDRESS_MAP);
+const marketplaceSDK = new MelosMarketplaceSDK(TESTING_ADDRESS_MAP, DEFAULT_LIMIT, TESTING_REPLACE_MAP);
 
 // Increase timeout if your tests failing due to timeout
 jest.setTimeout(300 * SECOND);

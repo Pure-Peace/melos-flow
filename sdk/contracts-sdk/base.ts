@@ -4,6 +4,18 @@ export const TESTING_ADDRESS_MAP = {
   MelosMarketplace: '0xf8d6e0586b0a20c7',
 };
 
+export const TESTING_REPLACE_MAP = {
+  NFT_NAME: 'MelosNFT',
+  NFT_ADDRESS: '"../../contracts/MelosNFT.cdc"',
+  NFT_PROVIDER_PRIVATE_PATH: '/private/MelosNFTCollectionProviderPrivatePath',
+  NFT_PUBLIC_PATH: 'MelosNFT.CollectionPublicPath',
+  NFT_STORAGE_PATH: 'MelosNFT.CollectionStoragePath',
+  FT_NAME: 'FlowToken',
+  FT_RECEIVER: '/public/flowTokenReceiver',
+  FT_ADDRESS: '"../../contracts/core/FlowToken.cdc"',
+  FT_STORAGE_PATH: '/storage/flowTokenVault',
+};
+
 export const DEFAULT_LIMIT = 999;
 
 export class BaseSDK {
