@@ -111,6 +111,7 @@ pub contract MelosMarketplace {
   )
   pub event ListingRemoved(listingId: UInt64, purchased: Bool, completed: Bool)
   pub event FixedPricesListingCompleted(listingId: UInt64, payment: UFix64, buyer: Address)
+  pub event FungibleTokenRefunded(balance: UFix64, receiver: Address, paymentType: Type)
 
   // UnrefundPayment events
   pub event UnRefundPaymentCreated(type: Type, managerId: UInt64, balance: UFix64)
@@ -354,9 +355,12 @@ pub contract MelosMarketplace {
     managerId: UInt64,
     payment: @FungibleToken.Vault
   ) {
-    if payment.balance > 0.0 {
-      if let refund = refund.borrow() {
-        refund.deposit(from: <- payment)
+    let balance = payment.balance
+    let paymentType = payment.getType()
+    if balance > 0.0 {
+      if let refundRef = refund.borrow() {
+        refundRef.deposit(from: <- payment)
+        emit FungibleTokenRefunded(balance: balance, receiver: refund.address, paymentType: paymentType)
       } else {
         let _ <- MelosMarketplace.unRefundPayments[resourceId] <- create UnRefundPayment(
           payment: <- payment, managerId: managerId, type: self.getType()
