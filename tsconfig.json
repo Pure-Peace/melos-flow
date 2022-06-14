@@ -20,7 +20,8 @@
     "baseUrl": ".",
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "allowJs": true
+    "allowJs": true,
+    "noImplicitAny": false
   },
   "include": [
     "./test",

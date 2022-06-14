@@ -32,10 +32,10 @@ export function sansPrefix(address: string): string {
 }
 
 export function eventFilter<T, E>(txResult: TxResult, contract: string, contractEvent: E) {
-  const filtedEvents = [];
+  const filtedEvents: T[] = [];
   for (const ev of txResult.events) {
     if (ev.type.endsWith(`${contract}.${contractEvent}`)) {
-      filtedEvents.push(ev.data as T);
+      filtedEvents.push(ev.data);
     }
   }
   return filtedEvents;
