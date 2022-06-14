@@ -1,60 +1,98 @@
 import {sendTransaction, executeScript} from 'flow-cadut';
-import {txCode, scriptCode} from '../common';
 import {AuthAccount} from '../types';
-import {addressMap, limit} from './config';
+import {BaseSDK} from './base';
 
-export async function setupCollection(account: AuthAccount) {
-  return sendTransaction({code: txCode('melos-nft/setupCollection'), payer: account.auth, addressMap, limit});
-}
+import MelosNftTransactions from '../../sdk-code/transactions/melos-nft';
+import MelosNftScripts from '../../sdk-code/scripts/melos-nft';
 
-/**
- * Returns Melos supply.
- * @throws Will throw an error if execution will be halted
- * */
-export async function totalSupply() {
-  return executeScript<number>({code: scriptCode('melos-nft/totalSupply'), addressMap, limit});
-}
+export class MelosNFTSDK extends BaseSDK {
+  async setupCollection(account: AuthAccount, options?: {addressMap?: Record<string, string>; limit?: number}) {
+    return sendTransaction({
+      code: MelosNftTransactions.setupCollection,
+      payer: account.auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
 
-/**
- * Mints Melos to **recipient**.
- * */
-export async function mint(minter: AuthAccount, recipient: string) {
-  return sendTransaction({code: txCode('melos-nft/mint'), args: [recipient], payer: minter.auth, addressMap, limit});
-}
+  /**
+   * Returns Melos supply.
+   * @throws Will throw an error if execution will be halted
+   * */
+  async totalSupply(options?: {addressMap?: Record<string, string>; limit?: number}) {
+    return executeScript<number>({
+      code: MelosNftScripts.totalSupply,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
 
-/**
- * Transfers Melos NFT with id equal **itemId** from **sender** account to **recipient**.
- * @param {AuthAccount} sender - sender
- * @param {string} recipient - recipient address
- * @param {UInt64} itemId - id of the item to transfer
- * */
-export async function transfer(sender: AuthAccount, recipient: string, itemId: number) {
-  return sendTransaction({
-    code: txCode('melos-nft/transfer'),
-    args: [itemId, recipient],
-    payer: sender.auth,
-    addressMap,
-    limit,
-  });
-}
+  /**
+   * Mints Melos to **recipient**.
+   * */
+  async mint(minter: AuthAccount, recipient: string, options?: {addressMap?: Record<string, string>; limit?: number}) {
+    return sendTransaction({
+      code: MelosNftTransactions.mint,
+      args: [recipient],
+      payer: minter.auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
 
-export async function getAccountNFTs(address: string) {
-  return executeScript<number[]>({code: scriptCode('melos-nft/getAccountNFTs'), args: [address], addressMap, limit});
-}
+  /**
+   * Transfers Melos NFT with id equal **itemId** from **sender** account to **recipient**.
+   * @param {AuthAccount} sender - sender
+   * @param {string} recipient - recipient address
+   * @param {UInt64} itemId - id of the item to transfer
+   * */
+  async transfer(
+    sender: AuthAccount,
+    recipient: string,
+    itemId: number,
+    options?: {addressMap?: Record<string, string>; limit?: number}
+  ) {
+    return sendTransaction({
+      code: MelosNftTransactions.transfer,
+      args: [itemId, recipient],
+      payer: sender.auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
 
-/**
- * Returns the number of Melos in an account's collection.
- * @param {string} address - account address
- * */
-export async function balanceOf(address: string) {
-  return executeScript<number>({code: scriptCode('melos-nft/getAccountBalance'), args: [address], addressMap, limit});
-}
+  async getAccountNFTs(address: string, options?: {addressMap?: Record<string, string>; limit?: number}) {
+    return executeScript<number[]>({
+      code: MelosNftScripts.getAccountNFTs,
+      args: [address],
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
 
-export async function getAccountHasNFT(address: string, nftId: number) {
-  return executeScript<boolean>({
-    code: scriptCode('melos-nft/getAccountHasNFT'),
-    args: [address, nftId],
-    addressMap,
-    limit,
-  });
+  /**
+   * Returns the number of Melos in an account's collection.
+   * @param {string} address - account address
+   * */
+  async balanceOf(address: string, options?: {addressMap?: Record<string, string>; limit?: number}) {
+    return executeScript<number>({
+      code: MelosNftScripts.getAccountBalance,
+      args: [address],
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
+  async getAccountHasNFT(
+    address: string,
+    nftId: number,
+    options?: {addressMap?: Record<string, string>; limit?: number}
+  ) {
+    return executeScript<boolean>({
+      code: MelosNftScripts.getAccountHasNFT,
+      args: [address, nftId],
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
 }
