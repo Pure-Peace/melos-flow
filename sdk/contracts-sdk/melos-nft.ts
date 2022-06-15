@@ -41,20 +41,20 @@ export class MelosNFTSDK extends BaseSDK {
   }
 
   /**
-   * Transfers Melos NFT with id equal **itemId** from **sender** account to **recipient**.
+   * Transfers Melos NFT with id equal **nftId** from **sender** account to **recipient**.
    * @param {AuthAccount} sender - sender
    * @param {string} recipient - recipient address
-   * @param {UInt64} itemId - id of the item to transfer
+   * @param {UInt64} nftId - id of the item to transfer
    * */
   async transfer(
     sender: AuthAccount,
     recipient: string,
-    itemId: number,
+    nftId: number,
     options?: {addressMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: MelosNftTransactions.transfer,
-      args: [itemId, recipient],
+      args: [nftId, recipient],
       payer: sender.auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
@@ -74,7 +74,7 @@ export class MelosNFTSDK extends BaseSDK {
    * Returns the number of Melos in an account's collection.
    * @param {string} address - account address
    * */
-  async balanceOf(address: string, options?: {addressMap?: Record<string, string>; limit?: number}) {
+  async getAccountBalance(address: string, options?: {addressMap?: Record<string, string>; limit?: number}) {
     return executeScript<number>({
       code: MelosNftScripts.getAccountBalance,
       args: [address],
@@ -91,6 +91,49 @@ export class MelosNFTSDK extends BaseSDK {
     return executeScript<boolean>({
       code: MelosNftScripts.getAccountHasNFT,
       args: [address, nftId],
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
+  async viewNFTData(address: string, nftId: number, options?: {addressMap?: Record<string, string>; limit?: number}) {
+    return executeScript<string>({
+      code: MelosNftScripts.viewNFTData,
+      args: [address, nftId],
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
+  async checkAccount(address: string, options?: {addressMap?: Record<string, string>; limit?: number}) {
+    return executeScript<boolean>({
+      code: MelosNftScripts.checkAccount,
+      args: [address],
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
+  async burn(sender: AuthAccount, nftId: number, options?: {addressMap?: Record<string, string>; limit?: number}) {
+    return sendTransaction({
+      code: MelosNftTransactions.burn,
+      args: [nftId],
+      payer: sender.auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
+  async batchMint(
+    sender: AuthAccount,
+    amount: number,
+    recipient: string,
+    options?: {addressMap?: Record<string, string>; limit?: number}
+  ) {
+    return sendTransaction({
+      code: MelosNftTransactions.batchMint,
+      args: [amount, recipient],
+      payer: sender.auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
