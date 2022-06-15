@@ -1042,7 +1042,7 @@ pub contract MelosMarketplace {
     }
 
     pub fun ensurePaymentTokenType(_ payment: @FungibleToken.Vault): @FungibleToken.Vault {
-      assert(payment.isInstance(self.details.paymentToken), message: "payment vault is not requested fungible token")
+      assert(payment.isInstance(self.details.paymentToken), message: "The payment token type is not the listing token type")
       return <- payment
     }
 

@@ -52,7 +52,7 @@ transaction(
     let PAYMENT_TOKEN_STORAGE_PATH = /storage/flowTokenVault
 
     let paymentToken = account.borrow<&FlowToken.Vault>(from: PAYMENT_TOKEN_STORAGE_PATH)
-      ?? panic("Cannot borrow paymentToken from account")
+      ?? panic("Cannot borrow paymentToken 'FlowToken' from account path '/storage/flowTokenVault'")
 
     self.refund = account.getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 
