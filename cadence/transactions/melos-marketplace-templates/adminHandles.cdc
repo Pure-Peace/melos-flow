@@ -1,5 +1,6 @@
 import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
-import FlowToken from "../../contracts/core/FlowToken.cdc"
+
+%ADMIN_IMPORTS%
 
 transaction(
 
@@ -13,6 +14,6 @@ transaction(
   }
 
   execute {
-    self.admin.setAllowedPaymentTokens([Type<@FlowToken.Vault>()])
+    %ADMIN_HANDLES%
   }
 }

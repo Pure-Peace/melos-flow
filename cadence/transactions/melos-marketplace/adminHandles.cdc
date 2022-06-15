@@ -1,5 +1,7 @@
 import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 
+%ADMIN_IMPORTS%
+
 transaction(
 
 ) {
@@ -19,5 +21,6 @@ transaction(
     // self.admin.setMaxAuctionDuration(newDuration)
     // self.admin.setMinimumListingDuration(newDuration)
     // self.admin.setTokenFeeConfig(tokenType: tokenType, config: config)
+    %ADMIN_HANDLES%
   }
 }
