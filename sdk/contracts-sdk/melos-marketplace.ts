@@ -8,7 +8,7 @@ import {
   ListingDetailsQuery,
 } from '../../sdk/type-contracts/MelosMarketplace';
 import {toUFix64} from '../common';
-import {AuthAccount, UFix64} from '../types';
+import {AuthAccount, FlowAddress, UFix64} from '../types';
 
 import MarketplaceScripts from '../../sdk-code/scripts/melos-marketplace';
 import MarketplaceTransactionsTemplates from '../../sdk-code/transactions/melos-marketplace-templates';
@@ -438,6 +438,131 @@ export class MelosMarketplaceSDK extends BaseSDK {
       payer: account.auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
+    });
+  }
+}
+
+export class MelosMarketplaceAdminSDK extends BaseSDK {
+  debug = false;
+
+  adminHandle(
+    account: AuthAccount,
+    options?: {
+      imports?: string;
+      handles?: string;
+      addressMap?: Record<string, string>;
+      replaceMap?: Record<string, string>;
+      limit?: number;
+    }
+  ) {
+    let code = MarketplaceTransactionsTemplates.adminHandles;
+    code = code.replace(new RegExp(`%ADMIN_IMPORTS%`, 'g'), options?.imports ?? '');
+    code = code.replace(new RegExp(`%ADMIN_HANDLES%`, 'g'), options?.handles ?? '');
+    code = this.code(code, options?.replaceMap);
+
+    if (this.debug) {
+      console.log(code);
+    }
+
+    return sendTransaction({
+      code,
+      args: [],
+      payer: account.auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
+  resolvePaymentTokens(cdcFunc: string, paymentTokens: [{tokenName: string; tokenAddress: FlowAddress}]) {
+    let imports = '';
+    let tokens = '';
+    for (const token of paymentTokens) {
+      imports += `import ${token.tokenName} from ${token.tokenAddress}`;
+      tokens += `${tokens !== '' ? ',' : ''}Type<@${token.tokenName}.Vault>()`;
+    }
+    const handles = `${cdcFunc}(${tokens})`;
+    return {imports, handles};
+  }
+
+  async addAllowedPaymentTokens(
+    account: AuthAccount,
+    paymentTokens: [{tokenName: string; tokenAddress: FlowAddress}],
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    return this.adminHandle(account, {
+      ...options,
+      ...this.resolvePaymentTokens('self.admin.addAllowedPaymentTokens', paymentTokens),
+    });
+  }
+
+  async removeAllowedPaymentTokens(
+    account: AuthAccount,
+    paymentTokens: [{tokenName: string; tokenAddress: FlowAddress}],
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    return this.adminHandle(account, {
+      ...options,
+      ...this.resolvePaymentTokens('self.admin.removeAllowedPaymentTokens', paymentTokens),
+    });
+  }
+
+  async setAllowedPaymentTokens(
+    account: AuthAccount,
+    paymentTokens: [{tokenName: string; tokenAddress: FlowAddress}],
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    return this.adminHandle(account, {
+      ...options,
+      ...this.resolvePaymentTokens('self.admin.setAllowedPaymentTokens', paymentTokens),
+    });
+  }
+
+  async setMaxAuctionDuration(
+    account: AuthAccount,
+    newDuration: number,
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    return this.adminHandle(account, {...options, handles: `self.admin.setMaxAuctionDuration(${newDuration})`});
+  }
+
+  async setMinimumListingDuration(
+    account: AuthAccount,
+    newDuration: number,
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    return this.adminHandle(account, {...options, handles: `self.admin.setMinimumListingDuration(${newDuration})`});
+  }
+
+  async removeTokenFeeConfig(
+    account: AuthAccount,
+    paymentTokens: {tokenName: string; tokenAddress: FlowAddress},
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    return this.adminHandle(account, {
+      ...options,
+      ...this.resolvePaymentTokens('self.admin.removeTokenFeeConfig', [paymentTokens]),
+    });
+  }
+
+  async setTokenFeeConfig(
+    account: AuthAccount,
+    tokenName: string,
+    tokenAddress: string,
+    txFeeReceiver: FlowAddress,
+    txFeePercent: UFix64,
+    royaltyReceiver: FlowAddress,
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    const imports = `import ${tokenName} from ${tokenAddress}`;
+    const handles = `self.admin.setTokenFeeConfig(
+      tokenType: Type<@${tokenName}.Vault>(), 
+      config: MelosMarketplace.FungibleTokenFeeConfig(txFeeReceiver: ${txFeeReceiver}, txFeePercent: ${txFeePercent}, royaltyReceiver: ${royaltyReceiver})
+    )`;
+
+    return this.adminHandle(account, {
+      ...options,
+      imports,
+      handles,
     });
   }
 }
