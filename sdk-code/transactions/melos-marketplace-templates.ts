@@ -129,7 +129,7 @@ transaction(
     self.listing = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
 
     let paymentToken = account.borrow<&%FT_NAME%.Vault>(from: PAYMENT_TOKEN_STORAGE_PATH)
-      ?? panic("Cannot borrow paymentToken from account")
+      ?? panic("Cannot borrow paymentToken '%FT_NAME%' from account path '%FT_STORAGE_PATH%'")
 
     self.refund = account.getCapability<&{FungibleToken.Receiver}>(%FT_RECEIVER%)
 
@@ -205,7 +205,7 @@ transaction(
     let PAYMENT_TOKEN_STORAGE_PATH = %FT_STORAGE_PATH%
 
     let paymentToken = account.borrow<&%FT_NAME%.Vault>(from: PAYMENT_TOKEN_STORAGE_PATH)
-      ?? panic("Cannot borrow paymentToken from account")
+      ?? panic("Cannot borrow paymentToken '%FT_NAME%' from account path '%FT_STORAGE_PATH%'")
 
     self.refund = account.getCapability<&{FungibleToken.Receiver}>(%FT_RECEIVER%)
 

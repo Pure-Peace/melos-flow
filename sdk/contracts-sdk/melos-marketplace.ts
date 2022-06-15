@@ -448,7 +448,7 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
     code = this.code(code, options?.replaceMap);
 
     if (this.debug) {
-      console.log(code);
+      console.log('AdminSDK DEBUG: ', code);
     }
 
     return sendTransaction({
@@ -463,12 +463,12 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
   resolvePaymentTokens(
     cdcFunc: string,
     isList: boolean,
-    paymentTokens: [{tokenName: string; tokenAddress: FlowAddress}]
+    paymentTokens: {tokenName: string; tokenAddress: FlowAddress}[]
   ) {
     let imports = '';
     let tokens = '';
     for (const token of paymentTokens) {
-      imports += `import ${token.tokenName} from ${token.tokenAddress}`;
+      imports += `import ${token.tokenName} from ${token.tokenAddress}\n`;
       tokens += `${tokens !== '' ? ',' : ''}Type<@${token.tokenName}.Vault>()`;
     }
     const handles = `${cdcFunc}(${isList ? '[' + tokens + ']' : tokens})`;
@@ -477,7 +477,7 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
 
   async addAllowedPaymentTokens(
     account: AuthAccount,
-    paymentTokens: [{tokenName: string; tokenAddress: FlowAddress}],
+    paymentTokens: {tokenName: string; tokenAddress: FlowAddress}[],
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return this.adminHandle(account, {
@@ -488,7 +488,7 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
 
   async removeAllowedPaymentTokens(
     account: AuthAccount,
-    paymentTokens: [{tokenName: string; tokenAddress: FlowAddress}],
+    paymentTokens: {tokenName: string; tokenAddress: FlowAddress}[],
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return this.adminHandle(account, {
@@ -499,7 +499,7 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
 
   async setAllowedPaymentTokens(
     account: AuthAccount,
-    paymentTokens: [{tokenName: string; tokenAddress: FlowAddress}],
+    paymentTokens: {tokenName: string; tokenAddress: FlowAddress}[],
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return this.adminHandle(account, {
@@ -544,7 +544,7 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
     royaltyReceiver: FlowAddress,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
-    const imports = `import ${tokenName} from ${tokenAddress}`;
+    const imports = `import ${tokenName} from ${tokenAddress}\n`;
     const handles = `self.admin.setTokenFeeConfig(
       tokenType: Type<@${tokenName}.Vault>(), 
       config: MelosMarketplace.FungibleTokenFeeConfig(txFeeReceiver: ${txFeeReceiver}, txFeePercent: ${txFeePercent}, royaltyReceiver: ${royaltyReceiver})
