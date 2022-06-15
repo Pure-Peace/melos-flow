@@ -47,7 +47,7 @@ describe('Melos NFT test', () => {
     assertTx(await nftSDK.setupCollection(account));
 
     // shall be able te read Alice collection and ensure it's empty
-    const itemCount = assertTx(await nftSDK.balanceOf(account.address));
+    const itemCount = assertTx(await nftSDK.getAccountBalance(account.address));
     expect(itemCount).toBe(0);
   });
 

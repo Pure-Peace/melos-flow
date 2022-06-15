@@ -149,19 +149,6 @@ export class MelosMarketplaceSDK extends BaseSDK {
     });
   }
 
-  async setAllowedPaymentTokens(
-    admin: AuthAccount,
-    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
-  ) {
-    return sendTransaction({
-      code: this.code(MarketplaceTransactionsTemplates.adminSetAllowedPaymentTokens, options?.replaceMap),
-      args: [],
-      payer: admin.auth,
-      addressMap: options?.addressMap ?? this.addressMap,
-      limit: options?.limit ?? this.limit,
-    });
-  }
-
   async getAllowedPaymentTokens(options?: {
     addressMap?: Record<string, string>;
     replaceMap?: Record<string, string>;
@@ -473,14 +460,18 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
     });
   }
 
-  resolvePaymentTokens(cdcFunc: string, paymentTokens: [{tokenName: string; tokenAddress: FlowAddress}]) {
+  resolvePaymentTokens(
+    cdcFunc: string,
+    isList: boolean,
+    paymentTokens: [{tokenName: string; tokenAddress: FlowAddress}]
+  ) {
     let imports = '';
     let tokens = '';
     for (const token of paymentTokens) {
       imports += `import ${token.tokenName} from ${token.tokenAddress}`;
       tokens += `${tokens !== '' ? ',' : ''}Type<@${token.tokenName}.Vault>()`;
     }
-    const handles = `${cdcFunc}(${tokens})`;
+    const handles = `${cdcFunc}(${isList ? '[' + tokens + ']' : tokens})`;
     return {imports, handles};
   }
 
@@ -491,7 +482,7 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
   ) {
     return this.adminHandle(account, {
       ...options,
-      ...this.resolvePaymentTokens('self.admin.addAllowedPaymentTokens', paymentTokens),
+      ...this.resolvePaymentTokens('self.admin.addAllowedPaymentTokens', true, paymentTokens),
     });
   }
 
@@ -502,7 +493,7 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
   ) {
     return this.adminHandle(account, {
       ...options,
-      ...this.resolvePaymentTokens('self.admin.removeAllowedPaymentTokens', paymentTokens),
+      ...this.resolvePaymentTokens('self.admin.removeAllowedPaymentTokens', true, paymentTokens),
     });
   }
 
@@ -513,7 +504,7 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
   ) {
     return this.adminHandle(account, {
       ...options,
-      ...this.resolvePaymentTokens('self.admin.setAllowedPaymentTokens', paymentTokens),
+      ...this.resolvePaymentTokens('self.admin.setAllowedPaymentTokens', true, paymentTokens),
     });
   }
 
@@ -540,7 +531,7 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
   ) {
     return this.adminHandle(account, {
       ...options,
-      ...this.resolvePaymentTokens('self.admin.removeTokenFeeConfig', [paymentTokens]),
+      ...this.resolvePaymentTokens('self.admin.removeTokenFeeConfig', false, [paymentTokens]),
     });
   }
 

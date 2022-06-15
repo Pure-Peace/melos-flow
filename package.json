@@ -12,8 +12,8 @@
     "prepare": "yarn generate-code",
     "build": "yarn prepare && tsc --project tsconfig-build.json",
     "clean": "rimraf ./build ./sdk-code",
-    "test": "jest --runInBand",
-    "gen-test": "yarn prepare && yarn test",
+    "test": "yarn prepare && yarn test-no-gen",
+    "test-no-gen": "jest --runInBand",
     "verify": "tsc --noEmit",
     "generate-code": "node ./generateCadence.js && node ./generateSdkCode.js"
   },

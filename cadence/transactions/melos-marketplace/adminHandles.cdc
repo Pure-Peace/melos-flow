@@ -14,13 +14,6 @@ transaction(
   }
 
   execute {
-    // self.admin.addAllowedPaymentTokens(newAllowedPaymentTokens)
-    // self.admin.removeAllowedPaymentTokens(removedPaymentTokens)
-    // self.admin.removeTokenFeeConfig(tokenType)
-    // self.admin.setAllowedPaymentTokens(newAllowedPaymentTokens)
-    // self.admin.setMaxAuctionDuration(newDuration)
-    // self.admin.setMinimumListingDuration(newDuration)
-    // self.admin.setTokenFeeConfig(tokenType: tokenType, config: config)
     %ADMIN_HANDLES%
   }
 }

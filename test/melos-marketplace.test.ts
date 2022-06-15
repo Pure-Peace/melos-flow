@@ -22,7 +22,7 @@ import {MelosNFTMintedEvent, MelosNFTEvents} from '../sdk/type-contracts/MelosNF
 
 import {CommonSDK} from '../sdk/contracts-sdk/common';
 import {MelosNFTSDK} from '../sdk/contracts-sdk/melos-nft';
-import {MelosMarketplaceSDK} from '../sdk/contracts-sdk/melos-marketplace';
+import {MelosMarketplaceAdminSDK, MelosMarketplaceSDK} from '../sdk/contracts-sdk/melos-marketplace';
 
 const TESTING_REPLACE_MAP = {
   NFT_NAME: 'MelosNFT',
@@ -39,6 +39,7 @@ const TESTING_REPLACE_MAP = {
 const commonSDK = new CommonSDK(TESTING_ADDRESS_MAP);
 const nftSDK = new MelosNFTSDK(TESTING_ADDRESS_MAP);
 const marketplaceSDK = new MelosMarketplaceSDK(TESTING_ADDRESS_MAP, DEFAULT_LIMIT, TESTING_REPLACE_MAP);
+const adminSDK = new MelosMarketplaceAdminSDK(TESTING_ADDRESS_MAP);
 
 // Increase timeout if your tests failing due to timeout
 jest.setTimeout(300 * SECOND);
@@ -70,7 +71,11 @@ const initializeMarketplace = async () => {
 
   // Set allowed payment tokens
   const admin = await getAuthAccountByName('emulator-account');
-  assertTx(await marketplaceSDK.setAllowedPaymentTokens(admin));
+  assertTx(
+    await adminSDK.setAllowedPaymentTokens(admin, [
+      {tokenName: 'FlowToken', tokenAddress: TESTING_REPLACE_MAP.FT_ADDRESS},
+    ])
+  );
   const allowedPaymentTokens = assertTx(await marketplaceSDK.getAllowedPaymentTokens());
   console.log('allowedPaymentTokens: ', allowedPaymentTokens);
   expect(allowedPaymentTokens.length).toBeGreaterThan(0);
