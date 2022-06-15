@@ -60,6 +60,11 @@ pub contract MelosNFT: NonFungibleToken {
             return <-token
         }
 
+        pub fun burn(nftId: UInt64) {
+          destroy self.withdraw(withdrawID: nftId)
+          MelosNFT.totalSupply = MelosNFT.totalSupply - 1
+        }
+
         // deposit takes a NFT and adds it to the collections dictionary
         // and adds the ID to the id array
         pub fun deposit(token: @NonFungibleToken.NFT) {
