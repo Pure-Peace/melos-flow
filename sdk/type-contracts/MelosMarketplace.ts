@@ -136,10 +136,11 @@ export enum ListingType {
 
 export type MarketplaceEvents =
   | 'MelosSettlementInitialized'
-  | 'ListingManagerCreated'
-  | 'ListingManagerDestroyed'
+  | 'MarketplaceManagerCreated'
+  | 'MarketplaceManagerDestroyed'
   | 'FungibleTokenFeeUpdated'
   | 'ListingTxFeeCutted'
+  | 'OfferAcceptFeeCutted'
   | 'FungibleTokenFeeRemoved'
   | 'MinimumListingDurationChanged'
   | 'MaxAuctionDurationChanged'
@@ -150,8 +151,11 @@ export type MarketplaceEvents =
   | 'ListingCreated'
   | 'ListingRemoved'
   | 'FixedPricesListingCompleted'
+  | 'FungibleTokenRefunded'
   | 'OfferCreated'
   | 'OfferAccepted'
   | 'OfferRemoved'
   | 'UnRefundPaymentCreated'
-  | 'UnRefundPaymentClaimed';
+  | 'UnRefundPaymentClaimed'
+  | 'UnRefundPaymentDeposited'
+  | 'UnRefundPaymentNotify';
