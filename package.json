@@ -9,12 +9,12 @@
     "sdk/typings.d.ts"
   ],
   "scripts": {
-    "prepare": "yarn generate-code",
+    "prepare": "yarn clean && yarn generate-code",
     "build": "yarn prepare && yarn build:es2015 && yarn build:esm && yarn build:cjs",
     "build:es2015": "tsc --project tsconfig-build.json --module es2015 --target es2015 --outDir dist/es2015",
     "build:esm": "tsc --project tsconfig-build.json --module es2015 --target es5 --outDir dist/esm",
     "build:cjs": "tsc --project tsconfig-build.json --module commonjs --target es5 --outDir dist/cjs",
-    "clean": "rimraf ./build ./sdk-code",
+    "clean": "rimraf ./build ./dist ./sdk-code",
     "test": "yarn prepare && yarn test-no-gen",
     "test-no-gen": "jest --runInBand",
     "verify": "tsc --noEmit",
