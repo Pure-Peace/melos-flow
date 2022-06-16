@@ -231,7 +231,7 @@ describe('Melos marketplace tests', () => {
     return await new Promise((r) => setTimeout(r, 1000));
   });
 
-  /*  it('should be able to create an empty ListingManager on alice', async () => {
+  it('should be able to create an empty MarketplaceManager on alice', async () => {
     // Setup
     await deployContractsIfNotDeployed();
     const alice = await getAuthAccountByName('alice');
@@ -607,7 +607,7 @@ describe('Melos marketplace tests', () => {
     // Bob remove his offer
     const removeOfferResult = assertTx(await marketplaceSDKFlow.removeOffer(bob, bobOffer.offerId));
     console.log('removeOfferResult: ', removeOfferResult);
-  }); */
+  });
 
   it('FUSD && UnRefundPayment tests', async () => {
     // Deploy contracts
@@ -674,6 +674,7 @@ describe('Melos marketplace tests', () => {
     // Alice remove listing
     console.log('remove listing...');
     const result = assertTx(await marketplaceSDKFUSD.removeListing(alice, listingId));
-    console.log(result);
+    const resultEvents = getTxEvents(result);
+    console.log('listing removed events: ', resultEvents);
   });
 });

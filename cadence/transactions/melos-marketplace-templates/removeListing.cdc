@@ -3,15 +3,15 @@ import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 transaction(
   listingId: UInt64
 ) {
-  let listingManager: &MelosMarketplace.ListingManager
+  let manager: &MelosMarketplace.MarketplaceManager
   prepare(account: AuthAccount) {
-    let STORAGE_PATH = MelosMarketplace.ListingManagerStoragePath
+    let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
 
-    self.listingManager = account.borrow<&MelosMarketplace.ListingManager>(from: STORAGE_PATH) 
-      ?? panic("Cannot borrow ListingManager")
+    self.manager = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) 
+      ?? panic("Cannot borrow MarketplaceManager")
   }
 
   execute {
-    self.listingManager.removeListing(listingId: listingId)
+    self.manager.removeListing(listingId: listingId)
   }
 }

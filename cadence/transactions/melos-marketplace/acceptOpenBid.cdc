@@ -4,15 +4,15 @@ transaction(
   listingId: UInt64,
   bidId: UInt64
 ) {
-  let listingManager: &MelosMarketplace.ListingManager
+  let manager: &MelosMarketplace.MarketplaceManager
   prepare(account: AuthAccount) {
-    let STORAGE_PATH = MelosMarketplace.ListingManagerStoragePath
+    let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
 
-    self.listingManager = account.borrow<&MelosMarketplace.ListingManager>(from: STORAGE_PATH) 
-      ?? panic("Cannot borrow ListingManager")
+    self.manager = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) 
+      ?? panic("Cannot borrow MarketplaceManager")
   }
 
   execute {
-    self.listingManager.acceptOpenBid(listingId: listingId, bidId: bidId)
+    self.manager.acceptOpenBid(listingId: listingId, bidId: bidId)
   }
 }

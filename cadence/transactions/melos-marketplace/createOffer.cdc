@@ -6,20 +6,20 @@ import MelosNFT from "../../contracts/MelosNFT.cdc"
 import FlowToken from "../../contracts/core/FlowToken.cdc"
 
 
-pub fun getOrCreateOfferManager(account: AuthAccount): &MelosMarketplace.OfferManager {
-    let PUBLIC_PATH = MelosMarketplace.OfferManagerPublicPath
-    let STORAGE_PATH = MelosMarketplace.OfferManagerStoragePath
+pub fun getOrCreateManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
+    let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
+    let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
 
-    if let offerManagerRef = account.borrow<&MelosMarketplace.OfferManager>(from: STORAGE_PATH) {
-      return offerManagerRef
+    if let managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) {
+      return managerRef
     }
 
-    let offerManager <- MelosMarketplace.createOfferManager()
-    let offerManagerRef = &offerManager as &MelosMarketplace.OfferManager
-    account.save(<- offerManager, to: STORAGE_PATH)
-    account.link<&{MelosMarketplace.OfferManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+    let manager <- MelosMarketplace.createMarketplaceManager()
+    let managerRef = &manager as &MelosMarketplace.MarketplaceManager
+    account.save(<- manager, to: STORAGE_PATH)
+    account.link<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.OfferManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
 
-    return offerManagerRef
+    return managerRef
 }
 
 pub fun getOrCreateNFTCollection(account: AuthAccount): Capability<&{NonFungibleToken.Receiver}> {
@@ -46,8 +46,8 @@ transaction(
   let payment: @FungibleToken.Vault
   let collection: Capability<&{NonFungibleToken.Receiver}>
   let refund: Capability<&{FungibleToken.Receiver}>
-  let offerManager: &MelosMarketplace.OfferManager
-  let offerManagerCapability: Capability<&{MelosMarketplace.OfferManagerPublic}>
+  let manager: &MelosMarketplace.MarketplaceManager
+  let offerManagerCapability: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.OfferManagerPublic}>
   prepare(account: AuthAccount) {
     let PAYMENT_TOKEN_STORAGE_PATH = /storage/flowTokenVault
 
@@ -60,12 +60,12 @@ transaction(
 
     self.collection = getOrCreateNFTCollection(account: account)
     
-    self.offerManager = getOrCreateOfferManager(account: account)
-    self.offerManagerCapability = account.getCapability<&{MelosMarketplace.OfferManagerPublic}>(MelosMarketplace.OfferManagerPublicPath)
+    self.manager = getOrCreateManager(account: account)
+    self.offerManagerCapability = account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.OfferManagerPublic}>(MelosMarketplace.MarketplaceManagerPublicPath)
   }
 
   execute {
-    let result = self.offerManager.createOffer(
+    let result = self.manager.createOffer(
       nftId: nftId,
       nftType: Type<@MelosNFT.NFT>(),
       offerStartTime: offerStartTime ?? getCurrentBlock().timestamp,
@@ -73,7 +73,7 @@ transaction(
       payment: <- self.payment,
       rewardCollection: self.collection,
       refund: self.refund,
-      offerManager: self.offerManagerCapability,
+      manager: self.offerManagerCapability,
       royaltyPercent: royaltyPercent
     )
   }

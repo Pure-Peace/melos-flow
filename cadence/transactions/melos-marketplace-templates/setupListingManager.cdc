@@ -3,12 +3,12 @@ import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 
 transaction {
   prepare(account: AuthAccount) {
-    let PUBLIC_PATH = MelosMarketplace.ListingManagerPublicPath
-    let STORAGE_PATH = MelosMarketplace.ListingManagerStoragePath
+    let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
+    let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
 
-    if account.borrow<&MelosMarketplace.ListingManager>(from: STORAGE_PATH) == nil {
-      let listingManager <- MelosMarketplace.createListingManager()
-      account.save(<- listingManager, to: STORAGE_PATH)
+    if account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) == nil {
+      let manager <- MelosMarketplace.createMarketplaceManager()
+      account.save(<- manager, to: STORAGE_PATH)
       account.link<&{MelosMarketplace.ListingManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
     }
   }

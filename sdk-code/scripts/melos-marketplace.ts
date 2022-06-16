@@ -6,11 +6,11 @@ import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 pub fun main(address: Address): Int {
     let account = getAccount(address)
 
-    let listingManager = account.getCapability(MelosMarketplace.ListingManagerPublicPath)
+    let manager = account.getCapability(MelosMarketplace.MarketplaceManagerPublicPath)
         .borrow<&{MelosMarketplace.ListingManagerPublic}>()
-        ?? panic("Could not borrow capability from public ListingManager")
+         ?? panic("Could not borrow manager capability from MarketplaceManagerPublicPath")
     
-    return listingManager.getlistings().length
+    return manager.getlistings().length
 }
 
 `,
@@ -21,11 +21,11 @@ import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 pub fun main(address: Address): {UInt64: UInt64} {
     let account = getAccount(address)
 
-    let listingManager = account.getCapability(MelosMarketplace.ListingManagerPublicPath)
+    let manager = account.getCapability(MelosMarketplace.MarketplaceManagerPublicPath)
         .borrow<&{MelosMarketplace.ListingManagerPublic}>()
-        ?? panic("Could not borrow capability from public ListingManager")
+          ?? panic("Could not borrow manager capability from MarketplaceManagerPublicPath")
     
-    return listingManager.getlistings()
+    return manager.getlistings()
 }
 
 `,
