@@ -13,13 +13,13 @@ import {createAuth, getAccountFromEnv} from '../sdk/flow-service';
 import {MelosMarketplaceAdminSDK, MelosMarketplaceSDK} from '../sdk/contracts-sdk/melos-marketplace';
 import {CommonSDK} from '../sdk/contracts-sdk/common';
 
-const MELOS_NFT_ADDRESS = '0xf8d6e0586b0a20c7';
-const MELOS_MARKETPLACE = '0xf8d6e0586b0a20c7';
+const MELOS_NFT_ADDRESS = '0xe2fb1d6d24d0919e';
+const MELOS_MARKETPLACE = '0xe2fb1d6d24d0919e';
 
 const TESTNET_ADDRESS_MAP = {
   ...TESTNET_BASE_ADDRESS_MAP,
-  MELOS_NFT_ADDRESS,
-  MELOS_MARKETPLACE,
+  MelosNFT: MELOS_NFT_ADDRESS,
+  MelosMarketplace: MELOS_MARKETPLACE,
 };
 
 const TESTNET_REPLACE_MAP: ReplaceMap = {
