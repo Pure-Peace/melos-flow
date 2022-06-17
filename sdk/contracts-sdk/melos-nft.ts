@@ -29,12 +29,17 @@ export class MelosNFTSDK extends BaseSDK {
   }
 
   /**
-   * Mints Melos to **recipient**.
+   * Mints amount of Melos to **recipient**.
    * */
-  async mint(auth: FlowAuthorize, recipient: string, options?: {addressMap?: Record<string, string>; limit?: number}) {
+  async mint(
+    auth: FlowAuthorize,
+    recipient: string,
+    amount: number,
+    options?: {addressMap?: Record<string, string>; limit?: number}
+  ) {
     return sendTransaction({
       code: MelosNftTransactions.mint,
-      args: [recipient],
+      args: [recipient, amount],
       payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
@@ -127,13 +132,28 @@ export class MelosNFTSDK extends BaseSDK {
 
   async batchMint(
     auth: FlowAuthorize,
-    amount: number,
-    recipient: string,
+    amounts: number[],
+    recipients: string[],
     options?: {addressMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: MelosNftTransactions.batchMint,
-      args: [amount, recipient],
+      args: [amounts, recipients],
+      payer: auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
+  async batchTransfer(
+    auth: FlowAuthorize,
+    tokenIds: number[],
+    recipients: string[],
+    options?: {addressMap?: Record<string, string>; limit?: number}
+  ) {
+    return sendTransaction({
+      code: MelosNftTransactions.batchTransfer,
+      args: [tokenIds, recipients],
       payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
