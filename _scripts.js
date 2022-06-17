@@ -2,7 +2,7 @@
 'use strict';
 /* eslint-disable no-undef */
 /* eslint-disable @typescript-eslint/no-var-requires */
-const { spawn } = require('child_process');
+const {spawn} = require('child_process');
 require('dotenv').config();
 
 const commandlineArgs = process.argv.slice(2);
@@ -22,15 +22,13 @@ function execute(command) {
   });
 }
 
-/** 
+/**
  * @param {string} rawArgs
  */
 async function performAction(rawArgs) {
   const firstArg = rawArgs[0];
 
-  await execute(
-    `ts-node ./scripts/${firstArg}.ts`
-  );
+  await execute(`yarn ts-node ./scripts/${firstArg}.ts`);
 }
 
-performAction(commandlineArgs)
+performAction(commandlineArgs);

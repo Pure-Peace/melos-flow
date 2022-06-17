@@ -1,54 +1,6 @@
 declare module '@onflow/fcl';
 declare module '@onflow/config';
-declare module 'flow-cadut' {
-  type TxResult = {
-    txId: {
-      tag: string;
-      transaction?: any;
-      transactionStatus?: any;
-      transactionId: string;
-      encodedData?: any;
-      events?: any;
-      account?: any;
-      block?: any;
-      blockHeader?: any;
-      latestBlock?: any;
-      collection?: any;
-    };
-    status: number;
-    statusString: string;
-    statusCode: number;
-    errorMessage: string;
-    events: any[];
-  };
 
-  async function sendTransaction(
-    props: {
-      code?: string;
-      cadence?: string;
-      args?: any[];
-      addressMap?: Record<string, string>;
-      limit?: number;
-      processed?: boolean;
-      proposer?: FlowAuthorizeMinter;
-      payer?: FlowAuthorizeMinter;
-      signers?: FlowAuthorizeMinter;
-      wait?: string;
-    } = {wait: 'seal'}
-  ): Promise<[TxResult | null, any]>;
-
-  async function executeScript<T>(
-    props: {
-      code?: string;
-      cadence?: string;
-      args?: any[];
-      addressMap?: Record<string, string>;
-      limit?: number;
-      processed?: boolean;
-      raw?: boolean;
-    } = {raw: false}
-  ): Promise<[T?, any]>;
-}
 declare module 'flow-js-testing' {
   /**
    * Inits framework variables, storing private key of service account and base path

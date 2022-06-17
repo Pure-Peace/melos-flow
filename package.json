@@ -1,5 +1,5 @@
 {
-  "name": "melos-flow-contracts",
+  "name": "melos-flow",
   "version": "1.0.0",
   "description": "",
   "main": "build/index.js",
@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "prepare": "yarn clean && yarn generate-code",
+    "do": "node ./_scripts.js",
     "build": "yarn prepare && yarn build:es2015 && yarn build:esm && yarn build:cjs",
     "build:es2015": "tsc --project tsconfig-build.json --module es2015 --target es2015 --outDir dist/es2015",
     "build:esm": "tsc --project tsconfig-build.json --module es2015 --target es5 --outDir dist/esm",
@@ -28,10 +29,10 @@
   "license": "ISC",
   "dependencies": {
     "@onflow/fcl": "^0.0.78",
-    "@onflow/types": "^1.0.1",
+    "@onflow/types": "0.0.6",
     "elliptic": "^6.5.4",
-    "flow-cadut": "^0.1.16-alpha.4",
-    "ts-node": "^10.7.0"
+    "ts-node": "^10.7.0",
+    "tslib": "^2.4.0"
   },
   "devDependencies": {
     "@rarible/fcl-types": "^0.5.33-alpha.11",
