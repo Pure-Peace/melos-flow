@@ -18,7 +18,11 @@
     "test": "yarn prepare && yarn test-no-gen",
     "test-no-gen": "jest --runInBand",
     "verify": "tsc --noEmit",
-    "generate-code": "node ./generateCadence.js && node ./generateSdkCode.js"
+    "generate-code": "node ./generateCadence.js && node ./generateSdkCode.js",
+    "contract-deploy:testnet": "flow deploy project --config-path ./flow.testnet.json",
+    "contract-deploy:mainnet": "flow deploy project --config-path ./flow.mainnet.json",
+    "contract-update:testnet": "flow deploy project --update --config-path ./flow.testnet.json",
+    "contract-update:mainnet": "flow deploy project --update --config-path ./flow.mainnet.json"
   },
   "author": "",
   "license": "ISC",
