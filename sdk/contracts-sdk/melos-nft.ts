@@ -1,15 +1,16 @@
-import {sendTransaction, executeScript} from 'flow-cadut';
-import {AuthAccount} from '../types';
 import {BaseSDK} from './base';
+
+import {FlowAuthorize} from '../../sdk/flow-service';
 
 import MelosNftTransactions from '../../sdk-code/transactions/melos-nft';
 import MelosNftScripts from '../../sdk-code/scripts/melos-nft';
+import {executeScript, sendTransaction} from '../../sdk/transaction-utils';
 
 export class MelosNFTSDK extends BaseSDK {
-  async setupCollection(account: AuthAccount, options?: {addressMap?: Record<string, string>; limit?: number}) {
+  async setupCollection(auth: FlowAuthorize, options?: {addressMap?: Record<string, string>; limit?: number}) {
     return sendTransaction({
       code: MelosNftTransactions.setupCollection,
-      payer: account.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
@@ -30,11 +31,11 @@ export class MelosNFTSDK extends BaseSDK {
   /**
    * Mints Melos to **recipient**.
    * */
-  async mint(minter: AuthAccount, recipient: string, options?: {addressMap?: Record<string, string>; limit?: number}) {
+  async mint(auth: FlowAuthorize, recipient: string, options?: {addressMap?: Record<string, string>; limit?: number}) {
     return sendTransaction({
       code: MelosNftTransactions.mint,
       args: [recipient],
-      payer: minter.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
@@ -47,7 +48,7 @@ export class MelosNFTSDK extends BaseSDK {
    * @param {UInt64} nftId - id of the item to transfer
    * */
   async transfer(
-    sender: AuthAccount,
+    auth: FlowAuthorize,
     recipient: string,
     nftId: number,
     options?: {addressMap?: Record<string, string>; limit?: number}
@@ -55,7 +56,7 @@ export class MelosNFTSDK extends BaseSDK {
     return sendTransaction({
       code: MelosNftTransactions.transfer,
       args: [nftId, recipient],
-      payer: sender.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
@@ -114,18 +115,18 @@ export class MelosNFTSDK extends BaseSDK {
     });
   }
 
-  async burn(sender: AuthAccount, nftId: number, options?: {addressMap?: Record<string, string>; limit?: number}) {
+  async burn(auth: FlowAuthorize, nftId: number, options?: {addressMap?: Record<string, string>; limit?: number}) {
     return sendTransaction({
       code: MelosNftTransactions.burn,
       args: [nftId],
-      payer: sender.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
   }
 
   async batchMint(
-    sender: AuthAccount,
+    auth: FlowAuthorize,
     amount: number,
     recipient: string,
     options?: {addressMap?: Record<string, string>; limit?: number}
@@ -133,7 +134,7 @@ export class MelosNFTSDK extends BaseSDK {
     return sendTransaction({
       code: MelosNftTransactions.batchMint,
       args: [amount, recipient],
-      payer: sender.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });

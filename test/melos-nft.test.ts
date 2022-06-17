@@ -2,9 +2,9 @@ import {emulator, prepareEmulator, deployContractsIfNotDeployed, getAuthAccountB
 import {assertTx} from '../sdk/common';
 
 import {MelosNFTSDK} from '../sdk/contracts-sdk/melos-nft';
-import {TESTING_ADDRESS_MAP} from '../sdk/contracts-sdk/base';
+import {EMULATOR_ADDRESS_MAP} from '../sdk/common';
 
-const nftSDK = new MelosNFTSDK(TESTING_ADDRESS_MAP);
+const nftSDK = new MelosNFTSDK(EMULATOR_ADDRESS_MAP);
 
 // Increase timeout if your tests failing due to timeout
 jest.setTimeout(100000);
@@ -23,7 +23,8 @@ describe('Melos NFT test', () => {
   it('supply should be 0 after contract is deployed', async () => {
     await deployContractsIfNotDeployed();
 
-    assertTx(await nftSDK.setupCollection(await getAuthAccountByName('emulator-account')));
+    const admin = await getAuthAccountByName('emulator-account');
+    assertTx(await nftSDK.setupCollection(admin.auth));
 
     const [supply] = await nftSDK.totalSupply();
     expect(supply).toBe(0);
@@ -33,18 +34,18 @@ describe('Melos NFT test', () => {
     await deployContractsIfNotDeployed();
 
     const alice = await getAuthAccountByName('alice');
-    assertTx(await nftSDK.setupCollection(alice));
+    assertTx(await nftSDK.setupCollection(alice.auth));
 
     // Mint instruction for Alice account shall be resolved
     const minter = await getAuthAccountByName('emulator-account');
-    assertTx(await nftSDK.mint(minter, alice.address));
+    assertTx(await nftSDK.mint(minter.auth, alice.address));
   });
 
   it('should be able to create a new empty NFT Collection', async () => {
     await deployContractsIfNotDeployed();
 
     const account = await getAuthAccountByName('emulator-account');
-    assertTx(await nftSDK.setupCollection(account));
+    assertTx(await nftSDK.setupCollection(account.auth));
 
     // shall be able te read Alice collection and ensure it's empty
     const itemCount = assertTx(await nftSDK.getAccountBalance(account.address));
@@ -56,11 +57,11 @@ describe('Melos NFT test', () => {
 
     const alice = await getAuthAccountByName('alice');
     const bob = await getAuthAccountByName('bob');
-    await nftSDK.setupCollection(alice);
-    await nftSDK.setupCollection(bob);
+    await nftSDK.setupCollection(alice.auth);
+    await nftSDK.setupCollection(bob.auth);
 
     // Transfer transaction shall fail for non-existent item
-    const [res, err] = await nftSDK.transfer(alice, bob.address, 1337);
+    const [res, err] = await nftSDK.transfer(alice.auth, bob.address, 1337);
     expect(!!err).toBe(true);
   });
 
@@ -69,14 +70,14 @@ describe('Melos NFT test', () => {
 
     const alice = await getAuthAccountByName('alice');
     const bob = await getAuthAccountByName('bob');
-    await nftSDK.setupCollection(alice);
-    await nftSDK.setupCollection(bob);
+    await nftSDK.setupCollection(alice.auth);
+    await nftSDK.setupCollection(bob.auth);
 
     // Mint instruction for Alice account shall be resolved
     const minter = await getAuthAccountByName('emulator-account');
-    assertTx(await nftSDK.mint(minter, alice.address));
+    assertTx(await nftSDK.mint(minter.auth, alice.address));
 
     // Transfer transaction shall pass
-    assertTx(await nftSDK.transfer(alice, bob.address, 0));
+    assertTx(await nftSDK.transfer(alice.auth, bob.address, 0));
   });
 });

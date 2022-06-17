@@ -1,4 +1,3 @@
-import {sendTransaction, executeScript} from 'flow-cadut';
 import {
   ListingType,
   CommonParams,
@@ -8,25 +7,27 @@ import {
   ListingDetailsQuery,
 } from '../../sdk/type-contracts/MelosMarketplace';
 import {toUFix64} from '../common';
-import {AuthAccount, FlowAddress, UFix64} from '../types';
+import {FlowAddress, UFix64} from '../types';
 
 import MarketplaceScripts from '../../sdk-code/scripts/melos-marketplace';
 import MarketplaceTransactionsTemplates from '../../sdk-code/transactions/melos-marketplace-templates';
 import {BaseSDK} from './base';
+import {FlowAuthorize} from '../../sdk/flow-service';
+import {executeScript, sendTransaction} from '../../sdk/transaction-utils';
 
 export class MelosMarketplaceSDK extends BaseSDK {
   /**
-   * Sets up MelosMarketplace.MarketplaceManager on account and exposes public capability.
-   * @param {string} account - account address
+   * Sets up MelosMarketplace.MarketplaceManager on auth and exposes public capability.
+   * @param {string} auth - auth address
    * @throws Will throw an error if transaction is reverted.
    * */
   async setupListingManager(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.setupListingManager, options?.replaceMap),
-      payer: account.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
@@ -55,7 +56,7 @@ export class MelosMarketplaceSDK extends BaseSDK {
   }
 
   async createListing(
-    owner: AuthAccount,
+    auth: FlowAuthorize,
     nftId: number,
     listingType: ListingType,
     cfg: CommonParams | OpenBidParams | DutchAuctionParams | EnglishAuctionParams,
@@ -89,49 +90,49 @@ export class MelosMarketplaceSDK extends BaseSDK {
     return sendTransaction({
       code: this.getListingCodeByType(listingType, options?.replaceMap),
       args,
-      payer: owner.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
   }
 
   async removeListing(
-    listingOwner: AuthAccount,
+    auth: FlowAuthorize,
     listingId: number,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.removeListing, options?.replaceMap),
       args: [listingId],
-      payer: listingOwner.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
   }
 
   async publicRemoveEndedListing(
-    executor: AuthAccount,
+    auth: FlowAuthorize,
     listingId: number,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.publicRemoveEndedListing, options?.replaceMap),
       args: [listingId],
-      payer: executor.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
   }
 
   async purchaseListing(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     listingId: number,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.purchaseListing, options?.replaceMap),
       args: [listingId],
-      payer: account.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
@@ -224,7 +225,7 @@ export class MelosMarketplaceSDK extends BaseSDK {
   }
 
   async createBid(
-    buyer: AuthAccount,
+    auth: FlowAuthorize,
     listingId: number,
     price: number,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
@@ -232,14 +233,14 @@ export class MelosMarketplaceSDK extends BaseSDK {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.createBid, options?.replaceMap),
       args: [listingId, toUFix64(price)],
-      payer: buyer.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
   }
 
   async removeBid(
-    bidder: AuthAccount,
+    auth: FlowAuthorize,
     listingId: number,
     bidId: number,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
@@ -247,7 +248,7 @@ export class MelosMarketplaceSDK extends BaseSDK {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.removeBid, options?.replaceMap),
       args: [listingId, bidId],
-      payer: bidder.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
@@ -266,7 +267,7 @@ export class MelosMarketplaceSDK extends BaseSDK {
   }
 
   async acceptOpenBid(
-    seller: AuthAccount,
+    auth: FlowAuthorize,
     listingId: number,
     bidId: number,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
@@ -274,7 +275,7 @@ export class MelosMarketplaceSDK extends BaseSDK {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.acceptOpenBid, options?.replaceMap),
       args: [listingId, bidId],
-      payer: seller.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
@@ -305,14 +306,14 @@ export class MelosMarketplaceSDK extends BaseSDK {
   }
 
   async publicCompleteEnglishAuction(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     listingId: number,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.publicCompleteEnglishAuction, options?.replaceMap),
       args: [listingId],
-      payer: account.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
@@ -369,7 +370,7 @@ export class MelosMarketplaceSDK extends BaseSDK {
   }
 
   async createOffer(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     nftId: number,
     offerDuration: number,
     offerPrice: number,
@@ -380,49 +381,49 @@ export class MelosMarketplaceSDK extends BaseSDK {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.createOffer, options?.replaceMap),
       args: [nftId, toUFix64(offerDuration), toUFix64(offerPrice), toUFix64(royaltyPercent), toUFix64(offerStartTime)],
-      payer: account.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
   }
 
   async acceptOffer(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     offerId: number,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.acceptOffer, options?.replaceMap),
       args: [offerId],
-      payer: account.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
   }
 
   async removeOffer(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     offerId: number,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.removeOffer, options?.replaceMap),
       args: [offerId],
-      payer: account.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
   }
 
   async publicRemoveEndedOffer(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     offerId: number,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.publicRemoveEndedOffer, options?.replaceMap),
       args: [offerId],
-      payer: account.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
@@ -433,7 +434,7 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
   debug = false;
 
   adminHandle(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     options?: {
       imports?: string;
       handles?: string;
@@ -454,7 +455,7 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
     return sendTransaction({
       code,
       args: [],
-      payer: account.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
@@ -476,67 +477,67 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
   }
 
   async addAllowedPaymentTokens(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     paymentTokens: {tokenName: string; tokenAddress: FlowAddress}[],
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
-    return this.adminHandle(account, {
+    return this.adminHandle(auth, {
       ...options,
       ...this.resolvePaymentTokens('self.admin.addAllowedPaymentTokens', true, paymentTokens),
     });
   }
 
   async removeAllowedPaymentTokens(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     paymentTokens: {tokenName: string; tokenAddress: FlowAddress}[],
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
-    return this.adminHandle(account, {
+    return this.adminHandle(auth, {
       ...options,
       ...this.resolvePaymentTokens('self.admin.removeAllowedPaymentTokens', true, paymentTokens),
     });
   }
 
   async setAllowedPaymentTokens(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     paymentTokens: {tokenName: string; tokenAddress: FlowAddress}[],
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
-    return this.adminHandle(account, {
+    return this.adminHandle(auth, {
       ...options,
       ...this.resolvePaymentTokens('self.admin.setAllowedPaymentTokens', true, paymentTokens),
     });
   }
 
   async setMaxAuctionDuration(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     newDuration: number,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
-    return this.adminHandle(account, {...options, handles: `self.admin.setMaxAuctionDuration(${newDuration})`});
+    return this.adminHandle(auth, {...options, handles: `self.admin.setMaxAuctionDuration(${newDuration})`});
   }
 
   async setMinimumListingDuration(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     newDuration: number,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
-    return this.adminHandle(account, {...options, handles: `self.admin.setMinimumListingDuration(${newDuration})`});
+    return this.adminHandle(auth, {...options, handles: `self.admin.setMinimumListingDuration(${newDuration})`});
   }
 
   async removeTokenFeeConfig(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     paymentTokens: {tokenName: string; tokenAddress: FlowAddress},
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
-    return this.adminHandle(account, {
+    return this.adminHandle(auth, {
       ...options,
       ...this.resolvePaymentTokens('self.admin.removeTokenFeeConfig', false, [paymentTokens]),
     });
   }
 
   async setTokenFeeConfig(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     tokenName: string,
     tokenAddress: string,
     txFeeReceiver: FlowAddress,
@@ -550,7 +551,7 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
       config: MelosMarketplace.FungibleTokenFeeConfig(txFeeReceiver: ${txFeeReceiver}, txFeePercent: ${txFeePercent}, royaltyReceiver: ${royaltyReceiver})
     )`;
 
-    return this.adminHandle(account, {
+    return this.adminHandle(auth, {
       ...options,
       imports,
       handles,
