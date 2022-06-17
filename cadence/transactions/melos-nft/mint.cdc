@@ -6,7 +6,7 @@ import MelosNFT from "../../contracts/MelosNFT.cdc"
 // It must be run with the account that has the Admin resource
 // stored at path /storage/melosNFTAdmin.
 
-transaction(recipient: Address) {
+transaction(recipient: Address, amount: UInt64) {
 
     // local variable for storing the admin reference
     let admin: &MelosNFT.Admin
@@ -27,6 +27,6 @@ transaction(recipient: Address) {
             .getCapability<&{NonFungibleToken.CollectionPublic}>(MelosNFT.CollectionPublicPath)
 
         // mint the NFT and deposit it to the recipient's collection
-        self.admin.mintTo(recipient: receiver)
+        self.admin.mint(recipient: receiver, amount: amount)
     }
 }
