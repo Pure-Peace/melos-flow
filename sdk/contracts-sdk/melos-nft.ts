@@ -29,24 +29,6 @@ export class MelosNFTSDK extends BaseSDK {
   }
 
   /**
-   * Mints amount of Melos to **recipient**.
-   * */
-  async mint(
-    auth: FlowAuthorize,
-    recipient: string,
-    amount: number,
-    options?: {addressMap?: Record<string, string>; limit?: number}
-  ) {
-    return sendTransaction({
-      code: MelosNftTransactions.mint,
-      args: [recipient, amount],
-      payer: auth,
-      addressMap: options?.addressMap ?? this.addressMap,
-      limit: options?.limit ?? this.limit,
-    });
-  }
-
-  /**
    * Transfers Melos NFT with id equal **nftId** from **sender** account to **recipient**.
    * @param {AuthAccount} sender - sender
    * @param {string} recipient - recipient address
@@ -124,6 +106,24 @@ export class MelosNFTSDK extends BaseSDK {
     return sendTransaction({
       code: MelosNftTransactions.burn,
       args: [nftId],
+      payer: auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
+  /**
+   * Mints amount of Melos to **recipient**.
+   * */
+  async mint(
+    auth: FlowAuthorize,
+    recipient: string,
+    amount: number,
+    options?: {addressMap?: Record<string, string>; limit?: number}
+  ) {
+    return sendTransaction({
+      code: MelosNftTransactions.mint,
+      args: [recipient, amount],
       payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,

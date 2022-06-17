@@ -48,7 +48,7 @@ const setupCollectionAndMintNFT = async (account: AuthAccount) => {
 
   // Setup NFT collection and mint NFT for account
   assertTx(await nftSDK.setupCollection(account.auth));
-  const mintResult = assertTx(await nftSDK.mint(admin.auth, account.address));
+  const mintResult = assertTx(await nftSDK.mint(admin.auth, account.address, 5));
   const nfts = assertTx(await nftSDK.getAccountNFTs(account.address));
   expect(nfts.length).toBeGreaterThan(0);
 

@@ -38,7 +38,7 @@ describe('Melos NFT test', () => {
 
     // Mint instruction for Alice account shall be resolved
     const minter = await getAuthAccountByName('emulator-account');
-    assertTx(await nftSDK.mint(minter.auth, alice.address));
+    assertTx(await nftSDK.mint(minter.auth, alice.address, 1));
   });
 
   it('should be able to create a new empty NFT Collection', async () => {
@@ -75,9 +75,9 @@ describe('Melos NFT test', () => {
 
     // Mint instruction for Alice account shall be resolved
     const minter = await getAuthAccountByName('emulator-account');
-    assertTx(await nftSDK.mint(minter.auth, alice.address));
+    assertTx(await nftSDK.mint(minter.auth, alice.address, 1));
 
     // Transfer transaction shall pass
-    assertTx(await nftSDK.transfer(alice.auth, bob.address, 0));
+    assertTx(await nftSDK.transfer(alice.auth, bob.address, 1));
   });
 });
