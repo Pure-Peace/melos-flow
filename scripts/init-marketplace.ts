@@ -29,10 +29,10 @@ const TESTNET_REPLACE_MAP: ReplaceMap = {
 
 class InitMarketplace extends ScriptRunner {
   async main() {
-    const commonSDK = new CommonSDK(TESTNET_ADDRESS_MAP);
-    const nftSDK = new MelosNFTSDK(TESTNET_ADDRESS_MAP);
+    const commonSDK = new CommonSDK(TESTNET_ADDRESS_MAP, TESTNET_REPLACE_MAP);
+    const nftSDK = new MelosNFTSDK(TESTNET_ADDRESS_MAP, TESTNET_REPLACE_MAP);
     const marketplaceSDK = new MelosMarketplaceSDK(TESTNET_ADDRESS_MAP, TESTNET_REPLACE_MAP);
-    const adminSDK = new MelosMarketplaceAdminSDK(TESTNET_ADDRESS_MAP);
+    const adminSDK = new MelosMarketplaceAdminSDK(TESTNET_ADDRESS_MAP, TESTNET_REPLACE_MAP);
 
     const {address, pk, keyId} = getAccountFromEnv('testnet');
     const auth = createAuth(fcl, 'testnet', address!, pk!, keyId);
