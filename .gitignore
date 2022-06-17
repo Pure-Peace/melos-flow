@@ -43,4 +43,4 @@ yarn.lock
 dist
 flow.testnet.json
 flow.mainnet.json
-.env.example
+.env
