@@ -1,4 +1,4 @@
-import {FlowAuthorizeMinter} from './flow-service';
+import {FlowAuthorize} from './flow-service';
 
 export type FlowNetwork = 'emulator' | 'testnet' | 'mainnet';
 export type FlowCurrency = 'FLOW' | 'FUSD';
@@ -31,7 +31,7 @@ export interface Account {
 }
 
 export interface AuthAccount extends Account {
-  auth: FlowAuthorizeMinter;
+  auth: FlowAuthorize;
 }
 
 export type AccountsConfig = Record<string, Account>;
