@@ -1,36 +1,30 @@
 import NonFungibleToken from "../../contracts/core/NonFungibleToken.cdc"
 import MelosNFT from "../../contracts/MelosNFT.cdc"
 
-// This transction uses the Admin resource to mint a new Melos NFT.
+// This transction uses the Admin resource to mint amount of new Melos NFT.
 //
 // It must be run with the account that has the Admin resource
 // stored at path /storage/melosNFTAdmin.
 
-transaction(amount: Int, recipient: Address) {
-
+transaction(amounts: [UInt64], recipients: [Address]) {
     // local variable for storing the admin reference
     let admin: &MelosNFT.Admin
-
     prepare(signer: AuthAccount) {
+      assert(recipients.length == amounts.length, message: "Invalid mint array length")
 
-        // borrow a reference to the Admin resource in storage
-        self.admin = signer.borrow<&MelosNFT.Admin>(from: MelosNFT.AdminStoragePath)
-            ?? panic("Could not borrow a reference to the NFT admin")
+      // borrow a reference to the Admin resource in storage
+      self.admin = signer.borrow<&MelosNFT.Admin>(from: MelosNFT.AdminStoragePath)
+          ?? panic("Could not borrow a reference to the NFT admin")
     }
 
     execute {
-        // get the public account object for the recipient
-        let recipient = getAccount(recipient)
-
+      var i = 0
+      while i < recipients.length {
         // borrow the recipient's public NFT collection reference
-        let receiver = recipient
+        let receiver = getAccount(recipients[i])
             .getCapability<&{NonFungibleToken.CollectionPublic}>(MelosNFT.CollectionPublicPath)
-
-        // mint the NFT and deposit it to the recipient's collection
-        var i = 0
-        while i < amount {
-          i = i + 1
-          self.admin.mintTo(recipient: receiver)
-        }
+        self.admin.mint(recipient: receiver, amount: amounts[i])
+        i = i + 1
+      }
     }
 }
