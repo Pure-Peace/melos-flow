@@ -1,11 +1,12 @@
-import {executeScript, sendTransaction} from 'flow-cadut';
 import {BaseSDK} from './base';
 
-import {AuthAccount, FlowAddress, UFix64} from '../../sdk/types';
+import {FlowAddress, UFix64} from '../../sdk/types';
+import {toUFix64} from '../../sdk/common';
+import {FlowAuthorize} from '../../sdk/flow-service';
 
 import CommonScripts from '../../sdk-code/scripts/common';
 import CommonTransactions from '../../sdk-code/transactions/common';
-import {toUFix64} from '../../sdk/common';
+import {executeScript, sendTransaction} from '../../sdk/transaction-utils';
 
 export class CommonSDK extends BaseSDK {
   async getBlockTime(options?: {addressMap?: Record<string, string>; limit?: number}) {
@@ -36,21 +37,21 @@ export class CommonSDK extends BaseSDK {
   }
 
   async unlink(
-    account: AuthAccount,
+    auth: FlowAuthorize,
     path: string,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(CommonTransactions.unlink, {CAPABILITY_PATH: path, ...options?.replaceMap}),
       args: [],
-      payer: account.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
   }
 
   async mintFusd(
-    minter: AuthAccount,
+    auth: FlowAuthorize,
     amount: number,
     to: FlowAddress,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
@@ -58,47 +59,47 @@ export class CommonSDK extends BaseSDK {
     return sendTransaction({
       code: this.code(CommonTransactions.mintFusd, options?.replaceMap),
       args: [toUFix64(amount), to],
-      payer: minter.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
   }
 
   async setupFusdMinter(
-    minter: AuthAccount,
+    auth: FlowAuthorize,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(CommonTransactions.setupFusdMinter, options?.replaceMap),
       args: [],
-      payer: minter.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
   }
 
   async setupFusdVault(
-    user: AuthAccount,
+    auth: FlowAuthorize,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(CommonTransactions.setupFusdVault, options?.replaceMap),
       args: [],
-      payer: user.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
   }
 
   async depositFusdMinter(
-    admin: AuthAccount,
+    auth: FlowAuthorize,
     minterAddress: FlowAddress,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(CommonTransactions.depositFusdMinter, options?.replaceMap),
       args: [minterAddress],
-      payer: admin.auth,
+      payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });
