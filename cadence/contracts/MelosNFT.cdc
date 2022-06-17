@@ -3,6 +3,7 @@ import NonFungibleToken from "core/NonFungibleToken.cdc"
 pub contract MelosNFT: NonFungibleToken {
 
     pub var totalSupply: UInt64
+    pub let tokenStartId: UInt64
     pub var baseMetadataURI: String
 
     pub event ContractInitialized()
@@ -121,18 +122,25 @@ pub contract MelosNFT: NonFungibleToken {
     // - set baseMetadataURI
     pub resource Admin {
 
-        // Mints a new NFT
-        // and deposit it in the recipients collection using their collection reference
-        pub fun mintTo(recipient: Capability<&{NonFungibleToken.CollectionPublic}>): &NonFungibleToken.NFT {
-            // create a new NFT
-            let token <- create NFT(id: MelosNFT.totalSupply)
-            MelosNFT.totalSupply = MelosNFT.totalSupply + 1
-            let tokenRef = &token as &NonFungibleToken.NFT
+        // Mints amount of new NFT
+        // and deposit into the recipients collection using their collection reference
+        pub fun mint(recipient: Capability<&{NonFungibleToken.CollectionPublic}>, amount: UInt64): [&NonFungibleToken.NFT] {
+          let receiver = recipient.borrow() ?? panic("Could not get receiver reference to the NFT Collection") 
+          let tokenRefs: [&NonFungibleToken.NFT] = []
+
+          var currentId = MelosNFT.totalSupply + MelosNFT.tokenStartId
+          MelosNFT.totalSupply = MelosNFT.totalSupply + amount
+          let endId = MelosNFT.totalSupply + MelosNFT.tokenStartId
+
+          while currentId < endId {
+            let token <- create NFT(id: currentId)
+            tokenRefs.append(&token as &NonFungibleToken.NFT)
             emit Minted(id: token.id, recipient: recipient.address)
-            
-            let receiver = recipient.borrow() ?? panic("Could not get receiver reference to the NFT Collection") 
             receiver.deposit(token: <-token)
-            return tokenRef
+            currentId = currentId + 1
+          }
+
+          return tokenRefs
         }
 
         pub fun setBaseMetadataURI(baseMetadataURI: String) {
@@ -145,6 +153,7 @@ pub contract MelosNFT: NonFungibleToken {
     init(baseMetadataURI: String) {
         // Initialize the total supply
         self.totalSupply = 0
+        self.tokenStartId = 1
 
         self.baseMetadataURI = baseMetadataURI
 
