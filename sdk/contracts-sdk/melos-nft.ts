@@ -16,6 +16,15 @@ export class MelosNFTSDK extends BaseSDK {
     });
   }
 
+  async removeCollection(auth: FlowAuthorize, options?: {addressMap?: Record<string, string>; limit?: number}) {
+    return sendTransaction({
+      code: MelosNftTransactions.removeCollection,
+      payer: auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
   /**
    * Returns Melos supply.
    * @throws Will throw an error if execution will be halted

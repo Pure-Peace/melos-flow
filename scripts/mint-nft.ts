@@ -37,8 +37,10 @@ class InitMarketplace extends ScriptRunner {
     const {address, pk, keyId} = getAccountFromEnv('testnet');
     const auth = createAuth(fcl, 'testnet', address!, pk!, keyId);
 
-    const result = await nftSDK.mint(auth, '0x0bdba890ea791601', 20);
-    return result;
+    for (let i = 0; i < 20; i++) {
+      const result = await nftSDK.mint(auth, '0x0bdba890ea791601', 5);
+      console.log(`mint #${i + 1}: `, result);
+    }
   }
 }
 
