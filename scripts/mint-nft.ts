@@ -44,6 +44,8 @@ class InitMarketplace extends ScriptRunner {
       const result = await nftSDK.mint(auth, address, 5);
       console.log(`mint #${i + 1}: `, result);
     } */
+
+    return result;
   }
 }
 

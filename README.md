@@ -19,6 +19,7 @@ yarn test
 **Run script**
 
 - *This command can directly run the ts script in the /scripts directory, which is convenient for executing and debugging the cadence code.*
+- *Please copy `.env.example` to `.env` and complete it before run this command*
 
 ```bash
 yarn do <script name>
