@@ -13,8 +13,8 @@ import {createAuth, getAccountFromEnv} from '../sdk/flow-service';
 import {MelosMarketplaceAdminSDK, MelosMarketplaceSDK} from '../sdk/contracts-sdk/melos-marketplace';
 import {CommonSDK} from '../sdk/contracts-sdk/common';
 
-const MELOS_NFT_ADDRESS = '0x45ad65a684657739';
-const MELOS_MARKETPLACE = '0x45ad65a684657739';
+const MELOS_NFT_ADDRESS = process.env.TESTNET_MELOS_NFT_ADDRESS!;
+const MELOS_MARKETPLACE = process.env.TESTNET_MELOS_MARKETPLACE!;
 
 const TESTNET_ADDRESS_MAP = {
   ...TESTNET_BASE_ADDRESS_MAP,
