@@ -6,7 +6,7 @@ import {
   EnglishAuctionParams,
   ListingDetailsQuery,
 } from '../../sdk/type-contracts/MelosMarketplace';
-import {toUFix64} from '../common';
+import {toFlowAddress, toUFix64} from '../common';
 import {FlowAddress, UFix64} from '../types';
 
 import MarketplaceScripts from '../../sdk-code/scripts/melos-marketplace';
@@ -450,6 +450,7 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
     auth: FlowAuthorize,
     options?: {
       imports?: string;
+      selfVars?: {define: string; init: string}[];
       handles?: string;
       addressMap?: Record<string, string>;
       replaceMap?: Record<string, string>;
@@ -459,6 +460,17 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
     let code = MarketplaceTransactionsTemplates.adminHandles;
     code = code.replace(new RegExp(`%ADMIN_IMPORTS%`, 'g'), options?.imports ?? '');
     code = code.replace(new RegExp(`%ADMIN_HANDLES%`, 'g'), options?.handles ?? '');
+
+    let selfVarsDefine = '';
+    let selfVarsInit = '';
+    if (options?.selfVars) {
+      for (const v of options.selfVars) {
+        selfVarsDefine += v.define + '\n';
+        selfVarsInit += v.init + '\n';
+      }
+    }
+    code = code.replace(new RegExp(`%SELF_VARS%`, 'g'), selfVarsDefine);
+    code = code.replace(new RegExp(`%SELF_VARS_INIT%`, 'g'), selfVarsInit);
     code = this.code(code, options?.replaceMap);
 
     if (this.debug) {
@@ -558,10 +570,18 @@ export class MelosMarketplaceAdminSDK extends BaseSDK {
     royaltyReceiver: FlowAddress,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
-    const imports = `import ${tokenName} from ${tokenAddress}\n`;
+    const imports = `import ${tokenName} from ${tokenAddress}\nimport FungibleToken from "../../contracts/core/FungibleToken.cdc"\n`;
     const handles = `self.admin.setTokenFeeConfig(
       tokenType: Type<@${tokenName}.Vault>(), 
-      config: MelosMarketplace.FungibleTokenFeeConfig(txFeeReceiver: ${txFeeReceiver}, txFeePercent: ${txFeePercent}, royaltyReceiver: ${royaltyReceiver})
+      config: MelosMarketplace.FungibleTokenFeeConfig(
+        txFeeReceiver: getAccount(${toFlowAddress(
+          txFeeReceiver
+        )}).getCapability<&{FungibleToken.Receiver}>(%FT_RECEIVER%), 
+        txFeePercent: ${txFeePercent}, 
+        royaltyReceiver: getAccount(${toFlowAddress(
+          royaltyReceiver
+        )}).getCapability<&{FungibleToken.Receiver}>(%FT_RECEIVER%)
+      )
     )`;
 
     return this.adminHandle(auth, {
