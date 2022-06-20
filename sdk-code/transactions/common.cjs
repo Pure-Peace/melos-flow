@@ -64,6 +64,19 @@ transaction(recipient: Address, amount: UFix64) {
 }
 
 `,
+  link: `
+%IMPORTS%
+
+transaction() {
+    prepare(signer: AuthAccount) {
+      signer.link<%LINK_TARGET%>(
+        %CAPABILITY_PATH%,
+        target: %TARGET_PATH%
+      )
+    }
+}
+
+`,
   mintFusd: `
 import FungibleToken from "../contracts/core/FungibleToken.cdc"
 import FUSD from "../contracts/core/FUSD.cdc"

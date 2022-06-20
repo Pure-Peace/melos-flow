@@ -50,6 +50,34 @@ export class CommonSDK extends BaseSDK {
     });
   }
 
+  async link(
+    auth: FlowAuthorize,
+    target: string,
+    targetPath: string,
+    capabilityPath: string,
+    imports?: Record<string, FlowAddress>,
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    let _imports = '';
+    if (imports) {
+      for (const [contract, addr] of Object.entries(imports)) {
+        _imports += `import ${contract} from ${addr}\n`;
+      }
+    }
+    return sendTransaction({
+      code: this.code(CommonTransactions.link.replace(new RegExp(`%IMPORTS%`, 'g'), _imports), {
+        LINK_TARGET: target,
+        TARGET_PATH: targetPath,
+        CAPABILITY_PATH: capabilityPath,
+        ...options?.replaceMap,
+      }),
+      args: [],
+      payer: auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
   async mintFusd(
     auth: FlowAuthorize,
     amount: number,
