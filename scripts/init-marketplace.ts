@@ -8,6 +8,7 @@ import {
   TESTNET_BASE_ADDRESS_MAP,
   flowTokenReplaceMap,
   melosNftReplaceMap,
+  toUFix64,
 } from '../sdk/common';
 import {createAuth, getAccountFromEnv} from '../sdk/flow-service';
 import {MelosMarketplaceAdminSDK, MelosMarketplaceSDK} from '../sdk/contracts-sdk/melos-marketplace';
@@ -37,11 +38,23 @@ class InitMarketplace extends ScriptRunner {
     const {address, pk, keyId} = getAccountFromEnv('testnet');
     const auth = createAuth(fcl, 'testnet', address!, pk!, keyId);
 
-    const result = await adminSDK.setAllowedPaymentTokens(auth, [
+    const r1 = await adminSDK.setAllowedPaymentTokens(auth, [
       {tokenName: 'FlowToken', tokenAddress: TESTNET_BASE_ADDRESS_MAP.FlowToken},
       {tokenName: 'FUSD', tokenAddress: TESTNET_BASE_ADDRESS_MAP.FUSD},
     ]);
-    return result;
+
+    const txFeeReceiver = address;
+    const txFeePercent = toUFix64(0.2)!;
+    const royaltyReceiver = address;
+    const r2 = await adminSDK.setTokenFeeConfig(
+      auth,
+      'FlowToken',
+      TESTNET_BASE_ADDRESS_MAP.FlowToken,
+      txFeeReceiver,
+      txFeePercent,
+      royaltyReceiver
+    );
+    return [r1, r2];
   }
 }
 
