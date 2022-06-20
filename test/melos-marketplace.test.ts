@@ -15,6 +15,7 @@ import {
   BidListingCompletedEvent,
   OfferCreatedEvent,
   OfferAcceptedEvent,
+  UnRefundPaymentNotifyEvent,
 } from '../sdk/type-contracts/MelosMarketplace';
 
 import {
@@ -242,7 +243,7 @@ describe('Melos marketplace tests', () => {
     assertTx(await marketplaceSDKFlow.setupListingManager(alice.auth));
   });
 
-  it('Common listing tests: Create listing and purachase', async () => {
+  /* it('Common listing tests: Create listing and purachase', async () => {
     // Deploy contracts
     await deployContractsIfNotDeployed();
     const {melosMarketplaceIdentifier} = await initializeMarketplace();
@@ -610,7 +611,7 @@ describe('Melos marketplace tests', () => {
     // Bob remove his offer
     const removeOfferResult = assertTx(await marketplaceSDKFlow.removeOffer(bob.auth, bobOffer.offerId));
     console.log('removeOfferResult: ', removeOfferResult);
-  });
+  }); */
 
   it('FUSD && UnRefundPayment tests', async () => {
     // Deploy contracts
@@ -679,5 +680,40 @@ describe('Melos marketplace tests', () => {
     const result = assertTx(await marketplaceSDKFUSD.removeListing(alice.auth, listingId));
     const resultEvents = getTxEvents(result);
     console.log('listing removed events: ', resultEvents);
+    const unRefundPaymentEvents = eventFilter<UnRefundPaymentNotifyEvent, MarketplaceEvents>(
+      result,
+      melosMarketplaceIdentifier,
+      'UnRefundPaymentNotify'
+    );
+    expect(unRefundPaymentEvents.length).toBeGreaterThan(0);
+    console.log('unRefundPaymentEvents: ', unRefundPaymentEvents);
+    const {id: unRefundPaymentId, managerId, refundAddress, balance} = unRefundPaymentEvents[0];
+    expect(Number(balance)).toEqual(bidPriceBob);
+    expect(refundAddress).toEqual(bob.address);
+
+    // Bob relink his fusd receiver capability
+    assertTx(
+      await commonSDK.link(
+        bob.auth,
+        `&FUSD.Vault{FungibleToken.Receiver}`,
+        FUSD_TOKEN_EMULATOR.FT_STORAGE_PATH,
+        FUSD_TOKEN_EMULATOR.FT_RECEIVER,
+        {
+          FUSD: FUSD_TOKEN_EMULATOR.FT_ADDRESS,
+          FungibleToken: '../../contracts/core/FungibleToken.cdc',
+        }
+      )
+    );
+
+    const bobFusdBalanceBefore = assertTx(await commonSDK.getFusdBalance(bob.address));
+
+    // Bob claim unRefundPayment
+    const claimResult = assertTx(await marketplaceSDKFUSD.claimUnRefundPayment(bob.auth));
+    const claimEvents = getTxEvents(claimResult);
+    console.log('claimEvents: ', claimEvents);
+
+    // Payment should refunded
+    const bobFusdBalanceAfter = assertTx(await commonSDK.getFusdBalance(bob.address));
+    expect(Number(bobFusdBalanceBefore) + bidPriceBob).toEqual(Number(bobFusdBalanceAfter));
   });
 });

@@ -68,6 +68,14 @@ export type BidListingCompletedEvent = {
   price: UFix64;
 };
 
+export type UnRefundPaymentNotifyEvent = {
+  id: number;
+  managerId: number;
+  paymentType: any;
+  refundAddress: FlowAddress;
+  balance: UFix64;
+};
+
 export type ListingDetailsQuery = {
   details: {
     listingType: number;
