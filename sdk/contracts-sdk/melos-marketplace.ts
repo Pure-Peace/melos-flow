@@ -428,6 +428,19 @@ export class MelosMarketplaceSDK extends BaseSDK {
       limit: options?.limit ?? this.limit,
     });
   }
+
+  async claimUnRefundPayment(
+    auth: FlowAuthorize,
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    return sendTransaction({
+      code: this.code(MarketplaceTransactionsTemplates.claimUnRefundPayment, options?.replaceMap),
+      args: [],
+      payer: auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
 }
 
 export class MelosMarketplaceAdminSDK extends BaseSDK {
