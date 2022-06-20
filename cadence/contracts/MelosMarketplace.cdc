@@ -264,15 +264,14 @@ pub contract MelosMarketplace {
   }
 
   pub fun claimUnRefundPayments(
-    manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>, 
+    manager: &MelosMarketplace.MarketplaceManager, 
     paymentType: Type,
     refund: Capability<&{FungibleToken.Receiver}>
   ) {
-    let managerRef = manager.borrow() ?? panic("Cannot borrow manager")
     if let unRefundPayment <- MelosMarketplace.unRefundPayments.remove(
-      key: self.encodeUnRefundPaymentsKey(managerRef.uuid, paymentType)
+      key: self.encodeUnRefundPaymentsKey(manager.uuid, paymentType)
     ) {
-      unRefundPayment.claim(managerRef: managerRef, refund: refund)
+      unRefundPayment.claim(managerRef: manager, refund: refund)
       destroy unRefundPayment
     } else {
       panic("unRefundPayment are not exists")
