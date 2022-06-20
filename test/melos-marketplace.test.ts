@@ -243,7 +243,7 @@ describe('Melos marketplace tests', () => {
     assertTx(await marketplaceSDKFlow.setupListingManager(alice.auth));
   });
 
-  /* it('Common listing tests: Create listing and purachase', async () => {
+  it('Common listing tests: Create listing and purachase', async () => {
     // Deploy contracts
     await deployContractsIfNotDeployed();
     const {melosMarketplaceIdentifier} = await initializeMarketplace();
@@ -611,7 +611,7 @@ describe('Melos marketplace tests', () => {
     // Bob remove his offer
     const removeOfferResult = assertTx(await marketplaceSDKFlow.removeOffer(bob.auth, bobOffer.offerId));
     console.log('removeOfferResult: ', removeOfferResult);
-  }); */
+  });
 
   it('FUSD && UnRefundPayment tests', async () => {
     // Deploy contracts
