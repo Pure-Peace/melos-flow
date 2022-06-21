@@ -1,13 +1,53 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import {config} from '@onflow/config';
 import * as fcl from '@onflow/fcl';
 import * as t from '@onflow/types';
 
 import {ec as EC} from 'elliptic';
+import {resolve} from 'path';
 import {SHA3} from 'sha3';
 
 import {DEPLOYED_CONTRACTS, EXT_ENVIRONMENT, TRANSACTION, SCRIPT, CONTRACT, UNKNOWN, TxResult} from './common';
 
 const ec = new EC('p256');
+
+export type RawTxResult = {
+  result: TxResult;
+  err: any;
+};
+
+export class UnWrapAble<T> {
+  result?: T;
+  err?: any;
+  constructor(obj: {result?: T; err?: any}) {
+    this.result = obj.result;
+    this.err = obj.err;
+  }
+
+  unwrap() {
+    if (this.err) throw new Error(this.err);
+    return this.result!;
+  }
+}
+
+export type TxResultFields = {
+  txId?: string;
+  seal?: Promise<RawTxResult>;
+  exec?: Promise<RawTxResult>;
+  final?: Promise<RawTxResult>;
+};
+
+export class TransactionResponse extends UnWrapAble<TxResultFields> {
+  constructor(obj: {result?: TxResultFields; err?: any}) {
+    super(obj);
+  }
+}
+
+export class ScriptResponse<T> extends UnWrapAble<T> {
+  constructor(obj: {result?: T; err?: any}) {
+    super(obj);
+  }
+}
 
 export const getEnvironmentName = async () => {
   return (await config().get('ix.env')) || 'emulator';
@@ -563,20 +603,20 @@ export const executeScript = async <T>(props: {
   addressMap?: Record<string, string>;
   limit?: number;
   raw?: any;
-}): Promise<[T | null, any]> => {
+}): Promise<ScriptResponse<T>> => {
   const {raw = false} = props;
   try {
     const response = await prepareInteraction(props, 'script');
 
     // In some cases one might want to have raw output without decoding the response
     if (raw) {
-      return [response.encodedData, null];
+      return new ScriptResponse({result: response.encodedData});
     }
 
     const decoded = await fcl.decode(response);
-    return [decoded, null];
-  } catch (e) {
-    return [null, e];
+    return new ScriptResponse({result: decoded});
+  } catch (err) {
+    return new ScriptResponse({err});
   }
 };
 
@@ -615,21 +655,43 @@ export const sendTransaction = async (props: {
   processed?: any;
   proposer?: any;
   signers?: any;
-}): Promise<[TxResult | null, any]> => {
-  const {wait = 'seal'} = props;
+}): Promise<{
+  txId?: string;
+  seal?: Promise<RawTxResult>;
+  exec?: Promise<RawTxResult>;
+  final?: Promise<RawTxResult>;
+  err?: any;
+}> => {
   try {
     const response = await prepareInteraction(props, 'transaction');
-    if (wait) {
-      const waitMethod = waitForStatus(wait);
-      const rawResult = await fcl.tx(response)[waitMethod]();
-      const txResult = {
-        txId: response,
-        ...rawResult,
-      };
-      return [txResult, null];
-    }
-    return [response.transactionId, null];
-  } catch (e) {
-    return [null, e];
+    const builder = (stat) => {
+      return new Promise<RawTxResult>((res) => {
+        fcl
+          .tx(response)
+          [waitForStatus(stat)]()
+          .then((rawResult) => {
+            res({
+              result: {
+                txId: response,
+                ...rawResult,
+              },
+            } as RawTxResult);
+          })
+          .catch((err) => {
+            res({err} as RawTxResult);
+          });
+      });
+    };
+
+    return new TransactionResponse({
+      result: {
+        txId: response.transactionId as string,
+        seal: builder('seal'),
+        exec: builder('exec'),
+        final: builder('final'),
+      },
+    });
+  } catch (err) {
+    return new TransactionResponse({err});
   }
 };
