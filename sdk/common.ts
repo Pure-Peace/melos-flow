@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import {TxResult} from 'flow-cadut';
 import {readFileSync} from 'fs';
 import path from 'path';
 import {BASE_PATH, FlowNetwork} from './config';
+import {RawTxResult} from './transaction-utils';
 
 export const SEALED = 4;
 export const UFIX64_PRECISION = 8;
@@ -269,10 +269,8 @@ export const txCode = (file: string) => {
   return getCodeWithType(file, 'transactions');
 };
 
-export function assertTx<T>(response: [T, any]) {
-  const [res, err] = response;
-  if (err) throw new Error(err);
-  return res!;
+export async function assertTx(txResultResponser: () => Promise<RawTxResult>) {
+  return (await txResultResponser()).unwrap();
 }
 
 export class ScriptRunner {

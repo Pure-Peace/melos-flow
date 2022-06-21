@@ -1,8 +1,7 @@
 import {emulator, deployContractsIfNotDeployed, prepareEmulator, getAuthAccountByName, SECOND} from './utils/helpers';
 
 import {mintFlow} from 'flow-js-testing';
-import {TxResult} from 'flow-cadut';
-import {assertTx, eventFilter, getTxEvents} from '../sdk/common';
+import {assertTx, eventFilter, getTxEvents, TxResult} from '../sdk/common';
 import {AuthAccount, Account} from '../sdk/types';
 
 import {
@@ -48,9 +47,9 @@ const setupCollectionAndMintNFT = async (account: AuthAccount) => {
   const admin = await getAuthAccountByName('emulator-account');
 
   // Setup NFT collection and mint NFT for account
-  assertTx(await nftSDK.setupCollection(account.auth));
-  const mintResult = assertTx(await nftSDK.mint(admin.auth, account.address, 5));
-  const nfts = assertTx(await nftSDK.getAccountNFTs(account.address));
+  await (await nftSDK.setupCollection(account.auth)).assertOk('seal');
+  const mintResult = await (await nftSDK.mint(admin.auth, account.address, 5)).assertOk('seal');
+  const nfts = (await nftSDK.getAccountNFTs(account.address)).unwrap();
   expect(nfts.length).toBeGreaterThan(0);
 
   const mintedEvents = eventFilter<MelosNFTMintedEvent, MelosNFTEvents>(mintResult, 'MelosNFT', 'Minted');
@@ -62,22 +61,22 @@ const setupCollectionAndMintNFT = async (account: AuthAccount) => {
 const setupSeller = async (name: string) => {
   const userResult = await setupUser(name);
   const mintResult = await setupCollectionAndMintNFT(userResult.user);
-  assertTx(await marketplaceSDKFlow.setupListingManager(userResult.user.auth));
+  await (await marketplaceSDKFlow.setupListingManager(userResult.user.auth)).assertOk('seal');
   return {...userResult, ...mintResult};
 };
 
 const initializeMarketplace = async () => {
-  const melosMarketplaceIdentifier = assertTx(await marketplaceSDKFlow.getContractIdentifier());
+  const melosMarketplaceIdentifier = (await marketplaceSDKFlow.getContractIdentifier()).unwrap();
 
   // Set allowed payment tokens
   const admin = await getAuthAccountByName('emulator-account');
-  assertTx(
+  await (
     await adminSDK.setAllowedPaymentTokens(admin.auth, [
       {tokenName: 'FlowToken', tokenAddress: FLOW_TOKEN_EMULATOR.FT_ADDRESS},
       {tokenName: 'FUSD', tokenAddress: FUSD_TOKEN_EMULATOR.FT_ADDRESS},
     ])
-  );
-  const allowedPaymentTokens = assertTx(await marketplaceSDKFlow.getAllowedPaymentTokens());
+  ).assertOk('seal');
+  const allowedPaymentTokens = (await marketplaceSDKFlow.getAllowedPaymentTokens()).unwrap();
   console.log('allowedPaymentTokens: ', allowedPaymentTokens);
   expect(allowedPaymentTokens.length).toBeGreaterThan(0);
 
@@ -89,7 +88,7 @@ const setupUser = async (name: string, airdropFlow = 1000) => {
   const user = await getAuthAccountByName(name);
 
   await mintFlow(user.address, airdropFlow.toFixed(8));
-  const balance = assertTx(await commonSDK.getFlowBalance(user.address));
+  const balance = (await commonSDK.getFlowBalance(user.address)).unwrap();
 
   console.log(`${name} flow balance: `, balance);
   expect(Number(balance)).toBeGreaterThanOrEqual(airdropFlow);
@@ -99,9 +98,9 @@ const setupUser = async (name: string, airdropFlow = 1000) => {
 
 const setupFusdMinter = async () => {
   const {user: fusdMinter} = await setupUser('fusdMinter');
-  assertTx(await commonSDK.setupFusdMinter(fusdMinter.auth));
+  await (await commonSDK.setupFusdMinter(fusdMinter.auth)).assertOk('seal');
   const admin = await getAuthAccountByName('emulator-account');
-  assertTx(await commonSDK.depositFusdMinter(admin.auth, fusdMinter.address));
+  await (await commonSDK.depositFusdMinter(admin.auth, fusdMinter.address)).assertOk('seal');
   return fusdMinter;
 };
 
@@ -119,11 +118,11 @@ const handleCreateListing = async (
   console.log('ListingCreated events: ', listingCreatedEvents);
   expect(listingCreatedEvents.length).toBeGreaterThan(0);
 
-  const aliceListingCount = assertTx(await marketplaceSDKFlow.getAccountListingCount(seller.address));
+  const aliceListingCount = (await marketplaceSDKFlow.getAccountListingCount(seller.address)).unwrap();
   expect(aliceListingCount).toBeGreaterThan(0);
 
   const listingId = listingCreatedEvents[0].listingId;
-  const listingDetails = assertTx(await marketplaceSDKFlow.getListingDetails(listingId));
+  const listingDetails = (await marketplaceSDKFlow.getListingDetails(listingId)).unwrap();
   console.log('listingDetails: ', listingDetails);
 
   return {listingCreatedEvents, createListingResult, aliceListingCount, listingId, listingDetails};
@@ -134,17 +133,17 @@ const removePurachasedListing = async (
   melosMarketplaceIdentifier: string,
   listingRemover: AuthAccount
 ) => {
-  const listingIsPurchased = assertTx(await marketplaceSDKFlow.getListingPurachased(listingId));
+  const listingIsPurchased = (await marketplaceSDKFlow.getListingPurachased(listingId)).unwrap();
 
   // Listing should be purachased if listing type is not english auction
-  if (!assertTx(await marketplaceSDKFlow.getListingIsType(listingId, ListingType.EnglishAuction))) {
+  if (!(await marketplaceSDKFlow.getListingIsType(listingId, ListingType.EnglishAuction)).unwrap()) {
     expect(listingIsPurchased).toBe(true);
   }
 
   // Should be able to remove the listing after purachased
-  const removeListingResult = assertTx(
+  const removeListingResult = await (
     await marketplaceSDKFlow.publicRemoveEndedListing(listingRemover.auth, listingId)
-  );
+  ).assertOk('seal');
   const removeListingEvent = eventFilter<ListingRemovedEvent, MarketplaceEvents>(
     removeListingResult,
     melosMarketplaceIdentifier,
@@ -154,7 +153,7 @@ const removePurachasedListing = async (
   expect(removeListingEvent.length).toBeGreaterThan(0);
 
   // After removed, listing should be not exists
-  const isListingExists = assertTx(await marketplaceSDKFlow.getListingExists(listingId));
+  const isListingExists = (await marketplaceSDKFlow.getListingExists(listingId)).unwrap();
   expect(isListingExists).toBe(false);
 
   return {removeListingResult, removeListingEvent, listingIsPurchased};
@@ -166,8 +165,8 @@ const purachasedBalanceCheck = async (
   seller: Account,
   buyer: Account
 ) => {
-  const sellerBalanceAfter = assertTx(await commonSDK.getFlowBalance(seller.address));
-  const buyerBalanceAfter = assertTx(await commonSDK.getFlowBalance(buyer.address));
+  const sellerBalanceAfter = (await commonSDK.getFlowBalance(seller.address)).unwrap();
+  const buyerBalanceAfter = (await commonSDK.getFlowBalance(buyer.address)).unwrap();
 
   const sellerEarned = Number(sellerBalanceAfter) - Number(sellerBeforeBalance);
   const buyerSpend = Number(buyerBeforeBalance) - Number(buyerBalanceAfter);
@@ -186,7 +185,7 @@ const handleCreateBid = async (
   bidPrice: number,
   melosMarketplaceIdentifier: string
 ) => {
-  const bidResult = assertTx(await marketplaceSDKFlow.createBid(bidder.auth, listingId, bidPrice));
+  const bidResult = await (await marketplaceSDKFlow.createBid(bidder.auth, listingId, bidPrice)).assertOk('seal');
   const bidCreatedEvents = eventFilter<BidCreatedEvent, MarketplaceEvents>(
     bidResult,
     melosMarketplaceIdentifier,
@@ -207,9 +206,9 @@ const handleCreateOffer = async (
   offerDuration: number,
   offerPrice: number
 ) => {
-  const offerCreateResult = assertTx(
+  const offerCreateResult = await (
     await marketplaceSDKFlow.createOffer(offerer.auth, nftId, offerDuration, offerPrice)
-  );
+  ).assertOk('seal');
   const offerCreateEvents = eventFilter<OfferCreatedEvent, MarketplaceEvents>(
     offerCreateResult,
     melosMarketplaceIdentifier,
@@ -219,7 +218,7 @@ const handleCreateOffer = async (
   expect(offerCreateEvents.length).toBeGreaterThan(0);
 
   const {offerId} = offerCreateEvents[0];
-  const offer = assertTx(await marketplaceSDKFlow.getOffer(offerId));
+  const offer = (await marketplaceSDKFlow.getOffer(offerId)).unwrap();
 
   return {offerCreateEvents, offerCreateResult, offerId, offer};
 };
@@ -240,7 +239,7 @@ describe('Melos marketplace tests', () => {
     await deployContractsIfNotDeployed();
     const alice = await getAuthAccountByName('alice');
 
-    assertTx(await marketplaceSDKFlow.setupListingManager(alice.auth));
+    await (await marketplaceSDKFlow.setupListingManager(alice.auth)).assertOk('seal');
   });
 
   it('Common listing tests: Create listing and purachase', async () => {
@@ -253,17 +252,17 @@ describe('Melos marketplace tests', () => {
 
     // Create listing with NFT
     const {listingId} = await handleCreateListing(alice, melosMarketplaceIdentifier, async () => {
-      return assertTx(
+      return await (
         await marketplaceSDKFlow.createListing(alice.auth, nft, ListingType.Common, {price: 5, royaltyPercent: 0})
-      );
+      ).assertOk('seal');
     });
 
     const {user: bob, balance: bobBalanceBefore} = await setupUser('bob');
 
-    const aliceBalanceBefore = assertTx(await commonSDK.getFlowBalance(alice.address));
+    const aliceBalanceBefore = (await commonSDK.getFlowBalance(alice.address)).unwrap();
 
     // Bob purachase listing
-    const result = assertTx(await marketplaceSDKFlow.purchaseListing(bob.auth, listingId));
+    const result = await (await marketplaceSDKFlow.purchaseListing(bob.auth, listingId)).assertOk('seal');
     const fixedPricesListingCompleted = eventFilter<FixedPricesListingCompletedEvent, MarketplaceEvents>(
       result,
       melosMarketplaceIdentifier,
@@ -274,8 +273,8 @@ describe('Melos marketplace tests', () => {
     expect(fixedPricesListingCompleted.length).toBeGreaterThan(0);
 
     // Check NFT ownership
-    expect(assertTx(await nftSDK.getAccountHasNFT(alice.address, nft))).toEqual(false);
-    expect(assertTx(await nftSDK.getAccountHasNFT(bob.address, nft))).toEqual(true);
+    expect((await nftSDK.getAccountHasNFT(alice.address, nft)).unwrap()).toEqual(false);
+    expect((await nftSDK.getAccountHasNFT(bob.address, nft)).unwrap()).toEqual(true);
 
     await purachasedBalanceCheck(aliceBalanceBefore, bobBalanceBefore, alice, bob);
 
@@ -297,7 +296,7 @@ describe('Melos marketplace tests', () => {
     const priceCutInterval = 1;
     const listingDuration = 60;
     const {listingId, listingDetails} = await handleCreateListing(alice, melosMarketplaceIdentifier, async () => {
-      return assertTx(
+      return await (
         await marketplaceSDKFlow.createListing(alice.auth, nft, ListingType.DutchAuction, {
           royaltyPercent: 0,
           startingPrice,
@@ -305,7 +304,7 @@ describe('Melos marketplace tests', () => {
           reservePrice,
           priceCutInterval,
         })
-      );
+      ).assertOk('seal');
     });
     const listingStartTime = listingDetails.details.listingConfig.listingStartTime;
 
@@ -319,8 +318,8 @@ describe('Melos marketplace tests', () => {
       await mintFlow(alice.address, '0.1');
     }
 
-    const afterPrice = assertTx(await marketplaceSDKFlow.getListingPrice(listingId));
-    const currentBlockTime = assertTx(await commonSDK.getBlockTime());
+    const afterPrice = (await marketplaceSDKFlow.getListingPrice(listingId)).unwrap();
+    const currentBlockTime = (await commonSDK.getBlockTime()).unwrap();
     const priceDiff = Number(startingPrice) - Number(afterPrice);
     const timeDuration = Number(currentBlockTime) - Number(listingStartTime);
     console.log(
@@ -334,10 +333,10 @@ describe('Melos marketplace tests', () => {
       expect(Number(afterPrice)).toBeLessThan(Number(startingPrice));
     }
 
-    const aliceBalanceBefore = assertTx(await commonSDK.getFlowBalance(alice.address));
-    const bobBalanceBefore = assertTx(await commonSDK.getFlowBalance(bob.address));
+    const aliceBalanceBefore = (await commonSDK.getFlowBalance(alice.address)).unwrap();
+    const bobBalanceBefore = (await commonSDK.getFlowBalance(bob.address)).unwrap();
 
-    const result = assertTx(await marketplaceSDKFlow.purchaseListing(bob.auth, listingId));
+    const result = await (await marketplaceSDKFlow.purchaseListing(bob.auth, listingId)).assertOk('seal');
     const fixedPricesListingCompleted = eventFilter<FixedPricesListingCompletedEvent, MarketplaceEvents>(
       result,
       melosMarketplaceIdentifier,
@@ -348,8 +347,8 @@ describe('Melos marketplace tests', () => {
     expect(fixedPricesListingCompleted.length).toBeGreaterThan(0);
 
     // Check NFT ownership
-    expect(assertTx(await nftSDK.getAccountHasNFT(alice.address, nft))).toEqual(false);
-    expect(assertTx(await nftSDK.getAccountHasNFT(bob.address, nft))).toEqual(true);
+    expect((await nftSDK.getAccountHasNFT(alice.address, nft)).unwrap()).toEqual(false);
+    expect((await nftSDK.getAccountHasNFT(bob.address, nft)).unwrap()).toEqual(true);
 
     await purachasedBalanceCheck(aliceBalanceBefore, bobBalanceBefore, alice, bob);
 
@@ -368,63 +367,67 @@ describe('Melos marketplace tests', () => {
     // Create listing with NFT
     const minimumPrice = 5;
     const {listingId} = await handleCreateListing(alice, melosMarketplaceIdentifier, async () => {
-      return assertTx(
+      return await (
         await marketplaceSDKFlow.createListing(alice.auth, nft, ListingType.OpenBid, {minimumPrice, royaltyPercent: 0})
-      );
+      ).assertOk('seal');
     });
 
     const {user: bob} = await setupUser('bob');
 
     // If bid amount is less than minium price, will panic
     const bidPriceLow = 4;
-    const [, err] = await marketplaceSDKFlow.createBid(bob.auth, listingId, bidPriceLow);
+    const {err} = await (await marketplaceSDKFlow.createBid(bob.auth, listingId, bidPriceLow)).wait('seal');
     if (bidPriceLow < minimumPrice) {
       expect(err).toBeTruthy();
     }
 
     // Bob bid listing
     const bidPriceBob = 10;
-    const bobBalanceBeforeBid1 = assertTx(await commonSDK.getFlowBalance(bob.address));
+    const bobBalanceBeforeBid1 = (await commonSDK.getFlowBalance(bob.address)).unwrap();
     const bobBid = await handleCreateBid(bob, listingId, bidPriceBob, melosMarketplaceIdentifier);
     expect(Number(bobBid.bidCreatedEvents[0].offerPrice)).toEqual(bidPriceBob);
 
     // Alex bid listing
     const {user: alex} = await setupUser('alex');
     const bidPriceAlex = 8;
-    const alexBalanceBeforeBid = assertTx(await commonSDK.getFlowBalance(alex.address));
+    const alexBalanceBeforeBid = (await commonSDK.getFlowBalance(alex.address)).unwrap();
     const alexBid = await handleCreateBid(alex, listingId, bidPriceAlex, melosMarketplaceIdentifier);
     expect(Number(alexBid.bidCreatedEvents[0].offerPrice)).toEqual(bidPriceAlex);
 
     // Bob bid listing again
     const bidPriceBob2 = 9;
-    const bobBalanceBeforeBid2 = assertTx(await commonSDK.getFlowBalance(bob.address));
+    const bobBalanceBeforeBid2 = (await commonSDK.getFlowBalance(bob.address)).unwrap();
     const bobBid2 = await handleCreateBid(bob, listingId, bidPriceBob2, melosMarketplaceIdentifier);
-    const bobBalanceAfterBid2 = assertTx(await commonSDK.getFlowBalance(bob.address));
+    const bobBalanceAfterBid2 = (await commonSDK.getFlowBalance(bob.address)).unwrap();
 
     // Wallet balance should change (reduce)
     expect(Number(bobBalanceAfterBid2) + bidPriceBob2).toEqual(Number(bobBalanceBeforeBid2));
 
-    const sortedBids = assertTx(await marketplaceSDKFlow.getListingSortedBids(listingId));
+    const sortedBids = (await marketplaceSDKFlow.getListingSortedBids(listingId)).unwrap();
     expect(sortedBids.length).toBeGreaterThanOrEqual(3);
     console.log(`open bid listing (${listingId}) current bids (${sortedBids.length}): `, sortedBids);
 
     // Bob remove his second bid
-    const removeBidResult = assertTx(await marketplaceSDKFlow.removeBid(bob.auth, listingId, bobBid2.bidId));
+    const removeBidResult = await (
+      await marketplaceSDKFlow.removeBid(bob.auth, listingId, bobBid2.bidId)
+    ).assertOk('seal');
     const removeBidEvents = getTxEvents(removeBidResult);
     console.log('bob removeBidEvents: ', removeBidEvents);
     expect(removeBidEvents.length).toBeGreaterThanOrEqual(2); // Should exists BidRemoved event + TokensDeposit event
 
     // After remove bid, check current bid counts
-    const sortedBids2 = assertTx(await marketplaceSDKFlow.getListingSortedBids(listingId));
+    const sortedBids2 = (await marketplaceSDKFlow.getListingSortedBids(listingId)).unwrap();
     expect(sortedBids2.length).toBeGreaterThanOrEqual(2);
 
     // Wallet balance should change (increase)
-    const bobBalanceAfterRemoveBid2 = assertTx(await commonSDK.getFlowBalance(bob.address));
+    const bobBalanceAfterRemoveBid2 = (await commonSDK.getFlowBalance(bob.address)).unwrap();
     expect(Number(bobBalanceAfterRemoveBid2)).toEqual(Number(bobBalanceBeforeBid2));
 
     // Alice accept bobBid1
-    const aliceBalanceBeforeAcceptBid = assertTx(await commonSDK.getFlowBalance(alice.address));
-    const bidAcceptResult = assertTx(await marketplaceSDKFlow.acceptOpenBid(alice.auth, listingId, bobBid.bidId));
+    const aliceBalanceBeforeAcceptBid = (await commonSDK.getFlowBalance(alice.address)).unwrap();
+    const bidAcceptResult = await (
+      await marketplaceSDKFlow.acceptOpenBid(alice.auth, listingId, bobBid.bidId)
+    ).assertOk('seal');
     const bidListingCompletedEvents = eventFilter<BidListingCompletedEvent, MarketplaceEvents>(
       bidAcceptResult,
       melosMarketplaceIdentifier,
@@ -434,13 +437,13 @@ describe('Melos marketplace tests', () => {
     expect(bidListingCompletedEvents.length).toBeGreaterThan(0);
 
     // Check NFT ownership
-    expect(assertTx(await nftSDK.getAccountHasNFT(alice.address, nft))).toEqual(false);
-    expect(assertTx(await nftSDK.getAccountHasNFT(bob.address, nft))).toEqual(true);
+    expect((await nftSDK.getAccountHasNFT(alice.address, nft)).unwrap()).toEqual(false);
+    expect((await nftSDK.getAccountHasNFT(bob.address, nft)).unwrap()).toEqual(true);
 
     await purachasedBalanceCheck(aliceBalanceBeforeAcceptBid, bobBalanceBeforeBid1, alice, bob);
 
     // Alex not win, should get a refund
-    const alexBalanceAfterListingEnded = assertTx(await commonSDK.getFlowBalance(alex.address));
+    const alexBalanceAfterListingEnded = (await commonSDK.getFlowBalance(alex.address)).unwrap();
     expect(Number(alexBalanceAfterListingEnded)).toEqual(Number(alexBalanceBeforeBid));
 
     // listing ended, so bob can remove alice's listing
@@ -461,52 +464,52 @@ describe('Melos marketplace tests', () => {
     const minimumBidPercentage = 0.2; // 20% minimum markup
     const listingDuration = 20; // 20s
     const {listingId} = await handleCreateListing(alice, melosMarketplaceIdentifier, async () => {
-      return assertTx(
+      return await (
         await marketplaceSDKFlow.createListing(alice.auth, nft, ListingType.EnglishAuction, {
           reservePrice,
           minimumBidPercentage,
           basePrice,
           listingDuration,
         })
-      );
+      ).assertOk('seal');
     });
 
     const {user: bob} = await setupUser('bob');
 
     // If bid amount is less than basePrice * (1 + minimumBidPercentage) , will panic
     const bidPriceLow = 5;
-    const [, err] = await marketplaceSDKFlow.createBid(bob.auth, listingId, bidPriceLow);
+    const {err} = await (await marketplaceSDKFlow.createBid(bob.auth, listingId, bidPriceLow)).wait('seal');
     if (bidPriceLow < basePrice * (1 + minimumBidPercentage)) {
       expect(err).toBeTruthy();
     }
 
     // Bob bid listing
     const bidPriceBob = 15;
-    const bobBalanceBeforeBid = assertTx(await commonSDK.getFlowBalance(bob.address));
+    const bobBalanceBeforeBid = (await commonSDK.getFlowBalance(bob.address)).unwrap();
     const bobBid = await handleCreateBid(bob, listingId, bidPriceBob, melosMarketplaceIdentifier);
     expect(Number(bobBid.bidCreatedEvents[0].offerPrice)).toEqual(bidPriceBob);
 
-    const bobBalanceAfterBid = assertTx(await commonSDK.getFlowBalance(bob.address));
+    const bobBalanceAfterBid = (await commonSDK.getFlowBalance(bob.address)).unwrap();
 
     // Wallet balance should change (reduce)
     expect(Number(bobBalanceAfterBid) + bidPriceBob).toEqual(Number(bobBalanceBeforeBid));
 
-    const sortedBids = assertTx(await marketplaceSDKFlow.getListingSortedBids(listingId));
+    const sortedBids = (await marketplaceSDKFlow.getListingSortedBids(listingId)).unwrap();
     expect(sortedBids.length).toBeGreaterThanOrEqual(1);
     console.log(`english auction listing (${listingId}) current bids (${sortedBids.length}): `, sortedBids);
 
     // Top shoule be bob's bid now
-    const listingCurrentTopBid = assertTx(await marketplaceSDKFlow.getListingTopBid(listingId));
+    const listingCurrentTopBid = (await marketplaceSDKFlow.getListingTopBid(listingId)).unwrap();
     expect(listingCurrentTopBid.uuid).toEqual(bobBid.bidId);
     console.log('listingCurrentTopBid: ', listingCurrentTopBid);
 
     // Log new details
-    const details = assertTx(await marketplaceSDKFlow.getListingDetails(listingId));
+    const details = (await marketplaceSDKFlow.getListingDetails(listingId)).unwrap();
     console.log('new listing details', details);
 
     // Bob try completeEnglishAuction
-    const isListingEnded = assertTx(await marketplaceSDKFlow.getListingEnded(listingId));
-    const [, err1] = await marketplaceSDKFlow.publicCompleteEnglishAuction(bob.auth, listingId);
+    const isListingEnded = (await marketplaceSDKFlow.getListingEnded(listingId)).unwrap();
+    const {err: err1} = await (await marketplaceSDKFlow.publicCompleteEnglishAuction(bob.auth, listingId)).wait('seal');
     // If auction is not ended, will panic
     if (!isListingEnded) {
       expect(err1).toBeTruthy();
@@ -514,7 +517,7 @@ describe('Melos marketplace tests', () => {
 
     // Alex bid listing (should be top)
     const {user: alex} = await setupUser('alex');
-    const alexBeforeBalance = assertTx(await commonSDK.getFlowBalance(alex.address));
+    const alexBeforeBalance = (await commonSDK.getFlowBalance(alex.address)).unwrap();
     const bidPriceAlex = bidPriceBob * 2;
     const alexBid = await handleCreateBid(alex, listingId, bidPriceAlex, melosMarketplaceIdentifier);
     expect(Number(alexBid.bidCreatedEvents[0].offerPrice)).toEqual(bidPriceAlex);
@@ -523,13 +526,13 @@ describe('Melos marketplace tests', () => {
     // Sleep random time for english auction ended
     // Because the emulator is inconvenient to modify the time,
     // the loop is used to perform many transactions, so that the block time changes.
-    while (!assertTx(await marketplaceSDKFlow.getListingEnded(listingId))) {
+    while (!(await marketplaceSDKFlow.getListingEnded(listingId)).unwrap()) {
       for (let i = 0; i < 100; i++) {
         await mintFlow(alice.address, '0.1');
       }
     }
 
-    const aliceBeforeBalance = assertTx(await commonSDK.getFlowBalance(alice.address));
+    const aliceBeforeBalance = (await commonSDK.getFlowBalance(alice.address)).unwrap();
 
     // listing ended, so bob can remove alice's listing
     // If the listing is english auction, `publicCompleteEnglishAuction` will be executed automatically
@@ -549,15 +552,15 @@ describe('Melos marketplace tests', () => {
     expect(bidListingCompletedEvents[0].winBid).toEqual(alexBid.bidId);
 
     // Check NFT ownership
-    expect(assertTx(await nftSDK.getAccountHasNFT(alice.address, nft))).toEqual(false);
-    expect(assertTx(await nftSDK.getAccountHasNFT(bob.address, nft))).toEqual(false);
-    expect(assertTx(await nftSDK.getAccountHasNFT(alex.address, nft))).toEqual(true);
+    expect((await nftSDK.getAccountHasNFT(alice.address, nft)).unwrap()).toEqual(false);
+    expect((await nftSDK.getAccountHasNFT(bob.address, nft)).unwrap()).toEqual(false);
+    expect((await nftSDK.getAccountHasNFT(alex.address, nft)).unwrap()).toEqual(true);
 
     // Check balances
     await purachasedBalanceCheck(aliceBeforeBalance, alexBeforeBalance, alice, alex);
 
     // Bob not win, so he will get refund
-    const bobBalance = assertTx(await commonSDK.getFlowBalance(bob.address));
+    const bobBalance = (await commonSDK.getFlowBalance(bob.address)).unwrap();
     expect(bobBalance).toEqual(bobBalanceBeforeBid);
   });
 
@@ -569,7 +572,7 @@ describe('Melos marketplace tests', () => {
 
     // Setup NFT owner and mint NFT
     const {user: alice, nft} = await setupSeller('alice');
-    const aliceBeforeBalance = assertTx(await commonSDK.getFlowBalance(alice.address));
+    const aliceBeforeBalance = (await commonSDK.getFlowBalance(alice.address)).unwrap();
 
     // Bob create offer
     const {user: bob} = await setupUser('bob');
@@ -580,12 +583,14 @@ describe('Melos marketplace tests', () => {
 
     // Alex create offer
     const {user: alex} = await setupUser('alex');
-    const alexBalanceBefore = assertTx(await commonSDK.getFlowBalance(alex.address));
+    const alexBalanceBefore = (await commonSDK.getFlowBalance(alex.address)).unwrap();
     const offerPriceAlex = 5;
     const alexOffer = await handleCreateOffer(alex, nft, melosMarketplaceIdentifier, 300, offerPriceAlex);
 
     // Alice accept alex's offer
-    const offerAcceptedResult = assertTx(await marketplaceSDKFlow.acceptOffer(alice.auth, alexOffer.offerId));
+    const offerAcceptedResult = await (
+      await marketplaceSDKFlow.acceptOffer(alice.auth, alexOffer.offerId)
+    ).assertOk('seal');
     const offerAcceptedEvents = eventFilter<OfferAcceptedEvent, MarketplaceEvents>(
       offerAcceptedResult,
       melosMarketplaceIdentifier,
@@ -597,19 +602,19 @@ describe('Melos marketplace tests', () => {
     expect(offerAcceptedEvents[0].offerId).toEqual(alexOffer.offerId);
 
     // Check NFT ownership
-    expect(assertTx(await nftSDK.getAccountHasNFT(alice.address, nft))).toEqual(false);
-    expect(assertTx(await nftSDK.getAccountHasNFT(bob.address, nft))).toEqual(false);
-    expect(assertTx(await nftSDK.getAccountHasNFT(alex.address, nft))).toEqual(true);
+    expect((await nftSDK.getAccountHasNFT(alice.address, nft)).unwrap()).toEqual(false);
+    expect((await nftSDK.getAccountHasNFT(bob.address, nft)).unwrap()).toEqual(false);
+    expect((await nftSDK.getAccountHasNFT(alex.address, nft)).unwrap()).toEqual(true);
 
     // Check balances
     await purachasedBalanceCheck(aliceBeforeBalance, alexBalanceBefore, alice, alex);
 
     // Check balance
-    const unRefundPaymentsCount = assertTx(await marketplaceSDKFlow.getUnRefundPaymentsCount());
+    const unRefundPaymentsCount = (await marketplaceSDKFlow.getUnRefundPaymentsCount()).unwrap();
     expect(unRefundPaymentsCount).toEqual(0);
 
     // Bob remove his offer
-    const removeOfferResult = assertTx(await marketplaceSDKFlow.removeOffer(bob.auth, bobOffer.offerId));
+    const removeOfferResult = await (await marketplaceSDKFlow.removeOffer(bob.auth, bobOffer.offerId)).assertOk('seal');
     console.log('removeOfferResult: ', removeOfferResult);
   });
 
@@ -623,31 +628,31 @@ describe('Melos marketplace tests', () => {
 
     // Setup seller and mint NFT
     const {user: alice, nft} = await setupSeller('alice');
-    assertTx(await commonSDK.setupFusdVault(alice.auth));
+    await (await commonSDK.setupFusdVault(alice.auth)).assertOk('seal');
 
     // Create listing with NFT
     const minimumPrice = 5;
     const {listingId} = await handleCreateListing(alice, melosMarketplaceIdentifier, async () => {
-      return assertTx(
+      return await (
         await marketplaceSDKFUSD.createListing(alice.auth, nft, ListingType.OpenBid, {minimumPrice, royaltyPercent: 0})
-      );
+      ).assertOk('seal');
     });
 
     // Setup bob
     const {user: bob} = await setupUser('bob');
 
     // Setup and mint FUSD to bob
-    assertTx(await commonSDK.setupFusdVault(bob.auth));
+    await (await commonSDK.setupFusdVault(bob.auth)).assertOk('seal');
 
     const FUSD_MINT_AMOUNT = 1000;
-    assertTx(await commonSDK.mintFusd(fusdMinter.auth, FUSD_MINT_AMOUNT, bob.address));
-    const bobFusdBalance = assertTx(await commonSDK.getFusdBalance(bob.address));
+    await (await commonSDK.mintFusd(fusdMinter.auth, FUSD_MINT_AMOUNT, bob.address)).assertOk('seal');
+    const bobFusdBalance = (await commonSDK.getFusdBalance(bob.address)).unwrap();
     console.log('bob Fusd balance: ', bobFusdBalance);
     expect(Number(bobFusdBalance)).toEqual(FUSD_MINT_AMOUNT);
 
     // If bid amount is less than minium price, will panic
     const bidPriceLow = 4;
-    const [, err] = await marketplaceSDKFUSD.createBid(bob.auth, listingId, bidPriceLow);
+    const {err} = await (await marketplaceSDKFUSD.createBid(bob.auth, listingId, bidPriceLow)).wait('seal');
     if (bidPriceLow < minimumPrice) {
       expect(err).toBeTruthy();
     }
@@ -655,11 +660,11 @@ describe('Melos marketplace tests', () => {
     const bidPriceBob = 10;
 
     // If create bid with flow, will panic. Beacuse listing is created with FUSD
-    const [, err1] = await marketplaceSDKFlow.createBid(bob.auth, listingId, bidPriceBob);
+    const {err: err1} = await (await marketplaceSDKFlow.createBid(bob.auth, listingId, bidPriceBob)).wait('seal');
     expect(err1).toBeTruthy();
 
     // Bob create bid
-    const bidResult = assertTx(await marketplaceSDKFUSD.createBid(bob.auth, listingId, bidPriceBob));
+    const bidResult = await (await marketplaceSDKFUSD.createBid(bob.auth, listingId, bidPriceBob)).assertOk('seal');
     const bidCreatedEvents = eventFilter<BidCreatedEvent, MarketplaceEvents>(
       bidResult,
       melosMarketplaceIdentifier,
@@ -673,11 +678,11 @@ describe('Melos marketplace tests', () => {
     expect(Number(bidCreatedEvents[0].offerPrice)).toEqual(bidPriceBob);
 
     // Bob unlink his refund capability
-    assertTx(await commonSDK.unlink(bob.auth, FUSD_TOKEN_EMULATOR.FT_RECEIVER));
+    await (await commonSDK.unlink(bob.auth, FUSD_TOKEN_EMULATOR.FT_RECEIVER)).assertOk('seal');
 
     // Alice remove listing
     console.log('remove listing...');
-    const result = assertTx(await marketplaceSDKFUSD.removeListing(alice.auth, listingId));
+    const result = await (await marketplaceSDKFUSD.removeListing(alice.auth, listingId)).assertOk('seal');
     const resultEvents = getTxEvents(result);
     console.log('listing removed events: ', resultEvents);
     const unRefundPaymentEvents = eventFilter<UnRefundPaymentNotifyEvent, MarketplaceEvents>(
@@ -692,7 +697,7 @@ describe('Melos marketplace tests', () => {
     expect(refundAddress).toEqual(bob.address);
 
     // Bob relink his fusd receiver capability
-    assertTx(
+    await (
       await commonSDK.link(
         bob.auth,
         `&FUSD.Vault{FungibleToken.Receiver}`,
@@ -703,17 +708,17 @@ describe('Melos marketplace tests', () => {
           FungibleToken: '../../contracts/core/FungibleToken.cdc',
         }
       )
-    );
+    ).assertOk('seal');
 
-    const bobFusdBalanceBefore = assertTx(await commonSDK.getFusdBalance(bob.address));
+    const bobFusdBalanceBefore = (await commonSDK.getFusdBalance(bob.address)).unwrap();
 
     // Bob claim unRefundPayment
-    const claimResult = assertTx(await marketplaceSDKFUSD.claimUnRefundPayment(bob.auth));
+    const claimResult = await (await marketplaceSDKFUSD.claimUnRefundPayment(bob.auth)).assertOk('seal');
     const claimEvents = getTxEvents(claimResult);
     console.log('claimEvents: ', claimEvents);
 
     // Payment should refunded
-    const bobFusdBalanceAfter = assertTx(await commonSDK.getFusdBalance(bob.address));
+    const bobFusdBalanceAfter = (await commonSDK.getFusdBalance(bob.address)).unwrap();
     expect(Number(bobFusdBalanceBefore) + bidPriceBob).toEqual(Number(bobFusdBalanceAfter));
   });
 });

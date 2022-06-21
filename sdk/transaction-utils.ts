@@ -11,11 +11,6 @@ import {DEPLOYED_CONTRACTS, EXT_ENVIRONMENT, TRANSACTION, SCRIPT, CONTRACT, UNKN
 
 const ec = new EC('p256');
 
-export type RawTxResult = {
-  result: TxResult;
-  err: any;
-};
-
 export class UnWrapAble<T> {
   result?: T;
   err?: any;
@@ -30,16 +25,27 @@ export class UnWrapAble<T> {
   }
 }
 
-export type TxResultFields = {
-  txId?: string;
-  seal?: Promise<RawTxResult>;
-  exec?: Promise<RawTxResult>;
-  final?: Promise<RawTxResult>;
+export class RawTxResult extends UnWrapAble<TxResult> {}
+
+export type RawTransactionResponse = {
+  txId: string;
+  subscribe: (handle: (tx) => any) => () => Promise<any>;
+  seal: () => Promise<RawTxResult>;
+  exec: () => Promise<RawTxResult>;
+  final: () => Promise<RawTxResult>;
 };
 
-export class TransactionResponse extends UnWrapAble<TxResultFields> {
-  constructor(obj: {result?: TxResultFields; err?: any}) {
+export class TransactionResponse extends UnWrapAble<RawTransactionResponse> {
+  constructor(obj: {result?: RawTransactionResponse; err?: any}) {
     super(obj);
+  }
+
+  async assertOk(status: 'seal' | 'exec' | 'final') {
+    return (await this.wait(status)).unwrap();
+  }
+
+  async wait(status: 'seal' | 'exec' | 'final') {
+    return await this.unwrap()[status]();
   }
 }
 
@@ -655,37 +661,39 @@ export const sendTransaction = async (props: {
   processed?: any;
   proposer?: any;
   signers?: any;
-}): Promise<{
-  txId?: string;
-  seal?: Promise<RawTxResult>;
-  exec?: Promise<RawTxResult>;
-  final?: Promise<RawTxResult>;
-  err?: any;
-}> => {
+}): Promise<TransactionResponse> => {
   try {
     const response = await prepareInteraction(props, 'transaction');
-    const builder = (stat) => {
+    const builder = (stat) => () => {
       return new Promise<RawTxResult>((res) => {
         fcl
           .tx(response)
           [waitForStatus(stat)]()
           .then((rawResult) => {
-            res({
-              result: {
-                txId: response,
-                ...rawResult,
-              },
-            } as RawTxResult);
+            res(
+              new RawTxResult({
+                result: {
+                  txId: response,
+                  ...rawResult,
+                },
+              })
+            );
           })
           .catch((err) => {
-            res({err} as RawTxResult);
+            res(new RawTxResult({err}));
           });
       });
     };
 
+    const txId = response.transactionId as string;
+    const subscribe = (handle: any) => {
+      return fcl.tx({transactionId: txId}).subscribe(handle);
+    };
+
     return new TransactionResponse({
       result: {
-        txId: response.transactionId as string,
+        txId,
+        subscribe,
         seal: builder('seal'),
         exec: builder('exec'),
         final: builder('final'),
