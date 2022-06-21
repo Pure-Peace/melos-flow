@@ -1,12 +1,14 @@
 import {emulator as _emulator, getAccountAddress, getFlowBalance, init, mintFlow} from 'flow-js-testing';
 import * as fclLib from '@onflow/fcl';
 import {exec} from 'child_process';
+import fs from 'fs';
 
 import {BASE_PATH, EMULATOR_ADDRESS} from '../../sdk/config';
 import {FlowService} from '../../sdk/flow-service';
 import {EMULATOR_PORT} from '../../sdk/config';
 import {SEALED, toFlowAddress} from '../../sdk/common';
 import {Account, CreateFlowEmulatorParams, AuthAccount, DeploymentsConfig, AccountsConfig} from '../../sdk/types';
+import path from 'path';
 
 export const SECOND = 1000;
 export const HOUR = 3600 * SECOND;
@@ -15,10 +17,18 @@ export const DAY = 24 * HOUR;
 export const MINIMUM_BALANCE = 0.001;
 
 const _fcl: any = fclLib;
+let _flow;
 
 export const EXISTS_ACCOUNTS = new Set();
 
 export const emulator = _emulator;
+
+const flow = () => {
+  if (!_flow) {
+    _flow = JSON.parse(fs.readFileSync(path.join(__dirname, '../../flow.json'), {encoding: 'utf-8'}).toString());
+  }
+  return _flow;
+};
 
 export async function prepareEmulator(params: CreateFlowEmulatorParams) {
   await startEmulator(params);
@@ -50,15 +60,13 @@ export function createTestAuth(fcl: any, accountAddress: string, privateKey: str
 }
 
 export async function getAccountsFromFlowConfig(): Promise<Account[]> {
-  const flow = await import('../../flow.json');
-  return Object.entries(flow.accounts).map(([k, v]) => {
+  return Object.entries(flow().accounts as Record<any, any>).map(([k, v]) => {
     return {name: k, address: v.address, key: v.key};
   });
 }
 
 export async function getAccountByAddress(address: string): Promise<Account> {
-  const flow = await import('../../flow.json');
-  for (const [k, v] of Object.entries(flow.accounts)) {
+  for (const [k, v] of Object.entries(flow().accounts as Record<any, any>)) {
     if (v.address === address) {
       const account = {name: k, address: v.address, key: v.key};
       await createAccountIfNotExists(account);
@@ -84,11 +92,10 @@ export async function createAccountIfNotExists(account: Account) {
 }
 
 export async function getAccount(name: string): Promise<Account> {
-  const flow = await import('../../flow.json');
-  const acc = (flow.accounts as AccountsConfig)[name];
+  const acc = (flow().accounts as AccountsConfig)[name];
   let account;
   if (!acc) {
-    account = {name, address: await getAccountAddress(name), key: flow.accounts['emulator-account'].key};
+    account = {name, address: await getAccountAddress(name), key: flow().accounts['emulator-account'].key};
   } else {
     account = {name, ...acc};
   }
@@ -116,11 +123,10 @@ transaction {
 
 export async function buildCheckProjectCode() {
   let s = '';
-  const flow = await import('../../flow.json');
-  for (const account of Object.keys(flow.deployments.emulator)) {
-    for (const contract of (flow.deployments.emulator as DeploymentsConfig)[account]) {
+  for (const account of Object.keys(flow().deployments.emulator)) {
+    for (const contract of (flow().deployments.emulator as DeploymentsConfig)[account]) {
       s += `import ${typeof contract === 'string' ? contract : contract.name} from ${toFlowAddress(
-        (flow.accounts as AccountsConfig)[account].address
+        (flow().accounts as AccountsConfig)[account].address
       )}\n`;
     }
   }
