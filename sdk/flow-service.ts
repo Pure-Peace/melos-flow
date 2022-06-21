@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import {ec as EC} from 'elliptic';
 import {SHA3} from 'sha3';
-import type {Fcl} from '@rarible/fcl-types';
 
 import {toFlowAddress} from './common';
 import {FlowNetwork} from './config';
@@ -27,7 +26,7 @@ export type FlowAuthorize = (account: any) => Promise<FlowAuthorizeResponce>;
 
 export class FlowService {
   constructor(
-    private readonly fcl: Fcl,
+    private readonly fcl: any,
     private readonly flowAddress: string,
     private readonly privateKeyHex: string,
     private readonly accountIndex: string | number

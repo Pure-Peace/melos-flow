@@ -1,5 +1,4 @@
 import {emulator as _emulator, getAccountAddress, getFlowBalance, init, mintFlow} from 'flow-js-testing';
-import type {Fcl} from '@rarible/fcl-types';
 import * as fclLib from '@onflow/fcl';
 import {exec} from 'child_process';
 
@@ -15,7 +14,7 @@ export const DAY = 24 * HOUR;
 
 export const MINIMUM_BALANCE = 0.001;
 
-const _fcl: Fcl = fclLib;
+const _fcl: any = fclLib;
 
 export const EXISTS_ACCOUNTS = new Set();
 
@@ -44,7 +43,7 @@ export async function startEmulator(params: CreateFlowEmulatorParams = {logs: tr
   }
 }
 
-export function createTestAuth(fcl: Fcl, accountAddress: string, privateKey: string, keyIndex = 0) {
+export function createTestAuth(fcl: any, accountAddress: string, privateKey: string, keyIndex = 0) {
   fcl.config().put('accessNode.api', EMULATOR_ADDRESS);
   const flowService = new FlowService(fcl, accountAddress, privateKey, keyIndex);
   return flowService.authorizeMinter();

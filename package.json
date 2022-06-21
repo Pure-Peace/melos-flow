@@ -31,7 +31,6 @@
     "tslib": "^2.4.0"
   },
   "devDependencies": {
-    "@rarible/fcl-types": "^0.5.33-alpha.11",
     "@types/elliptic": "^6.4.14",
     "@types/jest": "^27.4.1",
     "@types/node": "^16.7.10",
