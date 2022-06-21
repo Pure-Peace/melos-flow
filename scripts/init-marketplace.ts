@@ -27,22 +27,26 @@ class InitMarketplace extends ScriptRunner {
     const {address, pk, keyId} = getAccountFromEnv(NETWORK);
     const auth = createAuth(fcl, NETWORK, address!, pk!, keyId);
 
-    const r1 = await adminSDK.setAllowedPaymentTokens(auth, [
-      {tokenName: 'FlowToken', tokenAddress: TESTNET_BASE_ADDRESS_MAP.FlowToken},
-      {tokenName: 'FUSD', tokenAddress: TESTNET_BASE_ADDRESS_MAP.FUSD},
-    ]);
+    const r1 = await (
+      await adminSDK.setAllowedPaymentTokens(auth, [
+        {tokenName: 'FlowToken', tokenAddress: TESTNET_BASE_ADDRESS_MAP.FlowToken},
+        {tokenName: 'FUSD', tokenAddress: TESTNET_BASE_ADDRESS_MAP.FUSD},
+      ])
+    ).assertOk('seal');
 
     const txFeeReceiver = address;
     const txFeePercent = toUFix64(0.2)!;
     const royaltyReceiver = address;
-    const r2 = await adminSDK.setTokenFeeConfig(
-      auth,
-      'FlowToken',
-      TESTNET_BASE_ADDRESS_MAP.FlowToken,
-      txFeeReceiver,
-      txFeePercent,
-      royaltyReceiver
-    );
+    const r2 = await (
+      await adminSDK.setTokenFeeConfig(
+        auth,
+        'FlowToken',
+        TESTNET_BASE_ADDRESS_MAP.FlowToken,
+        txFeeReceiver,
+        txFeePercent,
+        royaltyReceiver
+      )
+    ).assertOk('seal');
     return [r1, r2];
   }
 }

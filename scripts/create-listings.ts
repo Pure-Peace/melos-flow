@@ -28,20 +28,24 @@ class InitMarketplace extends ScriptRunner {
     const {address, pk, keyId} = getAccountFromEnv(NETWORK);
     const auth = createAuth(fcl, NETWORK, address!, pk!, keyId);
 
-    const r = await marketplaceSDK.createListing(auth, 1, ListingType.Common, {price: 5});
-    const r1 = await marketplaceSDK.createListing(auth, 2, ListingType.Common, {price: 5});
-    const r2 = await marketplaceSDK.createListing(auth, 3, ListingType.EnglishAuction, {
-      reservePrice: 4,
-      minimumBidPercentage: 0.2,
-      basePrice: 1,
-      listingDuration: 3600,
-    });
-    const r3 = await marketplaceSDK.createListing(auth, 4, ListingType.EnglishAuction, {
-      reservePrice: 4,
-      minimumBidPercentage: 0.2,
-      basePrice: 1,
-      listingDuration: 3600,
-    });
+    const r = await (await marketplaceSDK.createListing(auth, 1, ListingType.Common, {price: 5})).assertOk('seal');
+    const r1 = await (await marketplaceSDK.createListing(auth, 2, ListingType.Common, {price: 5})).assertOk('seal');
+    const r2 = await (
+      await marketplaceSDK.createListing(auth, 3, ListingType.EnglishAuction, {
+        reservePrice: 4,
+        minimumBidPercentage: 0.2,
+        basePrice: 1,
+        listingDuration: 3600,
+      })
+    ).assertOk('seal');
+    const r3 = await (
+      await marketplaceSDK.createListing(auth, 4, ListingType.EnglishAuction, {
+        reservePrice: 4,
+        minimumBidPercentage: 0.2,
+        basePrice: 1,
+        listingDuration: 3600,
+      })
+    ).assertOk('seal');
     return [r, r1, r2, r3];
   }
 }
