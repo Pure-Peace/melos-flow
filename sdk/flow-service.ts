@@ -5,6 +5,7 @@ import type {Fcl} from '@rarible/fcl-types';
 
 import {toFlowAddress} from './common';
 import flowConfig from '../flow.json';
+import {FlowNetwork} from './config';
 
 const ec = new EC('p256');
 
@@ -84,7 +85,7 @@ export class FlowService {
   };
 }
 
-export function getAccessNode(network: 'emulator' | 'testnet' | 'mainnet') {
+export function getAccessNode(network: FlowNetwork) {
   switch (network) {
     case 'emulator': {
       return process.env.EMULATOR_ACCESS_NODE || 'http://127.0.0.1:8080';
@@ -98,7 +99,7 @@ export function getAccessNode(network: 'emulator' | 'testnet' | 'mainnet') {
   }
 }
 
-export function getAccountFromEnv(network: 'emulator' | 'testnet' | 'mainnet', name?: string) {
+export function getAccountFromEnv(network: FlowNetwork, name?: string) {
   if (network === 'emulator') {
     const {address, key} = flowConfig.accounts[name || 'emulator-account'];
     return {
@@ -123,13 +124,13 @@ export function getAccountFromEnv(network: 'emulator' | 'testnet' | 'mainnet', n
   return account;
 }
 
-export function setAccessNode(fcl: Fcl, network: 'emulator' | 'testnet' | 'mainnet') {
+export function setAccessNode(fcl: Fcl, network: FlowNetwork) {
   fcl.config().put('accessNode.api', getAccessNode(network));
 }
 
 export function createAuth(
   fcl: Fcl,
-  network: 'emulator' | 'testnet' | 'mainnet',
+  network: FlowNetwork,
   accountAddress: string,
   privateKey: string,
   keyIndex: number | string = 0
@@ -137,4 +138,40 @@ export function createAuth(
   setAccessNode(fcl, network);
   const flowService = new FlowService(fcl, toFlowAddress(accountAddress), privateKey, Number(keyIndex));
   return flowService.authorizeMinter();
+}
+
+export class FlowAccount {
+  address: string;
+  pk: string;
+  keyId: number;
+  constructor(address: string, pk: string, keyId = 0) {
+    this.address = address;
+    this.pk = pk;
+    this.keyId = keyId;
+  }
+
+  static parse(str: string) {
+    const [address, pk, keyId] = str.split(':');
+    return new FlowAccount(address, pk, Number(keyId || 0));
+  }
+
+  upgrade(fcl: any, network: FlowNetwork): AuthFlowAccount {
+    return AuthFlowAccount.fromFlowAccount(fcl, network, this);
+  }
+
+  createAuth(fcl: any, network: FlowNetwork) {
+    return createAuth(fcl, network, this.address, this.pk, this.keyId);
+  }
+}
+
+export class AuthFlowAccount extends FlowAccount {
+  auth: FlowAuthorize;
+  constructor(fcl: any, network: FlowNetwork, address: string, pk: string, keyId = 0) {
+    super(address, pk, keyId);
+    this.auth = this.createAuth(fcl, network);
+  }
+
+  static fromFlowAccount(fcl: any, network: FlowNetwork, flowAccount: FlowAccount) {
+    return new AuthFlowAccount(fcl, network, flowAccount.address, flowAccount.pk, flowAccount.keyId);
+  }
 }
