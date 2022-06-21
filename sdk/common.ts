@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import {TxResult} from 'flow-cadut';
 import {readFileSync} from 'fs';
 import path from 'path';
@@ -121,7 +122,7 @@ export function fusdReplaceMap(network: 'emulator' | 'testnet' | 'mainnet'): Fun
   };
 }
 
-export function melosNftReplaceMap(nftContractAddress: string): NonFungibleTokenReplaceMap {
+export function melosNftReplaceMap(nftContractAddress?: string): NonFungibleTokenReplaceMap {
   return {
     NFT_NAME: 'MelosNFT',
     NFT_ADDRESS: nftContractAddress || '"../../contracts/MelosNFT.cdc"',
@@ -286,4 +287,26 @@ export class ScriptRunner {
         console.error(err);
       });
   }
+}
+
+export function getMaps(network: 'mainnet' | 'testnet' | 'emulator') {
+  if (network === 'emulator') {
+    return {addressMap: EMULATOR_ADDRESS_MAP, replaceMap: EMULATOR_REPLACE_MAP};
+  }
+
+  const MelosNFT = process.env[`${network.toUpperCase()}_MELOS_NFT_ADDRESS`]!;
+  const MelosMarketplace = process.env[`${network.toUpperCase()}_MELOS_MARKETPLACE`]!;
+
+  const addressMap = {
+    ...(network === 'testnet' ? TESTNET_BASE_ADDRESS_MAP : MAINNET_BASE_ADDRESS_MAP),
+    MelosNFT,
+    MelosMarketplace,
+  };
+
+  const replaceMap: ReplaceMap = {
+    ...flowTokenReplaceMap(network),
+    ...melosNftReplaceMap(MelosNFT),
+  };
+
+  return {addressMap, replaceMap};
 }

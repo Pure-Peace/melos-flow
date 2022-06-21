@@ -4,6 +4,7 @@ import {SHA3} from 'sha3';
 import type {Fcl} from '@rarible/fcl-types';
 
 import {toFlowAddress} from './common';
+import flowConfig from '../flow.json';
 
 const ec = new EC('p256');
 
@@ -97,10 +98,19 @@ export function getAccessNode(network: 'emulator' | 'testnet' | 'mainnet') {
   }
 }
 
-export function getAccountFromEnv(network: 'emulator' | 'testnet' | 'mainnet') {
-  const ADDR_ENV_KEY = `${network.toUpperCase()}_FLOW_ACCOUNT_ADDRESS`;
-  const PRIVKEY_ENV_KEY = `${network.toUpperCase()}_FLOW_ACCOUNT_PRIVATE_KEY`;
-  const KEY_ID_ENV_KEY = `${network.toUpperCase()}_FLOW_ACCOUNT_KEY_ID`;
+export function getAccountFromEnv(network: 'emulator' | 'testnet' | 'mainnet', name?: string) {
+  if (network === 'emulator') {
+    const {address, key} = flowConfig.accounts[name || 'emulator-account'];
+    return {
+      address,
+      pk: key,
+      keyId: 0,
+    };
+  }
+
+  const ADDR_ENV_KEY = `${name ? name.toLocaleUpperCase() : ''}_${network.toUpperCase()}_FLOW_ACCOUNT_ADDRESS`;
+  const PRIVKEY_ENV_KEY = `${name ? name.toLocaleUpperCase() : ''}_${network.toUpperCase()}_FLOW_ACCOUNT_PRIVATE_KEY`;
+  const KEY_ID_ENV_KEY = `${name ? name.toLocaleUpperCase() : ''}_${network.toUpperCase()}_FLOW_ACCOUNT_KEY_ID`;
 
   const account = {
     address: process.env[ADDR_ENV_KEY]!,
