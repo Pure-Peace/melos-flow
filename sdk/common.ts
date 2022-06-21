@@ -2,7 +2,7 @@
 import {TxResult} from 'flow-cadut';
 import {readFileSync} from 'fs';
 import path from 'path';
-import {BASE_PATH} from './config';
+import {BASE_PATH, FlowNetwork} from './config';
 
 export const SEALED = 4;
 export const UFIX64_PRECISION = 8;
@@ -289,7 +289,7 @@ export class ScriptRunner {
   }
 }
 
-export function getMaps(network: 'mainnet' | 'testnet' | 'emulator') {
+export function getMaps(network: FlowNetwork) {
   if (network === 'emulator') {
     return {addressMap: EMULATOR_ADDRESS_MAP, replaceMap: EMULATOR_REPLACE_MAP};
   }
