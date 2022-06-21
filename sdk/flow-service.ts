@@ -129,12 +129,12 @@ export function getAccountFromEnv(network: FlowNetwork, name?: string) {
   return account;
 }
 
-export function setAccessNode(fcl: Fcl, network: FlowNetwork) {
+export function setAccessNode(fcl: any, network: FlowNetwork) {
   fcl.config().put('accessNode.api', getAccessNode(network));
 }
 
 export function createAuth(
-  fcl: Fcl,
+  fcl: any,
   network: FlowNetwork,
   accountAddress: string,
   privateKey: string,
