@@ -4,10 +4,16 @@ import {SHA3} from 'sha3';
 import type {Fcl} from '@rarible/fcl-types';
 
 import {toFlowAddress} from './common';
-import flowConfig from '../flow.json';
 import {FlowNetwork} from './config';
 
 const ec = new EC('p256');
+
+export const accounts = {
+  'emulator-account': {
+    address: '0xf8d6e0586b0a20c7',
+    key: '98e4e163c9494dbfc2dc271f48941ed7113890d5fddc2cfa8a603836a09806b8',
+  },
+};
 
 export type FlowSigningFunctionResponse = {addr: string; keyId: number; signature: string};
 export type FlowSigningFunction = (signable: {message: string}) => FlowSigningFunctionResponse;
@@ -101,7 +107,7 @@ export function getAccessNode(network: FlowNetwork) {
 
 export function getAccountFromEnv(network: FlowNetwork, name?: string) {
   if (network === 'emulator') {
-    const {address, key} = flowConfig.accounts[name || 'emulator-account'];
+    const {address, key} = accounts[name || 'emulator-account'];
     return {
       address,
       pk: key,

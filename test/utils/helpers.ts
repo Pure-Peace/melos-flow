@@ -5,7 +5,6 @@ import {exec} from 'child_process';
 
 import {BASE_PATH, EMULATOR_ADDRESS} from '../../sdk/config';
 import {FlowService} from '../../sdk/flow-service';
-import flow from '../../flow.json';
 import {EMULATOR_PORT} from '../../sdk/config';
 import {SEALED, toFlowAddress} from '../../sdk/common';
 import {Account, CreateFlowEmulatorParams, AuthAccount, DeploymentsConfig, AccountsConfig} from '../../sdk/types';
@@ -51,13 +50,15 @@ export function createTestAuth(fcl: Fcl, accountAddress: string, privateKey: str
   return flowService.authorizeMinter();
 }
 
-export function getAccountsFromFlowConfig(): Account[] {
+export async function getAccountsFromFlowConfig(): Promise<Account[]> {
+  const flow = await import('../../flow.json');
   return Object.entries(flow.accounts).map(([k, v]) => {
     return {name: k, address: v.address, key: v.key};
   });
 }
 
 export async function getAccountByAddress(address: string): Promise<Account> {
+  const flow = await import('../../flow.json');
   for (const [k, v] of Object.entries(flow.accounts)) {
     if (v.address === address) {
       const account = {name: k, address: v.address, key: v.key};
@@ -84,6 +85,7 @@ export async function createAccountIfNotExists(account: Account) {
 }
 
 export async function getAccount(name: string): Promise<Account> {
+  const flow = await import('../../flow.json');
   const acc = (flow.accounts as AccountsConfig)[name];
   let account;
   if (!acc) {
@@ -113,8 +115,9 @@ transaction {
   }
 }`;
 
-export function buildCheckProjectCode() {
+export async function buildCheckProjectCode() {
   let s = '';
+  const flow = await import('../../flow.json');
   for (const account of Object.keys(flow.deployments.emulator)) {
     for (const contract of (flow.deployments.emulator as DeploymentsConfig)[account]) {
       s += `import ${typeof contract === 'string' ? contract : contract.name} from ${toFlowAddress(
@@ -127,10 +130,10 @@ export function buildCheckProjectCode() {
 
 export async function checkProjectDeployments() {
   try {
-    const account = getAccountsFromFlowConfig()[0];
+    const account = await getAccountsFromFlowConfig()[0];
     const auth = await createTestAuth(_fcl, account.address, account.key);
     const tx = await _fcl.send([
-      _fcl.transaction(buildCheckProjectCode()),
+      _fcl.transaction(await buildCheckProjectCode()),
       _fcl.payer(auth),
       _fcl.proposer(auth),
       _fcl.authorizations([auth]),
