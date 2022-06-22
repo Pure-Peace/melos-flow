@@ -1,7 +1,4 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import {readFileSync} from 'fs';
-import path from 'path';
-import {BASE_PATH} from './config';
 import {RawTxResult} from './transaction';
 import {
   FungibleTokenReplaceMap,
@@ -13,7 +10,6 @@ import {
   ScanResult,
 } from './types';
 
-export const SEALED = 4;
 export const UFIX64_PRECISION = 8;
 
 export const EXT_ENVIRONMENT = {
@@ -62,11 +58,6 @@ export const DEPLOYED_CONTRACTS = {
     FUSD: '0x3c5959b568896393',
   },
 };
-
-export const CONTRACT = 'contract';
-export const TRANSACTION = 'transaction';
-export const SCRIPT = 'script';
-export const UNKNOWN = 'unknown';
 
 export const EMULATOR_ADDRESS_MAP = {
   NonFungibleToken: '0xf8d6e0586b0a20c7',
@@ -187,14 +178,6 @@ export function toFlowAddress(value: string) {
 
 export const FLOW_ZERO_ADDRESS = toFlowAddress('0x0000000000000000');
 
-export function withPrefix(address: string): string {
-  return '0x' + sansPrefix(address);
-}
-
-export function sansPrefix(address: string): string {
-  return address.replace(/^0x/, '').replace(/^Fx/, '');
-}
-
 export function eventFilter<T, E>(txResult: TxResult, contract: string, contractEvent: E) {
   const filtedEvents: T[] = [];
   for (const ev of txResult.events) {
@@ -218,44 +201,8 @@ export async function sleep(duration: number) {
 export const toUFix64 = (value?: number) =>
   [null, undefined, NaN].includes(value) ? null : value!.toFixed(UFIX64_PRECISION);
 
-export const getCode = (filePath: string) => {
-  return readFileSync(path.join(BASE_PATH, filePath.endsWith('.cdc') ? filePath : `${filePath}.cdc`), {
-    encoding: 'utf-8',
-  });
-};
-
-export const getCodeWithType = (file: string, type: 'contracts' | 'scripts' | 'transactions') => {
-  return getCode(path.join(type, file));
-};
-
-export const contractCode = (file: string) => {
-  return getCodeWithType(file, 'contracts');
-};
-
-export const scriptCode = (file: string) => {
-  return getCodeWithType(file, 'scripts');
-};
-
-export const txCode = (file: string) => {
-  return getCodeWithType(file, 'transactions');
-};
-
 export async function assertTx(txResultResponser: () => Promise<RawTxResult>) {
   return (await txResultResponser()).unwrap();
-}
-
-export class ScriptRunner {
-  async main(): Promise<any> {}
-  run() {
-    this.main()
-      .then((r) => {
-        console.log('End with: ', r);
-        process.exit(0);
-      })
-      .catch((err) => {
-        console.error(err);
-      });
-  }
 }
 
 export function getMaps(network: FlowNetwork) {

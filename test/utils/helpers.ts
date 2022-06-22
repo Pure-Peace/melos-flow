@@ -6,8 +6,15 @@ import fs from 'fs';
 import {BASE_PATH, EMULATOR_ADDRESS} from '../../src/config';
 import {FlowService} from '../../src/flow-service';
 import {EMULATOR_PORT} from '../../src/config';
-import {SEALED, toFlowAddress} from '../../src/common';
-import {Account, CreateFlowEmulatorParams, AuthAccount, DeploymentsConfig, AccountsConfig} from '../../src/types';
+import {toFlowAddress} from '../../src/common';
+import {
+  Account,
+  CreateFlowEmulatorParams,
+  AuthAccount,
+  DeploymentsConfig,
+  AccountsConfig,
+  FlowTxStatus,
+} from '../../src/types';
 import path from 'path';
 
 export const SECOND = 1000;
@@ -145,7 +152,7 @@ export async function checkProjectDeployments() {
       _fcl.limit(999),
     ]);
     const result = await _fcl.tx(tx).onceSealed();
-    if (result.status !== SEALED) {
+    if (result.status !== FlowTxStatus.SEALED) {
       return false;
     }
     return true;
@@ -182,3 +189,25 @@ export async function deployContractsIfNotDeployed() {
     await deployProject();
   }
 }
+
+export const getCode = (filePath: string) => {
+  return fs.readFileSync(path.join(BASE_PATH, filePath.endsWith('.cdc') ? filePath : `${filePath}.cdc`), {
+    encoding: 'utf-8',
+  });
+};
+
+export const getCodeWithType = (file: string, type: 'contracts' | 'scripts' | 'transactions') => {
+  return getCode(path.join(type, file));
+};
+
+export const contractCode = (file: string) => {
+  return getCodeWithType(file, 'contracts');
+};
+
+export const scriptCode = (file: string) => {
+  return getCodeWithType(file, 'scripts');
+};
+
+export const txCode = (file: string) => {
+  return getCodeWithType(file, 'transactions');
+};

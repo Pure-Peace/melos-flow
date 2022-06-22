@@ -6,10 +6,15 @@ import * as t from '@onflow/types';
 import {ec as EC} from 'elliptic';
 import {SHA3} from 'sha3';
 
-import {DEPLOYED_CONTRACTS, EXT_ENVIRONMENT, TRANSACTION, SCRIPT, CONTRACT, UNKNOWN} from './common';
+import {DEPLOYED_CONTRACTS, EXT_ENVIRONMENT} from './common';
 import {TxResult, RawTransactionResponse, MethodArgs, AuthWithPrivateKey, FlowTransaction} from './types';
 
 const ec = new EC('p256');
+
+export const CONTRACT = 'contract';
+export const TRANSACTION = 'transaction';
+export const SCRIPT = 'script';
+export const UNKNOWN = 'unknown';
 
 export class UnWrapAble<T> {
   result?: T;

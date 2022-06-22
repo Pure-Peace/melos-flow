@@ -2,7 +2,7 @@
 import * as fcl from '@onflow/fcl';
 
 import {MelosNFTSDK} from '../src/contracts-sdk/melos-nft';
-import {ScriptRunner, TESTNET_BASE_ADDRESS_MAP, flowTokenReplaceMap, melosNftReplaceMap, getMaps} from '../src/common';
+import {TESTNET_BASE_ADDRESS_MAP, flowTokenReplaceMap, melosNftReplaceMap, getMaps} from '../src/common';
 import {createAuth, getAccountFromEnv} from '../src/flow-service';
 import {MelosMarketplaceAdminSDK, MelosMarketplaceSDK} from '../src/contracts-sdk/melos-marketplace';
 import {CommonSDK} from '../src/contracts-sdk/common';
@@ -11,7 +11,7 @@ import {ListingType} from '../src/type-contracts/melosMarketplace';
 const NETWORK = (process.env.NETWORK as any) || 'emulator';
 const {addressMap, replaceMap} = getMaps(NETWORK);
 
-class InitMarketplace extends ScriptRunner {
+class InitMarketplace {
   async main() {
     const commonSDK = new CommonSDK(addressMap, replaceMap);
     const nftSDK = new MelosNFTSDK(addressMap, replaceMap);
@@ -43,4 +43,12 @@ class InitMarketplace extends ScriptRunner {
   }
 }
 
-new InitMarketplace().run();
+new InitMarketplace()
+  .main()
+  .then((r) => {
+    console.log('End with: ', r);
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error(err);
+  });

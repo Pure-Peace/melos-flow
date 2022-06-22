@@ -1,3 +1,3 @@
-export * as cores from './cores';
-export * as melosMarketplace from './melosMarketplace';
-export * as melosNFT from './melosNFT';
+export * from './cores';
+export * from './melosMarketplace';
+export * from './melosNFT';
