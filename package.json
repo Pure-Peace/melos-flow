@@ -1,5 +1,5 @@
 {
-  "name": "melos-flow",
+  "name": "@melosstudio/flow-sdk",
   "version": "1.0.0",
   "description": "The flow (cadence) contract of Melos NFT and Marketplace. Contains sdk, scripts and tests.",
   "main": "dist/cjs/index.js",
@@ -12,8 +12,7 @@
   "scripts": {
     "prepare": "yarn clean && yarn generate-code",
     "do": "yarn prepare && node ./_scripts.js",
-    "build": "yarn prepare && yarn build:es2015 && yarn build:esm && yarn build:cjs",
-    "build:es2015": "tsc --project tsconfig-build.json --module es2015 --target es2015 --outDir dist/es2015",
+    "build": "yarn prepare && yarn build:esm && yarn build:cjs",
     "build:esm": "tsc --project tsconfig-build.json --module es2015 --target es2015 --outDir dist/esm",
     "build:cjs": "tsc --project tsconfig-build.json --module commonjs --target es2015 --outDir dist/cjs",
     "clean": "rimraf ./build ./dist ./sdk-code",
@@ -50,5 +49,9 @@
     "prettier": "^2.3.2",
     "ts-jest": "^27.1.4",
     "typescript": "^4.6.3"
+  },
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://registry.npmjs.org"
   }
 }
