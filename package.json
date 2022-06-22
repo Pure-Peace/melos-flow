@@ -1,13 +1,11 @@
 {
   "name": "@melosstudio/flow-sdk",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "The flow (cadence) contract of Melos NFT and Marketplace. Contains sdk, scripts and tests.",
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
+  "main": "dist/cjs",
+  "module": "dist/esm",
   "files": [
-    "dist",
-    "sdk",
-    "sdk-code"
+    "dist"
   ],
   "scripts": {
     "do": "yarn generate-code && node ./_scripts.js",
