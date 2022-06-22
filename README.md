@@ -62,3 +62,50 @@ yarn contract-update:testnet
 yarn contract-deploy:mainnet
 yarn contract-update:mainnet
 ```
+
+**SDK Examples**
+
+```typescript
+import {
+  MelosMarketplaceSDK,
+  MelosNFTSDK,
+  TESTNET_BASE_ADDRESS_MAP,
+  flowTokenReplaceMap,
+  melosNftReplaceMap,
+} from "@melosstudio/flow-sdk";
+
+const TESTNET_ADDRESS_MAP = {
+  ...TESTNET_BASE_ADDRESS_MAP,
+  MelosNFT: MELOS_NFT_ADDRESS,
+  MelosMarketplace: MELOS_MARKETPLACE,
+};
+
+const TESTNET_REPLACE_MAP = {
+  ...flowTokenReplaceMap("testnet"),
+  ...melosNftReplaceMap(MELOS_NFT_ADDRESS),
+};
+
+const nftSDK = new MelosNFTSDK(TESTNET_ADDRESS_MAP, TESTNET_REPLACE_MAP);
+
+
+// subscribe
+const unsub =  (await nftSDK.removeCollection(fcl.authz)).unwrap().subscribe()
+
+// only send
+const { result, err } = await nftSDK.removeCollection(fcl.authz);
+
+// full example
+const tx = (await nftSDK.removeCollection(fcl.authz)).unwrap();
+
+// wait for seal
+await tx.seal()
+
+// wait for final
+await tx.final()
+
+// wait for exec
+await tx.exec()
+
+// unwrap and wait for status
+await (await nftSDK.removeCollection(fcl.authz)).assertOk("seal")
+```
