@@ -155,9 +155,13 @@ export class FlowAccount {
     this.keyId = keyId;
   }
 
-  static parse(str: string) {
+  static parseStr(str: string) {
     const [address, pk, keyId] = str.split(':');
     return new FlowAccount(address, pk, Number(keyId || 0));
+  }
+
+  static parseObj(obj: {address: string; pk: string; keyId: number}) {
+    return new FlowAccount(obj.address, obj.pk, Number(obj.keyId || 0));
   }
 
   upgrade(fcl: any, network: FlowNetwork): AuthFlowAccount {

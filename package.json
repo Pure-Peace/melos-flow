@@ -4,6 +4,11 @@
   "description": "The flow (cadence) contract of Melos NFT and Marketplace. Contains sdk, scripts and tests.",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
+  "files": [
+    "dist",
+    "sdk",
+    "sdk-code"
+  ],
   "scripts": {
     "prepare": "yarn clean && yarn generate-code",
     "do": "yarn prepare && node ./_scripts.js",

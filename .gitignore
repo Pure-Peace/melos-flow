@@ -44,3 +44,4 @@ dist
 flow.testnet.json
 flow.mainnet.json
 .env
+.npmrc
