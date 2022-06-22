@@ -1,6 +1,6 @@
 {
   "name": "@melosstudio/flow-sdk",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "The flow (cadence) contract of Melos NFT and Marketplace. Contains sdk, scripts and tests.",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -23,7 +23,8 @@
     "contract-deploy:testnet": "flow deploy project --network=testnet --config-path ./flow.testnet.json",
     "contract-deploy:mainnet": "flow deploy project --network=mainnet --config-path ./flow.mainnet.json",
     "contract-update:testnet": "flow deploy project --network=testnet --update --config-path ./flow.testnet.json",
-    "contract-update:mainnet": "flow deploy project --network=mainnet --update --config-path ./flow.mainnet.json"
+    "contract-update:mainnet": "flow deploy project --network=mainnet --update --config-path ./flow.mainnet.json",
+    "buildPublish": "yarn build && yarn publish"
   },
   "author": "Pure-Peace",
   "license": "ISC",
