@@ -7,6 +7,7 @@ The flow (cadence) contract of Melos NFT and Marketplace. Contains sdk, scripts 
 **Install**
 
 ```bash
+npm i -g yarn
 yarn
 ```
 
@@ -29,6 +30,12 @@ yarn do <script name>
 
 ```bash
 yarn build
+```
+
+**Publish package**
+
+```bash
+yarn buildPublish
 ```
 
 **Generate esm/cjs/ts code used by sdk based on cadence script and transaction**
