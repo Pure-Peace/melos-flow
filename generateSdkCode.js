@@ -22,6 +22,17 @@ function fileHeader(ext) {
   return ['.ts', '.mjs'].includes(ext) ? 'export default' : 'module.exports =';
 }
 
+function toHump(value) {
+  return value.replace(/-(\w)/g, (_, letter) => letter.toUpperCase());
+}
+
+function importExt(name, ext) {
+  const pat = `'./${name}'`;
+  return ['.ts', '.mjs'].includes(ext)
+    ? `import ${toHump(name)} from ${pat};`
+    : `const ${toHump(name)} = require(${pat});`;
+}
+
 function add(dict, key, item) {
   if (!dict[key]) {
     dict[key] = [item];
@@ -33,6 +44,16 @@ function add(dict, key, item) {
 function createDirIfNotExists(path) {
   if (fs.existsSync(path)) return;
   fs.mkdirSync(path);
+}
+
+function generateIndex(dir, group) {
+  const content = group.map((g) => `  ${toHump(g)},\n`).join('');
+  for (const ext of GENERATE_EXTS) {
+    let imports = group.map((g) => importExt(g, ext)).join('\n');
+    const header = `${imports}\n\n${fileHeader(ext)} {\n`;
+    fs.writeFileSync(path.join(SDK_CODE_PATH, dir, 'index' + ext), header + content + '};\n', {encoding: 'utf-8'});
+    totalGenerated++;
+  }
 }
 
 function generateFilesAtDir(files, group, dir) {
@@ -74,6 +95,8 @@ for (const dir of dirs) {
   for (const group in dict) {
     generateFilesAtDir(dict[group], group, dir);
   }
+  generateIndex(dir, Object.keys(dict));
 }
+generateIndex('', INCLUDE_DIRS);
 
 console.log('generateSdkCode: ', totalGenerated, 'files are generated');
