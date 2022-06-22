@@ -1,11 +1,16 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import * as fcl from '@onflow/fcl';
-
-import {MelosNFTSDK} from '../src/contracts-sdk/melos-nft';
-import {TESTNET_BASE_ADDRESS_MAP, flowTokenReplaceMap, melosNftReplaceMap, toUFix64, getMaps} from '../src/common';
-import {createAuth, getAccountFromEnv} from '../src/flow-service';
-import {MelosMarketplaceAdminSDK, MelosMarketplaceSDK} from '../src/contracts-sdk/melos-marketplace';
-import {CommonSDK} from '../src/contracts-sdk/common';
+import {
+  getMaps,
+  CommonSDK,
+  MelosNFTSDK,
+  MelosMarketplaceSDK,
+  MelosMarketplaceAdminSDK,
+  getAccountFromEnv,
+  createAuth,
+  TESTNET_BASE_ADDRESS_MAP,
+  toUFix64,
+} from '../src';
 
 const NETWORK = (process.env.NETWORK as any) || 'emulator';
 const {addressMap, replaceMap} = getMaps(NETWORK);
