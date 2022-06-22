@@ -3,26 +3,10 @@ import {ec as EC} from 'elliptic';
 import {SHA3} from 'sha3';
 
 import {toFlowAddress} from './common';
-import {FlowNetwork} from './config';
+import {accounts} from './config';
+import {FlowAuthorize, FlowNetwork} from './types';
 
 const ec = new EC('p256');
-
-export const accounts = {
-  'emulator-account': {
-    address: '0xf8d6e0586b0a20c7',
-    key: '98e4e163c9494dbfc2dc271f48941ed7113890d5fddc2cfa8a603836a09806b8',
-  },
-};
-
-export type FlowSigningFunctionResponse = {addr: string; keyId: number; signature: string};
-export type FlowSigningFunction = (signable: {message: string}) => FlowSigningFunctionResponse;
-export type FlowAuthorizeResponce = {
-  tempId: string;
-  addr: string;
-  keyId: number;
-  signingFunction: FlowSigningFunction;
-};
-export type FlowAuthorize = (account: any) => Promise<FlowAuthorizeResponce>;
 
 export class FlowService {
   constructor(

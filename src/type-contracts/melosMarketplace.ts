@@ -1,4 +1,4 @@
-import {FlowAddress, UFix64} from '../../sdk/types';
+import {FlowAddress, UFix64} from '../types';
 import {FlowType} from 'typescript';
 
 export type ListingCreatedEvent = {

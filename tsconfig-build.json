@@ -5,11 +5,8 @@
   },
   "include": [
     "src/**/*",
-    "sdk/**/*",
-    "sdk-code/**/*",
-    "test/**/*"
   ],
   "exclude": [
-    "test/*.test.ts"
+    "test/**/*"
   ]
 }

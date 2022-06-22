@@ -1,12 +1,11 @@
 import {BaseSDK} from './base';
 
-import {FlowAddress, UFix64} from '../../sdk/types';
-import {toUFix64} from '../../sdk/common';
-import {FlowAuthorize} from '../../sdk/flow-service';
-
 import CommonScripts from '../../sdk-code/scripts/common';
 import CommonTransactions from '../../sdk-code/transactions/common';
-import {executeScript, sendTransaction} from '../../sdk/transaction-utils';
+
+import {executeScript, sendTransaction} from '../transaction';
+import {FlowAddress, FlowAuthorize, UFix64} from '../types';
+import {toUFix64} from '../common';
 
 export class CommonSDK extends BaseSDK {
   async getBlockTime(options?: {addressMap?: Record<string, string>; limit?: number}) {

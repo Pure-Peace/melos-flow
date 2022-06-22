@@ -5,15 +5,15 @@ import {
   DutchAuctionParams,
   EnglishAuctionParams,
   ListingDetailsQuery,
-} from '../../sdk/type-contracts/MelosMarketplace';
-import {toFlowAddress, toUFix64} from '../common';
-import {FlowAddress, UFix64} from '../types';
+} from '../type-contracts/melosMarketplace';
 
 import MarketplaceScripts from '../../sdk-code/scripts/melos-marketplace';
 import MarketplaceTransactionsTemplates from '../../sdk-code/transactions/melos-marketplace-templates';
+
+import {toFlowAddress, toUFix64} from '../common';
+import {FlowAddress, FlowAuthorize, UFix64} from '../types';
 import {BaseSDK} from './base';
-import {FlowAuthorize} from '../../sdk/flow-service';
-import {executeScript, sendTransaction} from '../../sdk/transaction-utils';
+import {executeScript, sendTransaction} from '../transaction';
 
 export class MelosMarketplaceSDK extends BaseSDK {
   /**

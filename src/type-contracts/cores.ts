@@ -1,4 +1,4 @@
-import {UFix64, FlowAddress} from '../../sdk/types';
+import {UFix64, FlowAddress} from '../types';
 
 export type FungibleTokensWithdrawnEvent = {
   amount: UFix64;

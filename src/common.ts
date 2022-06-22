@@ -1,8 +1,17 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import {readFileSync} from 'fs';
 import path from 'path';
-import {BASE_PATH, FlowNetwork} from './config';
-import {RawTxResult} from './transaction-utils';
+import {BASE_PATH} from './config';
+import {RawTxResult} from './transaction';
+import {
+  FungibleTokenReplaceMap,
+  NonFungibleTokenReplaceMap,
+  ReplaceMap,
+  TxResult,
+  FlowNetwork,
+  FlowValue,
+  ScanResult,
+} from './types';
 
 export const SEALED = 4;
 export const UFIX64_PRECISION = 8;
@@ -154,44 +163,6 @@ export const MELOS_NFT_EMULATOR: NonFungibleTokenReplaceMap = {
   NFT_STORAGE_PATH: 'MelosNFT.CollectionStoragePath',
 };
 
-export type FungibleTokenReplaceMap = {
-  FT_NAME: string;
-  FT_RECEIVER: string;
-  FT_ADDRESS: string;
-  FT_STORAGE_PATH: string;
-};
-
-export type NonFungibleTokenReplaceMap = {
-  NFT_NAME: string;
-  NFT_ADDRESS: string;
-  NFT_PROVIDER_PRIVATE_PATH: string;
-  NFT_PUBLIC_PATH: string;
-  NFT_STORAGE_PATH: string;
-};
-
-export type TxResult = {
-  txId: {
-    tag: string;
-    transaction?: any;
-    transactionStatus?: any;
-    transactionId: string;
-    encodedData?: any;
-    events?: any;
-    account?: any;
-    block?: any;
-    blockHeader?: any;
-    latestBlock?: any;
-    collection?: any;
-  };
-  status: number;
-  statusString: string;
-  statusCode: number;
-  errorMessage: string;
-  events: any[];
-};
-
-export type ReplaceMap = FungibleTokenReplaceMap & NonFungibleTokenReplaceMap;
-
 export const EMULATOR_REPLACE_MAP: ReplaceMap = {
   ...MELOS_NFT_EMULATOR,
   ...FLOW_TOKEN_EMULATOR,
@@ -315,28 +286,6 @@ export function extractOptional(field: any) {
   }
   return field;
 }
-
-export type FlowValue = {
-  type: string;
-  value: string | number | null | FlowValue;
-};
-
-export type ScanResult = {
-  blockId: Uint8Array;
-  blockHeight: number;
-  type: string;
-  transactionId: string;
-  transactionIndex: number;
-  eventIndex: number;
-  payload: {
-    type: string;
-    value: {
-      id: string;
-      fields: {name: string; value: FlowValue}[];
-    };
-  };
-};
-
 export class FlowEvent {
   blockHeight: number;
   type: string;

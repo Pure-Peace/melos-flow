@@ -3,11 +3,11 @@ import * as fclLib from '@onflow/fcl';
 import {exec} from 'child_process';
 import fs from 'fs';
 
-import {BASE_PATH, EMULATOR_ADDRESS} from '../../sdk/config';
-import {FlowService} from '../../sdk/flow-service';
-import {EMULATOR_PORT} from '../../sdk/config';
-import {SEALED, toFlowAddress} from '../../sdk/common';
-import {Account, CreateFlowEmulatorParams, AuthAccount, DeploymentsConfig, AccountsConfig} from '../../sdk/types';
+import {BASE_PATH, EMULATOR_ADDRESS} from '../../src/config';
+import {FlowService} from '../../src/flow-service';
+import {EMULATOR_PORT} from '../../src/config';
+import {SEALED, toFlowAddress} from '../../src/common';
+import {Account, CreateFlowEmulatorParams, AuthAccount, DeploymentsConfig, AccountsConfig} from '../../src/types';
 import path from 'path';
 
 export const SECOND = 1000;

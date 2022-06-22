@@ -4,10 +4,10 @@ import * as fcl from '@onflow/fcl';
 import * as t from '@onflow/types';
 
 import {ec as EC} from 'elliptic';
-import {resolve} from 'path';
 import {SHA3} from 'sha3';
 
-import {DEPLOYED_CONTRACTS, EXT_ENVIRONMENT, TRANSACTION, SCRIPT, CONTRACT, UNKNOWN, TxResult} from './common';
+import {DEPLOYED_CONTRACTS, EXT_ENVIRONMENT, TRANSACTION, SCRIPT, CONTRACT, UNKNOWN} from './common';
+import {TxResult, RawTransactionResponse, MethodArgs, AuthWithPrivateKey, FlowTransaction} from './types';
 
 const ec = new EC('p256');
 
@@ -26,14 +26,6 @@ export class UnWrapAble<T> {
 }
 
 export class RawTxResult extends UnWrapAble<TxResult> {}
-
-export type RawTransactionResponse = {
-  txId: string;
-  subscribe: (handle: (tx) => any) => () => Promise<any>;
-  seal: () => Promise<RawTxResult>;
-  exec: () => Promise<RawTxResult>;
-  final: () => Promise<RawTxResult>;
-};
 
 export class TransactionResponse extends UnWrapAble<RawTransactionResponse> {
   constructor(obj: {result?: RawTransactionResponse; err?: any}) {
@@ -702,4 +694,55 @@ export const sendTransaction = async (props: {
   } catch (err) {
     return new TransactionResponse({err});
   }
+};
+
+export const runScript = async (fcl: any, params: MethodArgs, addressMap?: Record<string, string>) => {
+  const cadence = replaceImportAddresses(params.cadence, addressMap);
+  const result = await fcl.send([fcl.script`${cadence}`, params.args]);
+  return await fcl.decode(result);
+};
+
+export const runTransaction = async (
+  fcl: any,
+  params: MethodArgs,
+  signature: AuthWithPrivateKey,
+  addressMap?: Record<string, string>,
+  gasLimit = 999
+): Promise<string> => {
+  const code = replaceImportAddresses(params.cadence, addressMap);
+  const ix = [fcl.limit(gasLimit)];
+  ix.push(
+    fcl.payer(signature || fcl.authz),
+    fcl.proposer(signature || fcl.authz),
+    fcl.authorizations([signature || fcl.authz])
+  );
+
+  if (params.args) {
+    ix.push(params.args);
+  }
+  ix.push(fcl.transaction(code));
+  const tx = await fcl.send(ix);
+  return tx.transactionId;
+};
+
+export const waitForSeal = async (fcl: any, txId: string): Promise<FlowTransaction> => {
+  const sealed = await fcl.tx(txId).onceSealed();
+  return {
+    ...sealed,
+    txId,
+  };
+};
+
+export function subscribeForTxResult(fcl: any, txId: string, cb: (tx: FlowTransaction) => void) {
+  const unsub = fcl.tx(txId).subscribe((transaction) => {
+    cb({txId, ...transaction});
+    if (fcl.tx.isSealed(transaction)) {
+      unsub();
+    }
+  });
+}
+
+export const contractAddressHex = async <T extends Record<string, any>>(fcl: any, label: keyof T) => {
+  const contract = await fcl.config().get(label);
+  return fcl.sansPrefix(contract);
 };

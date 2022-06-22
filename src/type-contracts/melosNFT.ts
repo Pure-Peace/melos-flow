@@ -1,4 +1,4 @@
-import {FlowAddress} from '../../sdk/types';
+import {FlowAddress} from '../types';
 
 export type MelosNFTEvents = 'Minted' | 'Withdraw' | 'Deposit' | 'MetadataBaseURIChanged';
 

@@ -9,14 +9,12 @@
   ],
   "scripts": {
     "do": "yarn generate-code && node ./_scripts.js",
-    "build": "yarn generate-code && yarn build:esm && yarn build:cjs",
-    "build:esm": "tsc --project tsconfig-build.json --module es2015 --target es2015 --outDir dist/esm",
-    "build:cjs": "tsc --project tsconfig-build.json --module commonjs --target es2015 --outDir dist/cjs",
+    "build": "yarn generate-code && yarn tsup src/index.ts --format cjs,esm --dts --clean",
     "clean": "rimraf ./build ./dist ./sdk-code",
     "test": "yarn generate-code && yarn test-no-gen",
     "test-no-gen": "jest --runInBand",
     "verify": "tsc --noEmit",
-    "generate-code": "yarn clean && node ./generateCadence.js && node ./generateSdkCode.js",
+    "generate-code": "yarn clean && node ./generate-cadence.js && node ./generate-sdk-code.js",
     "contract-deploy:testnet": "flow deploy project --network=testnet --config-path ./flow.testnet.json",
     "contract-deploy:mainnet": "flow deploy project --network=mainnet --config-path ./flow.mainnet.json",
     "contract-update:testnet": "flow deploy project --network=testnet --update --config-path ./flow.testnet.json",
@@ -29,7 +27,6 @@
     "@onflow/fcl": "^0.0.78",
     "@onflow/types": "0.0.6",
     "elliptic": "^6.5.4",
-    "ts-node": "^10.7.0",
     "tslib": "^2.4.0"
   },
   "devDependencies": {
@@ -46,7 +43,9 @@
     "jest": "^27.5.1",
     "prettier": "^2.3.2",
     "ts-jest": "^27.1.4",
-    "typescript": "^4.6.3"
+    "tsup": "^6.1.2",
+    "typescript": "^4.6.3",
+    "ts-node": "^10.7.0"
   },
   "publishConfig": {
     "access": "restricted",

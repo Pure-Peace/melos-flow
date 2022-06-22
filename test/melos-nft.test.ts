@@ -1,7 +1,7 @@
 import {emulator, prepareEmulator, deployContractsIfNotDeployed, getAuthAccountByName} from './utils/helpers';
 
-import {MelosNFTSDK} from '../sdk/contracts-sdk/melos-nft';
-import {EMULATOR_ADDRESS_MAP} from '../sdk/common';
+import {MelosNFTSDK} from '../src/contracts-sdk/melos-nft';
+import {EMULATOR_ADDRESS_MAP} from '../src/common';
 
 const nftSDK = new MelosNFTSDK(EMULATOR_ADDRESS_MAP);
 

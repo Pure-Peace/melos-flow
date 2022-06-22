@@ -1,10 +1,9 @@
-import {BaseSDK} from './base';
-
-import {FlowAuthorize} from '../../sdk/flow-service';
-
 import MelosNftTransactions from '../../sdk-code/transactions/melos-nft';
 import MelosNftScripts from '../../sdk-code/scripts/melos-nft';
-import {executeScript, sendTransaction} from '../../sdk/transaction-utils';
+
+import {BaseSDK} from './base';
+import {executeScript, sendTransaction} from '../transaction';
+import {FlowAuthorize} from '../types';
 
 export class MelosNFTSDK extends BaseSDK {
   async setupCollection(auth: FlowAuthorize, options?: {addressMap?: Record<string, string>; limit?: number}) {

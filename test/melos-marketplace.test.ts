@@ -1,8 +1,8 @@
 import {emulator, deployContractsIfNotDeployed, prepareEmulator, getAuthAccountByName, SECOND} from './utils/helpers';
 
 import {mintFlow} from 'flow-js-testing';
-import {assertTx, eventFilter, getTxEvents, TxResult} from '../sdk/common';
-import {AuthAccount, Account} from '../sdk/types';
+import {assertTx, eventFilter, getTxEvents} from '../src/common';
+import {AuthAccount, Account, TxResult} from '../src/types';
 
 import {
   ListingCreatedEvent,
@@ -15,7 +15,7 @@ import {
   OfferCreatedEvent,
   OfferAcceptedEvent,
   UnRefundPaymentNotifyEvent,
-} from '../sdk/type-contracts/MelosMarketplace';
+} from '../src/type-contracts/melosMarketplace';
 
 import {
   EMULATOR_REPLACE_MAP,
@@ -23,12 +23,12 @@ import {
   FUSD_TOKEN_EMULATOR,
   MELOS_NFT_EMULATOR,
   EMULATOR_ADDRESS_MAP,
-} from '../sdk/common';
-import {MelosNFTMintedEvent, MelosNFTEvents} from '../sdk/type-contracts/MelosNFT';
+} from '../src/common';
+import {MelosNFTMintedEvent, MelosNFTEvents} from '../src/type-contracts/melosNFT';
 
-import {CommonSDK} from '../sdk/contracts-sdk/common';
-import {MelosNFTSDK} from '../sdk/contracts-sdk/melos-nft';
-import {MelosMarketplaceAdminSDK, MelosMarketplaceSDK} from '../sdk/contracts-sdk/melos-marketplace';
+import {CommonSDK} from '../src/contracts-sdk/common';
+import {MelosNFTSDK} from '../src/contracts-sdk/melos-nft';
+import {MelosMarketplaceAdminSDK, MelosMarketplaceSDK} from '../src/contracts-sdk/melos-marketplace';
 
 const commonSDK = new CommonSDK(EMULATOR_ADDRESS_MAP);
 const nftSDK = new MelosNFTSDK(EMULATOR_ADDRESS_MAP);
