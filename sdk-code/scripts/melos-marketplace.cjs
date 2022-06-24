@@ -239,7 +239,7 @@ pub fun main(): [UInt64] {
 }
 
 `,
-  getRemovableOrders: `
+  getRemovableOffers: `
 import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 
 

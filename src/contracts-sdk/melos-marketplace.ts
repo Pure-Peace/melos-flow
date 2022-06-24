@@ -455,13 +455,13 @@ export class MelosMarketplaceSDK extends BaseSDK {
     });
   }
 
-  async getRemovableOrders(options?: {
+  async getRemovableOffers(options?: {
     addressMap?: Record<string, string>;
     replaceMap?: Record<string, string>;
     limit?: number;
   }) {
     return executeScript<number[]>({
-      code: MarketplaceScripts.getRemovableOrders,
+      code: MarketplaceScripts.getRemovableOffers,
       args: [],
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
