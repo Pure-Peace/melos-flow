@@ -271,8 +271,6 @@ export class FlowEvent {
         f.value = Number(f.value);
       } else if (f.type === 'Type') {
         f.value = f.value.staticType.typeID;
-      } else if (field.name.toLowerCase().endsWith('time') && !!f.value) {
-        f.value = Number(f.value);
       }
       this.data[field.name] = f;
     }
