@@ -1,14 +1,16 @@
 import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 
 transaction(
-  listingId: UInt64
+  listingIds: [UInt64]
 ) {
   prepare(account: AuthAccount) {
 
   }
 
   execute {
-    let listing = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
-    listing.completeEnglishAuction()
+    for listingId in listingIds {
+      let listing = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
+      listing.completeEnglishAuction()
+    }
   }
 }

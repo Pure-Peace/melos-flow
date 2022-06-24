@@ -152,9 +152,19 @@ pub contract MelosMarketplace {
     return self.listings.keys
   }
 
+  // Get all current offers ids
+  pub fun getOfferIds(): [UInt64] {
+    return self.offers.keys
+  }
+
   // Get current listing counts
   pub fun getListingCount(): Int {
     return self.listings.length
+  }
+
+  // Get all current offers counts
+  pub fun getOfferCount(): Int {
+    return self.offers.length
   }
 
   // Checks whether the specified listing id exists
@@ -222,6 +232,19 @@ pub contract MelosMarketplace {
     return self.allowedPaymentTokens.contains(token)
   }
 
+  pub fun isListingRemovable(listingId: UInt64): Bool {
+    let listingRef = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
+    return listingRef.isListingStarted() 
+        && (listingRef.isCompleted() 
+        || !listingRef.isNFTAvaliable()
+        || listingRef.isListingEnded())
+  }
+
+  pub fun isOfferRemovable(offerId: UInt64): Bool {
+    let offerRef = MelosMarketplace.getOffer(offerId) ?? panic("Offer not exists")
+    return offerRef.isCompleted() || offerRef.isEnded()
+  }
+
   access(self) fun fastSort(_ arr: [AnyStruct], fn: ((AnyStruct, AnyStruct): Bool)): [AnyStruct] {
     if (arr.length < 2) {
       return arr
@@ -278,6 +301,7 @@ pub contract MelosMarketplace {
     }
   }
 
+
   // Allow anyone to remove listings that matches the condition
   //
   // 1. listing is started
@@ -285,11 +309,7 @@ pub contract MelosMarketplace {
   //
   // If the listing type is english auction, it will be done automatically when the condition is matched
   pub fun removeListing(listingId: UInt64): Bool {
-    let listingRef = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
-    if listingRef.isListingStarted() 
-        && (listingRef.isCompleted() 
-        || !listingRef.isNFTAvaliable()
-        || listingRef.isListingEnded()) {
+    if MelosMarketplace.isListingRemovable(listingId: listingId) {
       destroy MelosMarketplace.listings.remove(key: listingId)
       return true
     }
@@ -299,8 +319,7 @@ pub contract MelosMarketplace {
 
   // Allow anyone to remove offers that has completed
   pub fun removeOffer(offerId: UInt64): Bool {
-    let offerRef = MelosMarketplace.getOffer(offerId) ?? panic("Offer not exists")
-    if offerRef.isCompleted() {
+    if MelosMarketplace.isOfferRemovable(offerId: offerId) {
       destroy MelosMarketplace.offers.remove(key: offerId)
       return true
     }
@@ -1364,7 +1383,7 @@ pub contract MelosMarketplace {
       nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>,
       receiver: Capability<&{FungibleToken.Receiver}>
     ) {
-      assert(!self.isEnded(), message: "Offer is already ended")
+      assert(!self.isEnded(), message: "Offer is ended")
       assert(!self.completed, message: "Offer is already completed")
 
       let collection = nftProvider.borrow() ?? panic("Cannot borrow NFT collection")

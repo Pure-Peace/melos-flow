@@ -1,13 +1,15 @@
 import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 
 transaction(
-  offerId: UInt64
+  offerIds: [UInt64]
 ) {
   prepare(account: AuthAccount) {
 
   }
 
   execute {
-    let result = MelosMarketplace.removeOffer(offerId: offerId)
+    for offerId in offerIds {
+      MelosMarketplace.removeOffer(offerId: offerId)
+    }
   }
 }

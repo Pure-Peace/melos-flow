@@ -112,12 +112,12 @@ export class MelosMarketplaceSDK extends BaseSDK {
 
   async publicRemoveEndedListing(
     auth: FlowAuthorize,
-    listingId: number,
+    listingIds: number[],
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.publicRemoveEndedListing, options?.replaceMap),
-      args: [listingId],
+      args: [listingIds],
       payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
@@ -307,12 +307,12 @@ export class MelosMarketplaceSDK extends BaseSDK {
 
   async publicCompleteEnglishAuction(
     auth: FlowAuthorize,
-    listingId: number,
+    listingIds: number[],
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.publicCompleteEnglishAuction, options?.replaceMap),
-      args: [listingId],
+      args: [listingIds],
       payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
@@ -417,12 +417,12 @@ export class MelosMarketplaceSDK extends BaseSDK {
 
   async publicRemoveEndedOffer(
     auth: FlowAuthorize,
-    offerId: number,
+    offerIds: number[],
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: this.code(MarketplaceTransactionsTemplates.publicRemoveEndedOffer, options?.replaceMap),
-      args: [offerId],
+      args: [offerIds],
       payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
@@ -437,6 +437,32 @@ export class MelosMarketplaceSDK extends BaseSDK {
       code: this.code(MarketplaceTransactionsTemplates.claimUnRefundPayment, options?.replaceMap),
       args: [],
       payer: auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
+  async getRemovableListings(options?: {
+    addressMap?: Record<string, string>;
+    replaceMap?: Record<string, string>;
+    limit?: number;
+  }) {
+    return executeScript<number[]>({
+      code: MarketplaceScripts.getRemovableListings,
+      args: [],
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
+  async getRemovableOrders(options?: {
+    addressMap?: Record<string, string>;
+    replaceMap?: Record<string, string>;
+    limit?: number;
+  }) {
+    return executeScript<number[]>({
+      code: MarketplaceScripts.getRemovableOrders,
+      args: [],
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
     });

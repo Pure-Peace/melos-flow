@@ -565,15 +565,17 @@ transaction(
 import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 
 transaction(
-  listingId: UInt64
+  listingIds: [UInt64]
 ) {
   prepare(account: AuthAccount) {
 
   }
 
   execute {
-    let listing = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
-    listing.completeEnglishAuction()
+    for listingId in listingIds {
+      let listing = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
+      listing.completeEnglishAuction()
+    }
   }
 }
 `,
@@ -581,14 +583,16 @@ transaction(
 import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 
 transaction(
-  listingId: UInt64
+  listingIds: [UInt64]
 ) {
   prepare(account: AuthAccount) {
 
   }
 
   execute {
-    let result = MelosMarketplace.removeListing(listingId: listingId)
+    for listingId in listingIds {
+      MelosMarketplace.removeListing(listingId: listingId)
+    }
   }
 }
 `,
@@ -596,14 +600,16 @@ transaction(
 import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 
 transaction(
-  offerId: UInt64
+  offerIds: [UInt64]
 ) {
   prepare(account: AuthAccount) {
 
   }
 
   execute {
-    let result = MelosMarketplace.removeOffer(offerId: offerId)
+    for offerId in offerIds {
+      MelosMarketplace.removeOffer(offerId: offerId)
+    }
   }
 }
 `,

@@ -142,7 +142,7 @@ const removePurachasedListing = async (
 
   // Should be able to remove the listing after purachased
   const removeListingResult = await (
-    await marketplaceSDKFlow.publicRemoveEndedListing(listingRemover.auth, listingId)
+    await marketplaceSDKFlow.publicRemoveEndedListing(listingRemover.auth, [listingId])
   ).assertOk('seal');
   const removeListingEvent = eventFilter<ListingRemovedEvent, MarketplaceEvents>(
     removeListingResult,
@@ -509,7 +509,9 @@ describe('Melos marketplace tests', () => {
 
     // Bob try completeEnglishAuction
     const isListingEnded = (await marketplaceSDKFlow.getListingEnded(listingId)).unwrap();
-    const {err: err1} = await (await marketplaceSDKFlow.publicCompleteEnglishAuction(bob.auth, listingId)).wait('seal');
+    const {err: err1} = await (
+      await marketplaceSDKFlow.publicCompleteEnglishAuction(bob.auth, [listingId])
+    ).wait('seal');
     // If auction is not ended, will panic
     if (!isListingEnded) {
       expect(err1).toBeTruthy();
