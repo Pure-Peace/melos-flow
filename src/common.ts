@@ -233,6 +233,21 @@ export function extractOptional(field: any) {
   }
   return field;
 }
+
+export function parseFlowType(flowType: string) {
+  const result = flowType.split('.');
+  if (result.length !== 4) {
+    throw new Error(`Failed to parse flow type, result: ${result}`);
+  }
+
+  const [, address, contract, name] = result;
+  return {
+    address,
+    contract,
+    name,
+  };
+}
+
 export class FlowEvent {
   blockHeight: number;
   type: string;
