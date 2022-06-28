@@ -1,6 +1,6 @@
 {
   "name": "@melosstudio/flow-sdk",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "The flow (cadence) contract of Melos NFT and Marketplace. Contains sdk, scripts and tests.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -17,7 +17,7 @@
   ],
   "scripts": {
     "do": "yarn generate-code && node ./_scripts.js",
-    "build": "yarn generate-code && yarn tsup src/index.ts --format cjs,esm --dts --clean --target es6",
+    "build": "yarn generate-code && yarn tsup src/index.ts --format cjs,esm --dts --clean",
     "clean": "rimraf ./build ./dist ./sdk-code",
     "test": "yarn generate-code && yarn test-no-gen",
     "test-no-gen": "jest --runInBand",
