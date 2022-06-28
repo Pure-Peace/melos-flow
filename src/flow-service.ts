@@ -98,9 +98,11 @@ export function getAccountFromEnv(network: FlowNetwork, name?: string) {
     };
   }
 
-  const ADDR_ENV_KEY = `${name ? name.toLocaleUpperCase() : ''}_${network.toUpperCase()}_FLOW_ACCOUNT_ADDRESS`;
-  const PRIVKEY_ENV_KEY = `${name ? name.toLocaleUpperCase() : ''}_${network.toUpperCase()}_FLOW_ACCOUNT_PRIVATE_KEY`;
-  const KEY_ID_ENV_KEY = `${name ? name.toLocaleUpperCase() : ''}_${network.toUpperCase()}_FLOW_ACCOUNT_KEY_ID`;
+  const ADDR_ENV_KEY = `${name ? name.toLocaleUpperCase() + '_' : ''}${network.toUpperCase()}_FLOW_ACCOUNT_ADDRESS`;
+  const PRIVKEY_ENV_KEY = `${
+    name ? name.toLocaleUpperCase() + '_' : ''
+  }${network.toUpperCase()}_FLOW_ACCOUNT_PRIVATE_KEY`;
+  const KEY_ID_ENV_KEY = `${name ? name.toLocaleUpperCase() + '_' : ''}${network.toUpperCase()}_FLOW_ACCOUNT_KEY_ID`;
 
   const account = {
     address: process.env[ADDR_ENV_KEY]!,
