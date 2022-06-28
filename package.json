@@ -17,7 +17,7 @@
   ],
   "scripts": {
     "do": "yarn generate-code && node ./_scripts.js",
-    "build": "yarn generate-code && yarn tsup src/index.ts --format cjs,esm --dts --clean",
+    "build": "yarn generate-code && yarn tsup src/index.ts --format cjs,esm --dts --clean --target es6",
     "clean": "rimraf ./build ./dist ./sdk-code",
     "test": "yarn generate-code && yarn test-no-gen",
     "test-no-gen": "jest --runInBand",
