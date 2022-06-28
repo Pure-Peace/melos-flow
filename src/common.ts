@@ -228,7 +228,7 @@ export function getMaps(network: FlowNetwork) {
 }
 
 export function extractOptional(field: any) {
-  if (field?.type === 'Optional' && !!field.value) {
+  if (field && field.type === 'Optional' && !!field.value) {
     return extractOptional(field.value);
   }
   return field;
