@@ -467,6 +467,22 @@ export class MelosMarketplaceSDK extends BaseSDK {
       limit: options?.limit ?? this.limit,
     });
   }
+
+  async getAccountListings(
+    address: FlowAddress,
+    options?: {
+      addressMap?: Record<string, string>;
+      replaceMap?: Record<string, string>;
+      limit?: number;
+    }
+  ) {
+    return executeScript<Record<number, number>>({
+      code: MarketplaceScripts.getAccountListings,
+      args: [address],
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
 }
 
 export class MelosMarketplaceAdminSDK extends BaseSDK {
