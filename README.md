@@ -35,7 +35,7 @@ yarn build
 **Publish package**
 
 ```bash
-yarn buildPublish
+yarn build-publish
 ```
 
 **Generate esm/cjs/ts code used by sdk based on cadence script and transaction**

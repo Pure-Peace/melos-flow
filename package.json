@@ -27,7 +27,7 @@
     "contract-deploy:mainnet": "flow deploy project --network=mainnet --config-path ./flow.mainnet.json",
     "contract-update:testnet": "flow deploy project --network=testnet --update --config-path ./flow.testnet.json",
     "contract-update:mainnet": "flow deploy project --network=mainnet --update --config-path ./flow.mainnet.json",
-    "buildPublish": "yarn build && yarn publish"
+    "build-publish": "yarn build && yarn publish"
   },
   "author": "Pure-Peace",
   "license": "ISC",
