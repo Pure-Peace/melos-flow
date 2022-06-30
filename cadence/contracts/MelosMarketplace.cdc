@@ -686,7 +686,7 @@ pub contract MelosMarketplace {
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
     ) {
-      assert(manager.check(), message: "Invalid manager")
+      assert(manager.check(), message: "Invalid manager Capability")
       assert(rewardCollection.check(), message: "Invalid NFT reward collection")
       assert(refund.check(), message: "Invalid refund capability")
 

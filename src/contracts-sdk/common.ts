@@ -131,4 +131,19 @@ export class CommonSDK extends BaseSDK {
       limit: options?.limit ?? this.limit,
     });
   }
+
+  async flowTokenTransfer(
+    auth: FlowAuthorize,
+    address: FlowAddress,
+    amount: UFix64,
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    return sendTransaction({
+      code: this.code(CommonTransactions.flowTokenTransfer, options?.replaceMap),
+      args: [address, amount],
+      payer: auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
 }
