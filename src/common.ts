@@ -8,6 +8,7 @@ import {
   FlowNetwork,
   FlowValue,
   ScanResult,
+  FlowEnv,
 } from './types';
 
 export const UFIX64_PRECISION = 8;
@@ -205,13 +206,17 @@ export async function assertTx(txResultResponser: () => Promise<RawTxResult>) {
   return (await txResultResponser()).unwrap();
 }
 
-export function getMaps(network: FlowNetwork) {
+export function getMaps(network: FlowNetwork, cfg: {env?: FlowEnv; MelosNFT?: string; MelosMarketplace?: string}) {
   if (network === 'emulator') {
     return {addressMap: EMULATOR_ADDRESS_MAP, replaceMap: EMULATOR_REPLACE_MAP};
   }
 
-  const MelosNFT = process.env[`${network.toUpperCase()}_MELOS_NFT_ADDRESS`]!;
-  const MelosMarketplace = process.env[`${network.toUpperCase()}_MELOS_MARKETPLACE`]!;
+  const MelosNFT = cfg.MelosNFT || (cfg.env && cfg.env[`${network.toUpperCase()}_MELOS_NFT_ADDRESS`]);
+  const MelosMarketplace = cfg.MelosMarketplace || (cfg.env && cfg.env[`${network.toUpperCase()}_MELOS_MARKETPLACE`]);
+
+  if (!MelosNFT || !MelosMarketplace) {
+    throw new Error('Invalid MelosNFT or MelosMarketplace address');
+  }
 
   const addressMap = {
     ...(network === 'testnet' ? TESTNET_BASE_ADDRESS_MAP : MAINNET_BASE_ADDRESS_MAP),

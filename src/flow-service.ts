@@ -4,9 +4,12 @@ import {SHA3} from 'sha3';
 
 import {toFlowAddress} from './common';
 import {accounts} from './config';
-import {FlowAuthorize, FlowNetwork} from './types';
+import {FlowAuthorize, FlowEnv, FlowNetwork} from './types';
+import {Buffer as __Buffer} from 'buffer/';
 
 const ec = new EC('p256');
+
+const _Buffer = Buffer || __Buffer;
 
 export class FlowService {
   constructor(
@@ -59,36 +62,36 @@ export class FlowService {
   };
 
   private signWithKey = (privateKey: string, msg: string): string => {
-    const key = ec.keyFromPrivate(Buffer.from(privateKey, 'hex'));
+    const key = ec.keyFromPrivate(_Buffer.from(privateKey, 'hex'));
     const sig = key.sign(this.hashMsg(msg));
     const n = 32;
-    const r = sig.r.toArrayLike(Buffer, 'be', n);
-    const s = sig.s.toArrayLike(Buffer, 'be', n);
-    return Buffer.concat([r, s]).toString('hex');
+    const r = sig.r.toArrayLike(_Buffer, 'be', n);
+    const s = sig.s.toArrayLike(_Buffer, 'be', n);
+    return _Buffer.concat([r, s]).toString('hex');
   };
 
   private hashMsg = (msg: string) => {
     const sha = new SHA3(256);
-    sha.update(Buffer.from(msg, 'hex'));
+    sha.update(_Buffer.from(msg, 'hex'));
     return sha.digest();
   };
 }
 
-export function getAccessNode(network: FlowNetwork) {
+export function getAccessNode(network: FlowNetwork, env?: FlowEnv) {
   switch (network) {
     case 'emulator': {
-      return process.env.EMULATOR_ACCESS_NODE || 'http://127.0.0.1:8080';
+      return env?.EMULATOR_ACCESS_NODE || 'http://127.0.0.1:8080';
     }
     case 'testnet': {
-      return process.env.TESTNET_ACCESS_NODE || 'https://access-testnet.onflow.org';
+      return env?.TESTNET_ACCESS_NODE || 'https://access-testnet.onflow.org';
     }
     case 'mainnet': {
-      return process.env.MAINNET_ACCESS_NODE || 'https://access.onflow.org';
+      return env?.MAINNET_ACCESS_NODE || 'https://access.onflow.org';
     }
   }
 }
 
-export function getAccountFromEnv(network: FlowNetwork, name?: string) {
+export function getAccountFromEnv(network: FlowNetwork, env: FlowEnv, name?: string) {
   if (network === 'emulator') {
     const {address, key} = accounts[name || 'emulator-account'];
     return {
@@ -105,9 +108,9 @@ export function getAccountFromEnv(network: FlowNetwork, name?: string) {
   const KEY_ID_ENV_KEY = `${name ? name.toLocaleUpperCase() + '_' : ''}${network.toUpperCase()}_FLOW_ACCOUNT_KEY_ID`;
 
   const account = {
-    address: process.env[ADDR_ENV_KEY]!,
-    pk: process.env[PRIVKEY_ENV_KEY]!,
-    keyId: process.env[KEY_ID_ENV_KEY]!,
+    address: env[ADDR_ENV_KEY]!,
+    pk: env[PRIVKEY_ENV_KEY]!,
+    keyId: env[KEY_ID_ENV_KEY]!,
   };
   if (!account.address) throw new Error(`Cannot get address from env key "${ADDR_ENV_KEY}"`);
   if (!account.pk) throw new Error(`Cannot get privateKey from env "${PRIVKEY_ENV_KEY}"`);
@@ -115,18 +118,11 @@ export function getAccountFromEnv(network: FlowNetwork, name?: string) {
   return account;
 }
 
-export function setAccessNode(fcl: any, network: FlowNetwork) {
-  fcl.config().put('accessNode.api', getAccessNode(network));
+export function setAccessNode(fcl: any, network: FlowNetwork, env?: FlowEnv) {
+  fcl.config().put('accessNode.api', getAccessNode(network, env));
 }
 
-export function createAuth(
-  fcl: any,
-  network: FlowNetwork,
-  accountAddress: string,
-  privateKey: string,
-  keyIndex: number | string = 0
-) {
-  setAccessNode(fcl, network);
+export function createAuth(fcl: any, accountAddress: string, privateKey: string, keyIndex: number | string = 0) {
   const flowService = new FlowService(fcl, toFlowAddress(accountAddress), privateKey, Number(keyIndex));
   return flowService.authorizeMinter();
 }
@@ -150,23 +146,23 @@ export class FlowAccount {
     return new FlowAccount(obj.address, obj.pk, Number(obj.keyId || 0));
   }
 
-  upgrade(fcl: any, network: FlowNetwork): AuthFlowAccount {
-    return AuthFlowAccount.fromFlowAccount(fcl, network, this);
+  upgrade(fcl: any): AuthFlowAccount {
+    return AuthFlowAccount.fromFlowAccount(fcl, this);
   }
 
-  createAuth(fcl: any, network: FlowNetwork) {
-    return createAuth(fcl, network, this.address, this.pk, this.keyId);
+  createAuth(fcl: any) {
+    return createAuth(fcl, this.address, this.pk, this.keyId);
   }
 }
 
 export class AuthFlowAccount extends FlowAccount {
   auth: FlowAuthorize;
-  constructor(fcl: any, network: FlowNetwork, address: string, pk: string, keyId = 0) {
+  constructor(fcl: any, address: string, pk: string, keyId = 0) {
     super(address, pk, keyId);
-    this.auth = this.createAuth(fcl, network);
+    this.auth = this.createAuth(fcl);
   }
 
-  static fromFlowAccount(fcl: any, network: FlowNetwork, flowAccount: FlowAccount) {
-    return new AuthFlowAccount(fcl, network, flowAccount.address, flowAccount.pk, flowAccount.keyId);
+  static fromFlowAccount(fcl: any, flowAccount: FlowAccount) {
+    return new AuthFlowAccount(fcl, flowAccount.address, flowAccount.pk, flowAccount.keyId);
   }
 }

@@ -3,9 +3,7 @@ import * as fclLib from '@onflow/fcl';
 import {exec} from 'child_process';
 import fs from 'fs';
 
-import {BASE_PATH, EMULATOR_ADDRESS} from '../../src/config';
 import {FlowService} from '../../src/flow-service';
-import {EMULATOR_PORT} from '../../src/config';
 import {toFlowAddress} from '../../src/common';
 import {
   Account,
@@ -16,6 +14,12 @@ import {
   FlowTxStatus,
 } from '../../src/types';
 import path from 'path';
+
+export const EMULATOR_PORT = 8080;
+export const EMULATOR_ADDRESS = `http://127.0.0.1:${EMULATOR_PORT}`;
+export const BASE_PATH = path.join(__dirname, '../../cadence');
+
+export const MINT_AMOUNT = 10000;
 
 export const SECOND = 1000;
 export const HOUR = 3600 * SECOND;

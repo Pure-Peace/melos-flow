@@ -8,10 +8,11 @@ import {
   MelosMarketplaceAdminSDK,
   getAccountFromEnv,
   createAuth,
+  setAccessNode,
 } from '../src';
 
 const NETWORK = (process.env.NETWORK as any) || 'emulator';
-const {addressMap, replaceMap} = getMaps(NETWORK);
+const {addressMap, replaceMap} = getMaps(NETWORK, {env: process.env});
 
 const TARGET_ADDRESS = '0x0bdba890ea791601';
 
@@ -22,8 +23,9 @@ class InitMarketplace {
     const marketplaceSDK = new MelosMarketplaceSDK(addressMap, replaceMap);
     const adminSDK = new MelosMarketplaceAdminSDK(addressMap, replaceMap);
 
-    const {address, pk, keyId} = getAccountFromEnv(NETWORK);
-    const auth = createAuth(fcl, NETWORK, address!, pk!, keyId);
+    const {address, pk, keyId} = getAccountFromEnv(NETWORK, process.env);
+    setAccessNode(fcl, NETWORK, process.env);
+    const auth = createAuth(fcl, address!, pk!, keyId);
 
     const result = await (await nftSDK.mint(auth, TARGET_ADDRESS, 10)).assertOk('seal');
 

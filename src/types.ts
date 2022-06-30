@@ -2,6 +2,7 @@ import {RawTxResult} from './transaction';
 
 export type FlowNetwork = 'emulator' | 'testnet' | 'mainnet';
 export type FlowCurrency = 'FLOW' | 'FUSD';
+export type FlowEnv = Record<string, any>;
 
 export type UFix64 = string;
 export type FlowType = string;

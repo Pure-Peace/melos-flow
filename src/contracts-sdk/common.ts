@@ -37,11 +37,11 @@ export class CommonSDK extends BaseSDK {
 
   async unlink(
     auth: FlowAuthorize,
-    path: string,
+    capabilityPath: string,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
-      code: this.code(CommonTransactions.unlink, {CAPABILITY_PATH: path, ...options?.replaceMap}),
+      code: this.code(CommonTransactions.unlink, {CAPABILITY_PATH: capabilityPath, ...options?.replaceMap}),
       args: [],
       payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
