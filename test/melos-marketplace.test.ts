@@ -61,7 +61,7 @@ const setupCollectionAndMintNFT = async (account: AuthAccount) => {
 const setupSeller = async (name: string) => {
   const userResult = await setupUser(name);
   const mintResult = await setupCollectionAndMintNFT(userResult.user);
-  await (await marketplaceSDKFlow.setupListingManager(userResult.user.auth)).assertOk('seal');
+  await (await marketplaceSDKFlow.setupManager(userResult.user.auth)).assertOk('seal');
   return {...userResult, ...mintResult};
 };
 
@@ -239,7 +239,7 @@ describe('Melos marketplace tests', () => {
     await deployContractsIfNotDeployed();
     const alice = await getAuthAccountByName('alice');
 
-    await (await marketplaceSDKFlow.setupListingManager(alice.auth)).assertOk('seal');
+    await (await marketplaceSDKFlow.setupManager(alice.auth)).assertOk('seal');
   });
 
   it('Common listing tests: Create listing and purachase', async () => {
@@ -256,6 +256,9 @@ describe('Melos marketplace tests', () => {
         await marketplaceSDKFlow.createListing(alice.auth, nft, ListingType.Common, {price: 5, royaltyPercent: 0})
       ).assertOk('seal');
     });
+
+    const aliceListings = (await marketplaceSDKFlow.getAccountListings(alice.address)).unwrap();
+    expect(!!aliceListings[listingId]).toBe(true);
 
     const {user: bob, balance: bobBalanceBefore} = await setupUser('bob');
 
@@ -278,8 +281,10 @@ describe('Melos marketplace tests', () => {
 
     await purachasedBalanceCheck(aliceBalanceBefore, bobBalanceBefore, alice, bob);
 
-    // listing ended, so bob can remove alice's listing
-    await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
+    // listing should be removed
+    expect((await marketplaceSDKFlow.getListingExists(listingId)).unwrap()).toEqual(false);
+    const aliceListings2 = (await marketplaceSDKFlow.getAccountListings(alice.address)).unwrap();
+    expect(!!aliceListings2[listingId]).toBe(false);
   });
 
   it('DutchAuction listing tests: Create listing and purachase', async () => {
@@ -306,6 +311,10 @@ describe('Melos marketplace tests', () => {
         })
       ).assertOk('seal');
     });
+
+    const aliceListings = (await marketplaceSDKFlow.getAccountListings(alice.address)).unwrap();
+    expect(!!aliceListings[listingId]).toBe(true);
+
     const listingStartTime = listingDetails.details.listingConfig.listingStartTime;
 
     // Bob purachase listing
@@ -352,8 +361,10 @@ describe('Melos marketplace tests', () => {
 
     await purachasedBalanceCheck(aliceBalanceBefore, bobBalanceBefore, alice, bob);
 
-    // listing ended, so bob can remove alice's listing
-    await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
+    // listing should be removed
+    expect((await marketplaceSDKFlow.getListingExists(listingId)).unwrap()).toEqual(false);
+    const aliceListings2 = (await marketplaceSDKFlow.getAccountListings(alice.address)).unwrap();
+    expect(!!aliceListings2[listingId]).toBe(false);
   });
 
   it('OpenBid listing tests: Create listing, bid and accept', async () => {
@@ -371,6 +382,9 @@ describe('Melos marketplace tests', () => {
         await marketplaceSDKFlow.createListing(alice.auth, nft, ListingType.OpenBid, {minimumPrice, royaltyPercent: 0})
       ).assertOk('seal');
     });
+
+    const aliceListings = (await marketplaceSDKFlow.getAccountListings(alice.address)).unwrap();
+    expect(!!aliceListings[listingId]).toBe(true);
 
     const {user: bob} = await setupUser('bob');
 
@@ -446,8 +460,10 @@ describe('Melos marketplace tests', () => {
     const alexBalanceAfterListingEnded = (await commonSDK.getFlowBalance(alex.address)).unwrap();
     expect(Number(alexBalanceAfterListingEnded)).toEqual(Number(alexBalanceBeforeBid));
 
-    // listing ended, so bob can remove alice's listing
-    await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
+    // listing should be removed
+    expect((await marketplaceSDKFlow.getListingExists(listingId)).unwrap()).toEqual(false);
+    const aliceListings2 = (await marketplaceSDKFlow.getAccountListings(alice.address)).unwrap();
+    expect(!!aliceListings2[listingId]).toBe(false);
   });
 
   it('EnglishAuction listing tests: Create listing, bid and complete', async () => {
@@ -473,6 +489,9 @@ describe('Melos marketplace tests', () => {
         })
       ).assertOk('seal');
     });
+
+    const aliceListings = (await marketplaceSDKFlow.getAccountListings(alice.address)).unwrap();
+    expect(!!aliceListings[listingId]).toBe(true);
 
     const {user: bob} = await setupUser('bob');
 
@@ -540,6 +559,11 @@ describe('Melos marketplace tests', () => {
     // If the listing is english auction, `publicCompleteEnglishAuction` will be executed automatically
     const {removeListingResult} = await removePurachasedListing(listingId, melosMarketplaceIdentifier, bob);
     console.log('english auction removeListingResult: ', removeListingResult);
+
+    // listing should be removed
+    expect((await marketplaceSDKFlow.getListingExists(listingId)).unwrap()).toEqual(false);
+    const aliceListings2 = (await marketplaceSDKFlow.getAccountListings(alice.address)).unwrap();
+    expect(!!aliceListings2[listingId]).toBe(false);
 
     // Get listing complete events
     const bidListingCompletedEvents = eventFilter<BidListingCompletedEvent, MarketplaceEvents>(
@@ -639,6 +663,9 @@ describe('Melos marketplace tests', () => {
         await marketplaceSDKFUSD.createListing(alice.auth, nft, ListingType.OpenBid, {minimumPrice, royaltyPercent: 0})
       ).assertOk('seal');
     });
+
+    const aliceListings = (await marketplaceSDKFUSD.getAccountListings(alice.address)).unwrap();
+    expect(!!aliceListings[listingId]).toBe(true);
 
     // Setup bob
     const {user: bob} = await setupUser('bob');

@@ -6,20 +6,19 @@ import %NFT_NAME% from %NFT_ADDRESS%
 import %FT_NAME% from %FT_ADDRESS%
 
 
-pub fun getOrCreateManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
-    let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
-    let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
+pub fun ensureManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
+  let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
+  let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
 
-    if let managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) {
-      return managerRef
-    }
-
+  var managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH)
+  if managerRef == nil {
     let manager <- MelosMarketplace.createMarketplaceManager()
-    let managerRef = &manager as &MelosMarketplace.MarketplaceManager
+    managerRef = &manager as &MelosMarketplace.MarketplaceManager
     account.save(<- manager, to: STORAGE_PATH)
-    account.link<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.OfferManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+    account.link<&{MelosMarketplace.MarketplaceManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+  }
 
-    return managerRef
+  return managerRef ?? panic("Could not get managerRef")
 }
 
 pub fun getOrCreateNFTCollection(account: AuthAccount): Capability<&{NonFungibleToken.Receiver}> {
@@ -47,7 +46,7 @@ transaction(
   let collection: Capability<&{NonFungibleToken.Receiver}>
   let refund: Capability<&{FungibleToken.Receiver}>
   let manager: &MelosMarketplace.MarketplaceManager
-  let offerManagerCapability: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.OfferManagerPublic}>
+  let managerCapa: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>
   prepare(account: AuthAccount) {
     let PAYMENT_TOKEN_STORAGE_PATH = %FT_STORAGE_PATH%
 
@@ -60,8 +59,10 @@ transaction(
 
     self.collection = getOrCreateNFTCollection(account: account)
     
-    self.manager = getOrCreateManager(account: account)
-    self.offerManagerCapability = account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.OfferManagerPublic}>(MelosMarketplace.MarketplaceManagerPublicPath)
+    self.manager = ensureManager(account: account)
+
+    self.managerCapa = account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic}>(MelosMarketplace.MarketplaceManagerPublicPath)
+    self.managerCapa.borrow() ?? panic("Could not get managerCapability")
   }
 
   execute {
@@ -73,7 +74,7 @@ transaction(
       payment: <- self.payment,
       rewardCollection: self.collection,
       refund: self.refund,
-      manager: self.offerManagerCapability,
+      manager: self.managerCapa,
       royaltyPercent: royaltyPercent
     )
   }

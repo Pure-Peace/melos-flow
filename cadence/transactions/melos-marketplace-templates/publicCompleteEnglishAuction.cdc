@@ -11,6 +11,7 @@ transaction(
     for listingId in listingIds {
       let listing = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
       listing.completeEnglishAuction()
+      MelosMarketplace.removeListing(listingId: listingId)
     }
   }
 }

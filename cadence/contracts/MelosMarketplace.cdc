@@ -669,7 +669,7 @@ pub contract MelosMarketplace {
   }
 
   pub resource Bid: BidPublic {
-    access(contract) let manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>
+    access(contract) let manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>
     access(contract) let rewardCollection: Capability<&{NonFungibleToken.Receiver}>
     access(contract) let refund: Capability<&{FungibleToken.Receiver}>
     access(contract) let payment: @FungibleToken.Vault
@@ -680,7 +680,7 @@ pub contract MelosMarketplace {
     access(contract) var bidTimestamp: UFix64
 
     init(
-      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>,
+      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>,
       listingId: UInt64,
       rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
@@ -692,7 +692,7 @@ pub contract MelosMarketplace {
 
       self.manager = manager
       let managerRef = self.manager.borrow()!
-      managerRef.recordBid(listingId: listingId, bidId: self.uuid)
+      managerRef._recordBid(listingId: listingId, bidId: self.uuid)
 
       self.listingId = listingId
 
@@ -723,7 +723,7 @@ pub contract MelosMarketplace {
         payment: <- self.payment
       )
       if let managerRef = self.manager.borrow() {
-        managerRef.removeBid(listingId: self.listingId, bidId: self.uuid)
+        managerRef._removeBid(listingId: self.listingId, bidId: self.uuid)
         managerRef.updateunRefundPaymentBalance(newBalance: unRefundPaymentBalance, paymentType: typ)
       }
       emit BidRemoved(listingId: self.listingId, bidId: self.uuid)
@@ -805,30 +805,31 @@ pub contract MelosMarketplace {
 
     pub fun purchase(payment: @FungibleToken.Vault, rewardCollection: Capability<&{NonFungibleToken.Receiver}>): Bool
     pub fun createOpenBid(
-      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>,
+      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>,
       rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
     ): UInt64
     pub fun createEnglishAuctionBid(
-      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>,
+      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>,
       rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
     ): UInt64
     pub fun createBid(
-        manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>,
-        rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
-        refund: Capability<&{FungibleToken.Receiver}>,
-        payment: @FungibleToken.Vault
+      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>,
+      rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
+      refund: Capability<&{FungibleToken.Receiver}>,
+      payment: @FungibleToken.Vault
     ): UInt64
-    pub fun removeBid(manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>, removeBidId: UInt64): Bool
+    pub fun removeBid(manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>, removeBidId: UInt64): Bool
     pub fun completeEnglishAuction(): Bool
   }
 
   pub resource Listing: ListingPublic {
     access(self) let details: ListingDetails
     access(self) var nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
+    access(contract) let manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>
 
     // Bid id => Bid
     access(self) let bids: @{UInt64: Bid}
@@ -843,11 +844,12 @@ pub contract MelosMarketplace {
       paymentToken: Type,
       listingConfig: {MelosMarketplace.ListingConfig},
       receiver: Capability<&{FungibleToken.Receiver}>,
-      managerId: UInt64
+      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>
     ) {
       MelosMarketplace.checkListingConfig(listingType, listingConfig)
       assert(MelosMarketplace.isTokenAllowed(paymentToken), message: "Payment tokens not allowed")
       assert(receiver.borrow() != nil, message: "Cannot borrow receiver")
+      assert(manager.check(), message: "Invalid manager Capability")
       
       let txFeePercent = MelosMarketplace.getFeeConfigByTokenType(tokenType: paymentToken)?.txFeePercent ?? 0.0
       let royaltyPercent = listingConfig.royaltyPercent ?? 0.0
@@ -859,9 +861,13 @@ pub contract MelosMarketplace {
 
       let nftType = nftRef.getType()
 
+      self.manager = manager
+      let managerRef = self.manager.borrow()!
+      managerRef._recordListing(self.uuid, nftId, nftType)
+
       self.details = ListingDetails(
         listingType: listingType,
-        managerId: managerId,
+        managerId: managerRef.uuid,
         nftType: nftType,
         nftId: nftId,
         nftResourceUUID: nftRef.uuid,
@@ -892,6 +898,10 @@ pub contract MelosMarketplace {
           && self.isListingEnded()
           && !self.isPurchased() {
         self.completeEnglishAuction()
+      }
+
+      if let managerRef = self.manager.borrow() {
+        managerRef._removeListing(self.uuid)
       }
 
       destroy self.bids
@@ -1047,7 +1057,7 @@ pub contract MelosMarketplace {
     }
 
     pub fun createOpenBid(
-      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>,
+      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>,
       rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
@@ -1080,7 +1090,7 @@ pub contract MelosMarketplace {
     }
 
     pub fun createEnglishAuctionBid(
-      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>,
+      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>,
       rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
@@ -1131,7 +1141,7 @@ pub contract MelosMarketplace {
     }
 
     pub fun createBid(
-      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>,
+      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>,
       rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
       payment: @FungibleToken.Vault
@@ -1155,21 +1165,21 @@ pub contract MelosMarketplace {
       panic("Listing type not support")
     }
 
-    pub fun removeBid(manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>, removeBidId: UInt64): Bool {
+    pub fun removeBid(manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>, removeBidId: UInt64): Bool {
       let removeBidRef = self.getBid(removeBidId)
       assert(removeBidRef != nil, message: "Bid not exists")
       assert(manager.borrow()!.uuid == removeBidRef!.managerId, message: "Invalid bid ownership")
 
-      let removeBid <- self.bids.remove(key: removeBidId)!
+      let bid <- self.bids.remove(key: removeBidId)!
       if self.isListingType(ListingType.EnglishAuction) {
         if removeBidId == (self.details.listingConfig as! EnglishAuction).topBidId {
           (self.details.listingConfig as! EnglishAuction).setTopBid(newTopBid: self.getTopBidFromBids())
         }
         
-        self.englishAuctionParticipant.remove(key: removeBid.bidder)
+        self.englishAuctionParticipant.remove(key: bid.bidder)
       }
 
-      destroy removeBid
+      destroy bid
 
       return true
     }
@@ -1314,7 +1324,7 @@ pub contract MelosMarketplace {
     access(contract) let payment: @FungibleToken.Vault
     access(contract) let rewardCollection: Capability<&{NonFungibleToken.Receiver}>
     access(contract) let refund: Capability<&{FungibleToken.Receiver}>
-    access(contract) let manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.OfferManagerPublic}>
+    access(contract) let manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>
 
     pub let offerer: Address
     pub let managerId: UInt64
@@ -1329,7 +1339,7 @@ pub contract MelosMarketplace {
       payment: @FungibleToken.Vault,
       rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
-      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.OfferManagerPublic}>,
+      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>,
       royaltyPercent: UFix64?
     ) {
       assert(manager.check(), message: "Invalid manager Capability")
@@ -1338,7 +1348,7 @@ pub contract MelosMarketplace {
 
       self.manager = manager
       let managerRef = self.manager.borrow()!
-      managerRef.recordOffer(self.uuid)
+      managerRef._recordOffer(self.uuid, nftId, nftType)
 
       self.nftId = nftId
       self.nftType = nftType
@@ -1420,7 +1430,7 @@ pub contract MelosMarketplace {
         payment: <- self.payment
       )
       if let managerRef = self.manager.borrow() {
-        managerRef.removeOfferInner(self.uuid)
+        managerRef._removeOffer(self.uuid)
         managerRef.updateunRefundPaymentBalance(newBalance: unRefundPaymentBalance, paymentType: typ)
       }
       emit OfferRemoved(offerId: self.uuid, completed: self.isCompleted())
@@ -1431,48 +1441,59 @@ pub contract MelosMarketplace {
   // MarketplaceManager
   // -----------------------------------------------------------------------
 
+  pub struct NFTRecord {
+    pub let nftId: UInt64
+    pub let nftType: Type
+    init(_ nftId: UInt64, _ nftType: Type) {
+      self.nftId = nftId
+      self.nftType = nftType
+    }
+  }
+
   pub resource interface MarketplaceManagerPublic {
     pub fun getUnRefundPayments(): {Type: UFix64}
     access(contract) fun updateunRefundPaymentBalance(newBalance: UFix64?, paymentType: Type)
-  }
 
-  pub resource interface OfferManagerPublic {
-    pub fun getOffers(): [UInt64]
+    // OfferManagerPublic
+    pub fun getOffers(): {UInt64: NFTRecord}
     pub fun isOfferExists(_ offerId: UInt64): Bool
-    pub fun findOfferIndex(_ offerId: UInt64): Int?
 
-    access(contract) fun recordOffer(_ offerId: UInt64): Bool
-    access(contract) fun removeOfferInner(_ offerId: UInt64): Bool
-  }
+    access(contract) fun _recordOffer(_ offerId: UInt64, _ nftId: UInt64, _ nftType: Type): Bool
+    access(contract) fun _removeOffer(_ offerId: UInt64): Bool
 
-  pub resource interface ListingManagerPublic {
-    pub fun getlistings(): {UInt64: UInt64}
-  }
+    // ListingManagerPublic
+    pub fun getlistings(): {UInt64: NFTRecord}
+    pub fun isListingExists(_ listingId: UInt64): Bool
 
-  pub resource interface BidManagerPublic {
+    access(contract) fun _recordListing(_ listingId: UInt64, _ nftId: UInt64, _ nftType: Type): Bool
+    access(contract) fun _removeListing(_ listingId: UInt64): Bool
+
+    // BidManagerPublic
     pub fun getListingBids(): {UInt64: [UInt64]}
     pub fun getBidOwnership(listingId: UInt64, bidId: UInt64): Bool
     pub fun isBidExists(listingId: UInt64, bidId: UInt64): Bool 
     pub fun findBidIndex(listingId: UInt64, bidId: UInt64): Int? 
     pub fun getBidIdsWithListingId(_ listingId: UInt64): [UInt64]
 
-    access(contract) fun recordBid(listingId: UInt64, bidId: UInt64): Bool
-    access(contract) fun removeBid(listingId: UInt64, bidId: UInt64): Bool
+    access(contract) fun _recordBid(listingId: UInt64, bidId: UInt64): Bool
+    access(contract) fun _removeBid(listingId: UInt64, bidId: UInt64): Bool
+
   }
 
-  pub resource MarketplaceManager: MarketplaceManagerPublic, ListingManagerPublic, BidManagerPublic, OfferManagerPublic  {
-    // Listing => NFT id
-    access(self) let listings: {UInt64: UInt64}
+  pub resource MarketplaceManager: MarketplaceManagerPublic  {
+    // Listing => NFTRecord
+    access(self) let listings: {UInt64: NFTRecord}
     // ListingId => [BidId]
     access(self) let listingBids: {UInt64: [UInt64]}
-    access(self) let offers: [UInt64]
+    // OfferId => NFTRecord
+    access(self) let offers: {UInt64: NFTRecord}
 
     access(self) var unRefundPayments: {Type: UFix64}
 
     init () {
       self.listings = {}
       self.listingBids = {}
-      self.offers = []
+      self.offers = {}
       self.unRefundPayments = {}
 
       emit MarketplaceManagerCreated(id: self.uuid)
@@ -1480,7 +1501,7 @@ pub contract MelosMarketplace {
 
     destroy() {
       assert(self.listings.keys.length == 0, message: "There are uncompleted listings")
-      assert(self.offers.length == 0, message: "Still offers exists")
+      assert(self.offers.keys.length == 0, message: "Still offers exists")
       for bids in self.listingBids.values {
         assert(bids.length == 0, message: "Bid records exists")
       }
@@ -1505,8 +1526,12 @@ pub contract MelosMarketplace {
     // Listing manager functions
     // -----------------------------------------------------------------------
 
-    pub fun getlistings(): {UInt64: UInt64} {
+    pub fun getlistings(): {UInt64: NFTRecord} {
       return self.listings
+    }
+
+    pub fun isListingExists(_ listingId: UInt64): Bool {
+      return self.listings[listingId] != nil
     }
 
     pub fun getListingOwnership(_ listingId: UInt64): Bool {
@@ -1516,13 +1541,32 @@ pub contract MelosMarketplace {
       return false
     }
 
+    access(contract) fun _recordListing(_ listingId: UInt64, _ nftId: UInt64, _ nftType: Type): Bool {
+      if self.listings[listingId] == nil {
+        self.listings[listingId] = NFTRecord(nftId, nftType)
+        return true
+      }
+
+      return false
+    }
+
+    access(contract) fun _removeListing(_ listingId: UInt64): Bool {
+      if self.listings[listingId] != nil {
+        self.listings.remove(key: listingId)
+        return true
+      }
+
+      return false
+    }
+
     pub fun createListing(
       listingType: ListingType,
       nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>,
       nftId: UInt64,
       paymentToken: Type,
       listingConfig: {MelosMarketplace.ListingConfig},
-      receiver: Capability<&{FungibleToken.Receiver}>
+      receiver: Capability<&{FungibleToken.Receiver}>,
+      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>,
     ): UInt64 {
       let listing <- create Listing(
         listingType: listingType,
@@ -1531,11 +1575,9 @@ pub contract MelosMarketplace {
         paymentToken: paymentToken,
         listingConfig: listingConfig,
         receiver: receiver,
-        managerId: self.uuid
+        manager: manager
       )
       let listingId = listing.uuid
-
-      self.listings[listingId] = nftId
       let _ <- MelosMarketplace.listings[listingId] <- listing
       destroy _
 
@@ -1549,6 +1591,10 @@ pub contract MelosMarketplace {
     
       let listing <- MelosMarketplace.listings.remove(key: listingId)!
       destroy listing
+
+      if self.isListingExists(listingId) {
+        self.listings.remove(key: listingId)
+      }
     }
 
     pub fun acceptOpenBid(listingId: UInt64, bidId: UInt64): Bool {
@@ -1596,7 +1642,7 @@ pub contract MelosMarketplace {
       return self.listingBids[listingId] ?? []
     }
 
-    access(contract) fun recordBid(listingId: UInt64, bidId: UInt64): Bool {
+    access(contract) fun _recordBid(listingId: UInt64, bidId: UInt64): Bool {
       if self.listingBids[listingId] == nil {
         self.listingBids[listingId] = [bidId]
         return true
@@ -1607,7 +1653,7 @@ pub contract MelosMarketplace {
       return false
     }
 
-    access(contract) fun removeBid(listingId: UInt64, bidId: UInt64): Bool {
+    access(contract) fun _removeBid(listingId: UInt64, bidId: UInt64): Bool {
       if self.listingBids[listingId] != nil {
         if let index = self.findBidIndex(listingId: listingId, bidId: bidId) {
           self.listingBids[listingId]!.remove(at: index)
@@ -1621,21 +1667,12 @@ pub contract MelosMarketplace {
     // Offer manager functions
     // -----------------------------------------------------------------------
 
-    pub fun getOffers(): [UInt64] {
+    pub fun getOffers(): {UInt64: NFTRecord} {
       return self.offers
     }
 
     pub fun isOfferExists(_ offerId: UInt64): Bool {
-      return self.offers.contains(offerId)
-    }
-
-    pub fun findOfferIndex(_ offerId: UInt64): Int? {
-      for index, id in self.offers {
-        if id == offerId {
-          return index
-        }
-      }
-      return nil
+      return self.offers[offerId] != nil
     }
 
     pub fun createOffer(
@@ -1646,7 +1683,7 @@ pub contract MelosMarketplace {
       payment: @FungibleToken.Vault,
       rewardCollection: Capability<&{NonFungibleToken.Receiver}>,
       refund: Capability<&{FungibleToken.Receiver}>,
-      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.OfferManagerPublic}>,
+      manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>,
       royaltyPercent: UFix64?
     ): UInt64 {
       let offer <- create Offer(
@@ -1672,20 +1709,24 @@ pub contract MelosMarketplace {
       let offer <- MelosMarketplace.offers.remove(key: offerId)!
       assert(offer.managerId == self.uuid, message: "")
       destroy offer
-      self.removeOfferInner(offerId)
+      
+      if self.isOfferExists(offerId) {
+        self._removeOffer(offerId)
+      }
     }
 
-    access(contract) fun recordOffer(_ offerId: UInt64): Bool {
-      if self.offers.contains(offerId) {
-        return false
-      } 
-      self.offers.append(offerId)
-      return true
+    access(contract) fun _recordOffer(_ offerId: UInt64, _ nftId: UInt64, _ nftType: Type): Bool {
+      if self.offers[offerId] == nil {
+        self.offers[offerId] = NFTRecord(nftId, nftType)
+        return true
+      }
+
+      return false
     }
 
-    access(contract) fun removeOfferInner(_ offerId: UInt64): Bool {
-      if let index = self.findOfferIndex(offerId) {
-        self.offers.remove(at: index)
+    access(contract) fun _removeOffer(_ offerId: UInt64): Bool {
+      if self.offers[offerId] != nil {
+        self.offers.remove(key: offerId)
         return true
       }
 

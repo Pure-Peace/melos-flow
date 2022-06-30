@@ -13,6 +13,14 @@ export type CreateFlowEmulatorParams = {
   logLevel?: ('debug' | 'info' | 'warning')[];
 };
 
+export type FlowTypeObject = {
+  kind: string;
+  typeID: FlowType;
+  fields: any[];
+  initializers: any[];
+  type: string;
+};
+
 export type DeploymentsConfig = Record<
   string,
   | string

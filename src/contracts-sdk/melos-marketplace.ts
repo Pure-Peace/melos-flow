@@ -11,22 +11,17 @@ import MarketplaceScripts from '../../sdk-code/scripts/melos-marketplace';
 import MarketplaceTransactionsTemplates from '../../sdk-code/transactions/melos-marketplace-templates';
 
 import {toFlowAddress, toUFix64} from '../common';
-import {FlowAddress, FlowAuthorize, UFix64} from '../types';
+import {FlowAddress, FlowAuthorize, FlowTypeObject, UFix64} from '../types';
 import {BaseSDK} from './base';
 import {executeScript, sendTransaction} from '../transaction';
 
 export class MelosMarketplaceSDK extends BaseSDK {
-  /**
-   * Sets up MelosMarketplace.MarketplaceManager on auth and exposes public capability.
-   * @param {string} auth - auth address
-   * @throws Will throw an error if transaction is reverted.
-   * */
-  async setupListingManager(
+  async setupManager(
     auth: FlowAuthorize,
     options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
-      code: this.code(MarketplaceTransactionsTemplates.setupListingManager, options?.replaceMap),
+      code: this.code(MarketplaceTransactionsTemplates.setupManager, options?.replaceMap),
       payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
@@ -476,7 +471,7 @@ export class MelosMarketplaceSDK extends BaseSDK {
       limit?: number;
     }
   ) {
-    return executeScript<Record<number, number>>({
+    return executeScript<Record<number, {nftId: number; nftType: FlowTypeObject}>>({
       code: MarketplaceScripts.getAccountListings,
       args: [address],
       addressMap: options?.addressMap ?? this.addressMap,

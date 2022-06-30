@@ -54,6 +54,7 @@ transaction(
 
   execute {
     self.manager.acceptOpenBid(listingId: listingId, bidId: bidId)
+    MelosMarketplace.removeListing(listingId: listingId)
   }
 }
 `,
@@ -114,6 +115,21 @@ import %NFT_NAME% from %NFT_ADDRESS%
 import %FT_NAME% from %FT_ADDRESS%
 
 
+pub fun ensureManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
+  let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
+  let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
+
+  var managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH)
+  if managerRef == nil {
+    let manager <- MelosMarketplace.createMarketplaceManager()
+    managerRef = &manager as &MelosMarketplace.MarketplaceManager
+    account.save(<- manager, to: STORAGE_PATH)
+    account.link<&{MelosMarketplace.MarketplaceManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+  }
+
+  return managerRef ?? panic("Could not get managerRef")
+}
+
 pub fun getOrCreateNFTCollection(account: AuthAccount): Capability<&{NonFungibleToken.Receiver}> {
   let PUBLIC_PATH = %NFT_PUBLIC_PATH%
   let STORAGE_PATH = %NFT_STORAGE_PATH%
@@ -128,20 +144,6 @@ pub fun getOrCreateNFTCollection(account: AuthAccount): Capability<&{NonFungible
   return account.getCapability<&{NonFungibleToken.Receiver}>(PUBLIC_PATH)
 }
 
-
-pub fun getOrCreateManager(account: AuthAccount): Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}> {
-  let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
-  let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
-
-  if account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) == nil {
-    let manager <- MelosMarketplace.createMarketplaceManager()
-    account.save(<- manager, to: STORAGE_PATH)
-    account.link<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
-  }
-
-  return account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>(PUBLIC_PATH)
-}
-
 transaction(
   listingId: UInt64,
   price: UFix64
@@ -150,7 +152,8 @@ transaction(
   let payment: @FungibleToken.Vault
   let refund: Capability<&{FungibleToken.Receiver}>
   let collection: Capability<&{NonFungibleToken.Receiver}>
-  let manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>
+  let manager: &MelosMarketplace.MarketplaceManager
+  let managerCapa: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>
   prepare(account: AuthAccount) {
     let PAYMENT_TOKEN_STORAGE_PATH = %FT_STORAGE_PATH%
     self.listing = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
@@ -164,12 +167,15 @@ transaction(
     
     self.collection = getOrCreateNFTCollection(account: account)
 
-    self.manager = getOrCreateManager(account: account)
+    self.manager = ensureManager(account: account)
+
+    self.managerCapa = account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic}>(MelosMarketplace.MarketplaceManagerPublicPath)
+    self.managerCapa.borrow() ?? panic("Could not get managerCapability")
   }
 
   execute {
     self.listing.createBid(
-      manager: self.manager, 
+      manager: self.managerCapa, 
       rewardCollection: self.collection, 
       refund: self.refund, 
       payment: <- self.payment
@@ -186,20 +192,19 @@ import %NFT_NAME% from %NFT_ADDRESS%
 import %FT_NAME% from %FT_ADDRESS%
 
 
-pub fun getOrCreateManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
-    let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
-    let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
+pub fun ensureManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
+  let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
+  let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
 
-    if let managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) {
-      return managerRef
-    }
-
+  var managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH)
+  if managerRef == nil {
     let manager <- MelosMarketplace.createMarketplaceManager()
-    let managerRef = &manager as &MelosMarketplace.MarketplaceManager
+    managerRef = &manager as &MelosMarketplace.MarketplaceManager
     account.save(<- manager, to: STORAGE_PATH)
-    account.link<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.OfferManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+    account.link<&{MelosMarketplace.MarketplaceManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+  }
 
-    return managerRef
+  return managerRef ?? panic("Could not get managerRef")
 }
 
 pub fun getOrCreateNFTCollection(account: AuthAccount): Capability<&{NonFungibleToken.Receiver}> {
@@ -227,7 +232,7 @@ transaction(
   let collection: Capability<&{NonFungibleToken.Receiver}>
   let refund: Capability<&{FungibleToken.Receiver}>
   let manager: &MelosMarketplace.MarketplaceManager
-  let offerManagerCapability: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.OfferManagerPublic}>
+  let managerCapa: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>
   prepare(account: AuthAccount) {
     let PAYMENT_TOKEN_STORAGE_PATH = %FT_STORAGE_PATH%
 
@@ -240,8 +245,10 @@ transaction(
 
     self.collection = getOrCreateNFTCollection(account: account)
     
-    self.manager = getOrCreateManager(account: account)
-    self.offerManagerCapability = account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.OfferManagerPublic}>(MelosMarketplace.MarketplaceManagerPublicPath)
+    self.manager = ensureManager(account: account)
+
+    self.managerCapa = account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic}>(MelosMarketplace.MarketplaceManagerPublicPath)
+    self.managerCapa.borrow() ?? panic("Could not get managerCapability")
   }
 
   execute {
@@ -253,7 +260,7 @@ transaction(
       payment: <- self.payment,
       rewardCollection: self.collection,
       refund: self.refund,
-      manager: self.offerManagerCapability,
+      manager: self.managerCapa,
       royaltyPercent: royaltyPercent
     )
   }
@@ -268,20 +275,19 @@ import %NFT_NAME% from %NFT_ADDRESS%
 import %FT_NAME% from %FT_ADDRESS%
 
 
-pub fun getOrCreateManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
-    let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
-    let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
+pub fun ensureManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
+  let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
+  let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
 
-    if let managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) {
-        return managerRef
-    }
-
+  var managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH)
+  if managerRef == nil {
     let manager <- MelosMarketplace.createMarketplaceManager()
-    let managerRef = &manager as &MelosMarketplace.MarketplaceManager
+    managerRef = &manager as &MelosMarketplace.MarketplaceManager
     account.save(<- manager, to: STORAGE_PATH)
-    account.link<&{MelosMarketplace.ListingManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+    account.link<&{MelosMarketplace.MarketplaceManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+  }
 
-    return managerRef
+  return managerRef ?? panic("Could not get managerRef")
 }
 
 pub fun getOrCreateNFTProvider(account: AuthAccount): Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}> {
@@ -308,6 +314,7 @@ transaction(
   let nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
   let receiver: Capability<&{FungibleToken.Receiver}>
   let manager: &MelosMarketplace.MarketplaceManager
+  let managerCapa: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>
   prepare(account: AuthAccount) {
     self.listingConfig = MelosMarketplace.Common(
       listingStartTime: listingStartTime ?? getCurrentBlock().timestamp,
@@ -318,7 +325,10 @@ transaction(
 
     self.receiver = account.getCapability<&{FungibleToken.Receiver}>(%FT_RECEIVER%)
     self.nftProvider = getOrCreateNFTProvider(account: account)
-    self.manager = getOrCreateManager(account: account)
+    self.manager = ensureManager(account: account)
+
+    self.managerCapa = account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic}>(MelosMarketplace.MarketplaceManagerPublicPath)
+    self.managerCapa.borrow() ?? panic("Could not get managerCapability")
   }
 
   execute {
@@ -328,7 +338,8 @@ transaction(
       nftId: nftId,
       paymentToken: Type<@%FT_NAME%.Vault>(),
       listingConfig: self.listingConfig,
-      receiver: self.receiver
+      receiver: self.receiver,
+      manager: self.managerCapa
     )
   }
 }
@@ -342,20 +353,19 @@ import %NFT_NAME% from %NFT_ADDRESS%
 import %FT_NAME% from %FT_ADDRESS%
 
 
-pub fun getOrCreateManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
-    let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
-    let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
+pub fun ensureManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
+  let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
+  let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
 
-    if let managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) {
-        return managerRef
-    }
-
+  var managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH)
+  if managerRef == nil {
     let manager <- MelosMarketplace.createMarketplaceManager()
-    let managerRef = &manager as &MelosMarketplace.MarketplaceManager
+    managerRef = &manager as &MelosMarketplace.MarketplaceManager
     account.save(<- manager, to: STORAGE_PATH)
-    account.link<&{MelosMarketplace.ListingManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+    account.link<&{MelosMarketplace.MarketplaceManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+  }
 
-    return managerRef
+  return managerRef ?? panic("Could not get managerRef")
 }
 
 pub fun getOrCreateNFTProvider(account: AuthAccount): Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}> {
@@ -384,6 +394,7 @@ transaction(
   let nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
   let receiver: Capability<&{FungibleToken.Receiver}>
   let manager: &MelosMarketplace.MarketplaceManager
+  let managerCapa: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>
   prepare(account: AuthAccount) {
     self.listingConfig = MelosMarketplace.DutchAuction(
       listingStartTime: listingStartTime ?? getCurrentBlock().timestamp,
@@ -396,7 +407,10 @@ transaction(
 
     self.receiver = account.getCapability<&{FungibleToken.Receiver}>(%FT_RECEIVER%)
     self.nftProvider = getOrCreateNFTProvider(account: account)
-    self.manager = getOrCreateManager(account: account)
+    self.manager = ensureManager(account: account)
+
+    self.managerCapa = account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic}>(MelosMarketplace.MarketplaceManagerPublicPath)
+    self.managerCapa.borrow() ?? panic("Could not get managerCapability")
   }
 
   execute {
@@ -406,7 +420,8 @@ transaction(
       nftId: nftId,
       paymentToken: Type<@%FT_NAME%.Vault>(),
       listingConfig: self.listingConfig,
-      receiver: self.receiver
+      receiver: self.receiver,
+      manager: self.managerCapa
     )
   }
 }
@@ -420,20 +435,19 @@ import %NFT_NAME% from %NFT_ADDRESS%
 import %FT_NAME% from %FT_ADDRESS%
 
 
-pub fun getOrCreateManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
-    let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
-    let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
+pub fun ensureManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
+  let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
+  let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
 
-    if let managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) {
-        return managerRef
-    }
-
+  var managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH)
+  if managerRef == nil {
     let manager <- MelosMarketplace.createMarketplaceManager()
-    let managerRef = &manager as &MelosMarketplace.MarketplaceManager
+    managerRef = &manager as &MelosMarketplace.MarketplaceManager
     account.save(<- manager, to: STORAGE_PATH)
-    account.link<&{MelosMarketplace.ListingManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+    account.link<&{MelosMarketplace.MarketplaceManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+  }
 
-    return managerRef
+  return managerRef ?? panic("Could not get managerRef")
 }
 
 pub fun getOrCreateNFTProvider(account: AuthAccount): Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}> {
@@ -461,6 +475,7 @@ transaction(
   let nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
   let receiver: Capability<&{FungibleToken.Receiver}>
   let manager: &MelosMarketplace.MarketplaceManager
+  let managerCapa: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>
   prepare(account: AuthAccount) {
     self.listingConfig = MelosMarketplace.EnglishAuction(
       listingStartTime: listingStartTime ?? getCurrentBlock().timestamp,
@@ -473,7 +488,10 @@ transaction(
 
     self.receiver = account.getCapability<&{FungibleToken.Receiver}>(%FT_RECEIVER%)
     self.nftProvider = getOrCreateNFTProvider(account: account)
-    self.manager = getOrCreateManager(account: account)
+    self.manager = ensureManager(account: account)
+
+    self.managerCapa = account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic}>(MelosMarketplace.MarketplaceManagerPublicPath)
+    self.managerCapa.borrow() ?? panic("Could not get managerCapability")
   }
 
   execute {
@@ -483,7 +501,8 @@ transaction(
       nftId: nftId,
       paymentToken: Type<@%FT_NAME%.Vault>(),
       listingConfig: self.listingConfig,
-      receiver: self.receiver
+      receiver: self.receiver,
+      manager: self.managerCapa
     )
   }
 }
@@ -497,20 +516,19 @@ import %NFT_NAME% from %NFT_ADDRESS%
 import %FT_NAME% from %FT_ADDRESS%
 
 
-pub fun getOrCreateManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
-    let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
-    let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
+pub fun ensureManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
+  let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
+  let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
 
-    if let managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) {
-        return managerRef
-    }
-
+  var managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH)
+  if managerRef == nil {
     let manager <- MelosMarketplace.createMarketplaceManager()
-    let managerRef = &manager as &MelosMarketplace.MarketplaceManager
+    managerRef = &manager as &MelosMarketplace.MarketplaceManager
     account.save(<- manager, to: STORAGE_PATH)
-    account.link<&{MelosMarketplace.ListingManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+    account.link<&{MelosMarketplace.MarketplaceManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+  }
 
-    return managerRef
+  return managerRef ?? panic("Could not get managerRef")
 }
 
 pub fun getOrCreateNFTProvider(account: AuthAccount): Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}> {
@@ -536,6 +554,7 @@ transaction(
   let nftProvider: Capability<&{NonFungibleToken.Provider, NonFungibleToken.CollectionPublic}>
   let receiver: Capability<&{FungibleToken.Receiver}>
   let manager: &MelosMarketplace.MarketplaceManager
+  let managerCapa: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>
   prepare(account: AuthAccount) {
     self.listingConfig = MelosMarketplace.OpenBid(
       listingStartTime: listingStartTime ?? getCurrentBlock().timestamp,
@@ -546,7 +565,10 @@ transaction(
 
     self.receiver = account.getCapability<&{FungibleToken.Receiver}>(%FT_RECEIVER%)
     self.nftProvider = getOrCreateNFTProvider(account: account)
-    self.manager = getOrCreateManager(account: account)
+    self.manager = ensureManager(account: account)
+    
+    self.managerCapa = account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic}>(MelosMarketplace.MarketplaceManagerPublicPath)
+    self.managerCapa.borrow() ?? panic("Could not get managerCapability")
   }
 
   execute {
@@ -556,7 +578,8 @@ transaction(
       nftId: nftId,
       paymentToken: Type<@%FT_NAME%.Vault>(),
       listingConfig: self.listingConfig,
-      receiver: self.receiver
+      receiver: self.receiver,
+      manager: self.managerCapa
     )
   }
 }
@@ -575,6 +598,7 @@ transaction(
     for listingId in listingIds {
       let listing = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
       listing.completeEnglishAuction()
+      MelosMarketplace.removeListing(listingId: listingId)
     }
   }
 }
@@ -656,23 +680,26 @@ transaction(
 
   execute {
     self.listing.purchase(payment: <- self.payment, rewardCollection: self.collection)
+    MelosMarketplace.removeListing(listingId: self.listing.uuid)
   }
 }
 `,
   removeBid: `
 import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 
-pub fun getOrCreateManager(account: AuthAccount): Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}> {
+pub fun ensureManager(account: AuthAccount): &MelosMarketplace.MarketplaceManager {
   let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
   let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
 
-  if account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) == nil {
+  var managerRef = account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH)
+  if managerRef == nil {
     let manager <- MelosMarketplace.createMarketplaceManager()
+    managerRef = &manager as &MelosMarketplace.MarketplaceManager
     account.save(<- manager, to: STORAGE_PATH)
-    account.link<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+    account.link<&{MelosMarketplace.MarketplaceManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
   }
 
-  return account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>(PUBLIC_PATH)
+  return managerRef ?? panic("Could not get managerRef")
 }
 
 transaction(
@@ -680,14 +707,18 @@ transaction(
   bidId: UInt64
 ) {
   let listing: &{MelosMarketplace.ListingPublic}
-  let manager: Capability<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>
+  let manager: &MelosMarketplace.MarketplaceManager
+  let managerCapa: Capability<&{MelosMarketplace.MarketplaceManagerPublic}>
   prepare(account: AuthAccount) {
     self.listing = MelosMarketplace.getListing(listingId) ?? panic("Listing not exists")
-    self.manager = getOrCreateManager(account: account)
+    self.manager = ensureManager(account: account)
+
+    self.managerCapa = account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic}>(MelosMarketplace.MarketplaceManagerPublicPath)
+    self.managerCapa.borrow() ?? panic("Could not get managerCapability")
   }
 
   execute {
-    self.listing.removeBid(manager: self.manager, removeBidId: bidId)
+    self.listing.removeBid(manager: self.managerCapa, removeBidId: bidId)
   }
 }
 
@@ -730,37 +761,18 @@ transaction(
   }
 }
 `,
-  setupBidManager: `
+  setupManager: `
 import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
 
-transaction {
+
+transaction() {
   prepare(account: AuthAccount) {
     let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
     let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
 
-    if account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) == nil {
       let manager <- MelosMarketplace.createMarketplaceManager()
       account.save(<- manager, to: STORAGE_PATH)
-      account.link<&{MelosMarketplace.MarketplaceManagerPublic, MelosMarketplace.BidManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
-    }
-  }
-}
-
-`,
-  setupListingManager: `
-import MelosMarketplace from "../../contracts/MelosMarketplace.cdc"
-
-
-transaction {
-  prepare(account: AuthAccount) {
-    let PUBLIC_PATH = MelosMarketplace.MarketplaceManagerPublicPath
-    let STORAGE_PATH = MelosMarketplace.MarketplaceManagerStoragePath
-
-    if account.borrow<&MelosMarketplace.MarketplaceManager>(from: STORAGE_PATH) == nil {
-      let manager <- MelosMarketplace.createMarketplaceManager()
-      account.save(<- manager, to: STORAGE_PATH)
-      account.link<&{MelosMarketplace.ListingManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
-    }
+      account.link<&{MelosMarketplace.MarketplaceManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
   }
 }
 

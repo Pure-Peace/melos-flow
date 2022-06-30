@@ -14,5 +14,6 @@ transaction(
 
   execute {
     self.manager.acceptOpenBid(listingId: listingId, bidId: bidId)
+    MelosMarketplace.removeListing(listingId: listingId)
   }
 }

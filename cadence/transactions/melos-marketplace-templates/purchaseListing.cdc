@@ -40,5 +40,6 @@ transaction(
 
   execute {
     self.listing.purchase(payment: <- self.payment, rewardCollection: self.collection)
+    MelosMarketplace.removeListing(listingId: self.listing.uuid)
   }
 }
