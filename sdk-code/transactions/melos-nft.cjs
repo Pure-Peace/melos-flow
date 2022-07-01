@@ -141,7 +141,7 @@ import MelosNFT from "../../contracts/MelosNFT.cdc"
 
 // transfer MelosNFT token with tokenId to given address
 //
-transaction(nftId: UInt64, recipient: Address) {
+transaction(recipient: Address, nftId: UInt64) {
     let token: @NonFungibleToken.NFT
     let receiver: Capability<&{NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver}>
 

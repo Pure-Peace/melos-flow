@@ -34,13 +34,13 @@ export class MelosNFTSDK extends BaseSDK {
 
   async transfer(
     auth: FlowAuthorize,
-    nftId: number,
     recipient: string,
+    nftId: number,
     options?: {addressMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({
       code: MelosNftTransactions.transfer,
-      args: [nftId, recipient],
+      args: [recipient, nftId],
       payer: auth,
       addressMap: options?.addressMap ?? this.addressMap,
       limit: options?.limit ?? this.limit,
