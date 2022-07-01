@@ -18,6 +18,11 @@ pub fun ensureManager(account: AuthAccount): &MelosMarketplace.MarketplaceManage
     account.link<&{MelosMarketplace.MarketplaceManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
   }
 
+  let capa = account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic}>(MelosMarketplace.MarketplaceManagerPublicPath)
+  if !capa.check() {
+    account.link<&{MelosMarketplace.MarketplaceManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+  }
+
   return managerRef ?? panic("Could not get managerRef")
 }
 

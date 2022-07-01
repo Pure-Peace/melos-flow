@@ -24,10 +24,6 @@ export class MelosNFTSDK extends BaseSDK {
     });
   }
 
-  /**
-   * Returns Melos supply.
-   * @throws Will throw an error if execution will be halted
-   * */
   async totalSupply(options?: {addressMap?: Record<string, string>; limit?: number}) {
     return executeScript<number>({
       code: MelosNftScripts.totalSupply,
@@ -36,16 +32,10 @@ export class MelosNFTSDK extends BaseSDK {
     });
   }
 
-  /**
-   * Transfers Melos NFT with id equal **nftId** from **sender** account to **recipient**.
-   * @param {AuthAccount} sender - sender
-   * @param {string} recipient - recipient address
-   * @param {UInt64} nftId - id of the item to transfer
-   * */
   async transfer(
     auth: FlowAuthorize,
-    recipient: string,
     nftId: number,
+    recipient: string,
     options?: {addressMap?: Record<string, string>; limit?: number}
   ) {
     return sendTransaction({

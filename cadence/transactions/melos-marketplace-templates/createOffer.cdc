@@ -18,6 +18,11 @@ pub fun ensureManager(account: AuthAccount): &MelosMarketplace.MarketplaceManage
     account.link<&{MelosMarketplace.MarketplaceManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
   }
 
+  let capa = account.getCapability<&{MelosMarketplace.MarketplaceManagerPublic}>(MelosMarketplace.MarketplaceManagerPublicPath)
+  if !capa.check() {
+    account.link<&{MelosMarketplace.MarketplaceManagerPublic}>(PUBLIC_PATH, target: STORAGE_PATH)
+  }
+
   return managerRef ?? panic("Could not get managerRef")
 }
 
@@ -28,6 +33,12 @@ pub fun getOrCreateNFTCollection(account: AuthAccount): Capability<&{NonFungible
   if account.borrow<&%NFT_NAME%.Collection>(from: STORAGE_PATH) == nil {
     let collection <- %NFT_NAME%.createEmptyCollection() as! @%NFT_NAME%.Collection
     account.save(<- collection, to: STORAGE_PATH)
+    account.link<&{NonFungibleToken.CollectionPublic, NonFungibleToken.Receiver}>(
+      PUBLIC_PATH, target: STORAGE_PATH)
+  }
+
+  let capa = account.getCapability<&{NonFungibleToken.Receiver}>(PUBLIC_PATH)
+  if !capa.check() {
     account.link<&{NonFungibleToken.CollectionPublic, NonFungibleToken.Receiver}>(
       PUBLIC_PATH, target: STORAGE_PATH)
   }

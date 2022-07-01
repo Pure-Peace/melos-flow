@@ -91,7 +91,7 @@ export class MelosMarketplaceSDK extends BaseSDK {
     });
   }
 
-  async createCommonListing(
+  async listingCommon(
     auth: FlowAuthorize,
     nftId: number,
     price: number,
@@ -109,7 +109,7 @@ export class MelosMarketplaceSDK extends BaseSDK {
     });
   }
 
-  async createOpenBid(
+  async listingOpenBid(
     auth: FlowAuthorize,
     nftId: number,
     minimumPrice: number,
@@ -133,7 +133,7 @@ export class MelosMarketplaceSDK extends BaseSDK {
     });
   }
 
-  async createDutchAuction(
+  async listingDutchAuction(
     auth: FlowAuthorize,
     nftId: number,
     startingPrice: number,
@@ -161,7 +161,7 @@ export class MelosMarketplaceSDK extends BaseSDK {
     });
   }
 
-  async createEnglishAuction(
+  async listingEnglishAuction(
     auth: FlowAuthorize,
     nftId: number,
     reservePrice: number,
