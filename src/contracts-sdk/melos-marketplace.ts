@@ -91,6 +91,104 @@ export class MelosMarketplaceSDK extends BaseSDK {
     });
   }
 
+  async createCommonListing(
+    auth: FlowAuthorize,
+    nftId: number,
+    price: number,
+    listingStartTime?: number,
+    listingDuration?: number,
+    royaltyPercent?: number,
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    return sendTransaction({
+      code: this.code(MarketplaceTransactionsTemplates.listingCommon),
+      args: [nftId, toUFix64(listingStartTime), toUFix64(listingDuration), toUFix64(royaltyPercent), toUFix64(price)],
+      payer: auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
+  async createOpenBid(
+    auth: FlowAuthorize,
+    nftId: number,
+    minimumPrice: number,
+    listingStartTime?: number,
+    listingDuration?: number,
+    royaltyPercent?: number,
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    return sendTransaction({
+      code: this.code(MarketplaceTransactionsTemplates.listingOpenBid),
+      args: [
+        nftId,
+        toUFix64(listingStartTime),
+        toUFix64(listingDuration),
+        toUFix64(royaltyPercent),
+        toUFix64(minimumPrice),
+      ],
+      payer: auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
+  async createDutchAuction(
+    auth: FlowAuthorize,
+    nftId: number,
+    startingPrice: number,
+    reservePrice: number,
+    priceCutInterval: number,
+    listingDuration: number,
+    listingStartTime?: number,
+    royaltyPercent?: number,
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    return sendTransaction({
+      code: this.code(MarketplaceTransactionsTemplates.listingDutchAuction),
+      args: [
+        nftId,
+        toUFix64(listingStartTime),
+        toUFix64(listingDuration),
+        toUFix64(royaltyPercent),
+        toUFix64(startingPrice),
+        toUFix64(reservePrice),
+        toUFix64(priceCutInterval),
+      ],
+      payer: auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
+  async createEnglishAuction(
+    auth: FlowAuthorize,
+    nftId: number,
+    reservePrice: number,
+    minimumBidPercentage: number,
+    basePrice: number,
+    listingDuration: number,
+    listingStartTime?: number,
+    royaltyPercent?: number,
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    return sendTransaction({
+      code: this.code(MarketplaceTransactionsTemplates.listingEnglishAuction),
+      args: [
+        nftId,
+        toUFix64(listingStartTime),
+        toUFix64(listingDuration),
+        toUFix64(royaltyPercent),
+        toUFix64(reservePrice),
+        toUFix64(minimumBidPercentage),
+        toUFix64(basePrice),
+      ],
+      payer: auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
   async removeListing(
     auth: FlowAuthorize,
     listingId: number,

@@ -199,8 +199,10 @@ export async function sleep(duration: number) {
   return new Promise((r) => setTimeout(r, duration));
 }
 
-export const toUFix64 = (value?: number) =>
-  [null, undefined, NaN].includes(value) ? null : value!.toFixed(UFIX64_PRECISION);
+export const toUFix64 = (value?: number | string) => {
+  if (typeof value === 'string') return value;
+  return [null, undefined, NaN].includes(value) ? null : value!.toFixed(UFIX64_PRECISION);
+};
 
 export async function assertTx(txResultResponser: () => Promise<RawTxResult>) {
   return (await txResultResponser()).unwrap();
