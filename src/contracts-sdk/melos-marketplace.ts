@@ -28,6 +28,18 @@ export class MelosMarketplaceSDK extends BaseSDK {
     });
   }
 
+  async removeManager(
+    auth: FlowAuthorize,
+    options?: {addressMap?: Record<string, string>; replaceMap?: Record<string, string>; limit?: number}
+  ) {
+    return sendTransaction({
+      code: this.code(MarketplaceTransactionsTemplates.removeManager, options?.replaceMap),
+      payer: auth,
+      addressMap: options?.addressMap ?? this.addressMap,
+      limit: options?.limit ?? this.limit,
+    });
+  }
+
   getListingCodeByType(listingType: ListingType, replaceMap?: Record<string, string>) {
     let code = '';
     switch (listingType) {
